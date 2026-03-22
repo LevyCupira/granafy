@@ -438,6 +438,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 <input type="file" id="importFileInput"  accept=".json"           onchange="importData(event)"  style="display:none"/>
 <input type="file" id="importXlsxInput" accept=".xlsx,.xls,.ods" onchange="importXlsx(event)"  style="display:none"/>
+<input type="file" id="importXlsxExtratoInput" accept=".xlsx,.xls,.ods" onchange="importXlsxExtrato(event)" style="display:none"/>
 <div style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:5px;font-size:.62rem;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:10;letter-spacing:.3px">
   Desenvolvido por <strong style="color:var(--accent)">Levy Lima</strong> — Teste Beta Granafy
 </div>
@@ -1411,6 +1412,23 @@ function renderExtrato(){
       <div class="summary-card"><div class="s-label">Total débitos</div><div class="s-val red">${fmt(tDb)}</div></div>
       <div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">${lncs.length}</div></div>
     </div>
+    <div class="form-card"><h3>📄 Importar extrato via planilha</h3>
+      <p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Baixe o modelo Excel, preencha com os dados do extrato do banco e importe. Valores <strong>positivos</strong> serão lançados como crédito e <strong>negativos</strong> como débito. A categoria pode ser editada após a importação.</p>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="max-width:280px">
+          <label>Conta de destino</label>
+          <select id="ex-import-conta" style="background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.84rem;padding:7px 10px;border-radius:7px;outline:none">
+            ${c.contas.length===0
+              ? '<option value="">— sem conta vinculada —</option>'
+              : c.contas.map(ct=>`<option value="${ct.id}">${esc(ct.banco)}${ct.agencia?' | Ag: '+esc(ct.agencia):''}${ct.numero?' | CC: '+esc(ct.numero):''}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-sm" onclick="exportExtratoTemplate()">⬇ Baixar modelo (.xlsx)</button>
+        <button class="btn-sm" onclick="document.getElementById('importXlsxExtratoInput').click()">⬆ Importar planilha (.xlsx)</button>
+      </div>
+    </div>
     <div class="form-card"><h3>+ Novo lançamento</h3>
       <div class="tipo-toggle" id="exTipoToggle">
         <button class="tipo-btn credito active" id="ex-tc" onclick="setTipoExtrato('credito')">↑ Crédito</button>
@@ -1458,6 +1476,81 @@ function renderExtrato(){
     setMoneyInput(inp,fatura);
   });
   initDrag('extrato',COLS_EXTRATO,renderExtrato);
+}
+function exportExtratoTemplate(){
+  const rows=[
+    ['data','descricao','valor','categoria'],
+    ['20/03/2026','Salário recebido',3500.00,'Salário'],
+    ['21/03/2026','Aluguel',-1200.00,'Aluguel'],
+    ['22/03/2026','Supermercado',-450.00,'Alimentação'],
+    ['22/03/2026','Freelance projeto X',800.00,'Freelance'],
+    ['23/03/2026','Conta de luz',-180.50,'Energia'],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:12},{wch:36},{wch:12},{wch:22}];
+  // Adiciona uma linha de instrução na cor cinza
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Extrato');
+  // Aba de instruções
+  const wsInfo=XLSX.utils.aoa_to_sheet([
+    ['INSTRUÇÕES DE PREENCHIMENTO'],
+    [''],
+    ['data','Use o formato DD/MM/AAAA'],
+    ['descricao','Descrição do lançamento (obrigatório)'],
+    ['valor','Positivo = Crédito (entrada) | Negativo = Débito (saída)'],
+    ['categoria','Opcional — pode ser editada após a importação no Granafy'],
+  ]);
+  wsInfo['!cols']=[{wch:14},{wch:52}];
+  XLSX.utils.book_append_sheet(wb,wsInfo,'Instruções');
+  XLSX.writeFile(wb,'modelo_extrato_granafy.xlsx');
+}
+function importXlsxExtrato(event){
+  const file=event.target.files[0];if(!file)return;
+  if(!activeClient)return alert('Selecione um cliente primeiro.');
+  // Lê a conta selecionada no card de importação
+  const contaId=document.getElementById('ex-import-conta')?.value||'';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const header=(rows[0]||[]).map(h=>String(h).toLowerCase().trim());
+    const iDate=header.findIndex(h=>h.includes('data')||h.includes('date'));
+    const iDesc=header.findIndex(h=>h.includes('desc'));
+    const iVal =header.findIndex(h=>h.includes('valor')||h.includes('value')||h.includes('amount'));
+    const iCat =header.findIndex(h=>h.includes('cat'));
+    if(iDate<0||iDesc<0||iVal<0)return alert('Planilha inválida. Colunas obrigatórias: data, descricao, valor.');
+    let count=0;
+    rows.slice(1).forEach(row=>{
+      const rawDate=String(row[iDate]||'').trim();
+      const desc=String(row[iDesc]||'').trim();
+      const rawVal=row[iVal];
+      let valorNum=0;
+      if(typeof rawVal==='number')valorNum=rawVal;
+      else valorNum=parseFloat(String(rawVal).replace(/[^0-9,.\-]/g,'').replace(',','.'))||0;
+      if(!desc||valorNum===0)return;
+      // Positivo = crédito, negativo = débito
+      const tipo=valorNum>=0?'credito':'debito';
+      const valor=Math.abs(valorNum);
+      // Categoria opcional — vazio fica como 'Outros' para edição posterior
+      const cat=iCat>=0&&String(row[iCat]||'').trim()?String(row[iCat]).trim():'Outros';
+      let dataFmt='';
+      if(typeof rawDate==='string'){
+        const dm=rawDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if(dm)dataFmt=`${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
+        else{const dm2=rawDate.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);if(dm2)dataFmt=rawDate.slice(0,10);}
+      }else if(typeof rawDate==='number'){
+        const d=new Date(Math.round((rawDate-25569)*86400*1000));dataFmt=d.toISOString().slice(0,10);
+      }
+      data.clients[activeClient].extrato.push({id:uid(),data:dataFmt,desc,cat,tipo,valor,contaId});
+      count++;
+    });
+    saveData();renderExtrato();
+    alert(count+' lançamento(s) importado(s) com sucesso!
+
+Dica: clique em ✏️ em qualquer linha para editar a categoria.');
+  };
+  reader.readAsArrayBuffer(file);event.target.value='';
 }
 function addContaCC(){
   const banco=document.getElementById('co-banco').value.trim();if(!banco)return alert('Informe o banco/instituição.');
