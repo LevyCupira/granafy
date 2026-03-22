@@ -320,22 +320,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .inativo-card .ic-actions{display:flex;gap:6px;flex-shrink:0}
 .btn-reativar{background:rgba(62,207,176,.15);border:1px solid rgba(62,207,176,.35);color:var(--success);font-family:'DM Sans',sans-serif;font-size:.74rem;font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer;transition:background var(--tr)}
 .btn-reativar:hover{background:rgba(62,207,176,.28)}
-/* ── SELEÇÃO MÚLTIPLA ── */
-.sel-check{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
-.sel-bar{display:none;align-items:center;gap:10px;padding:8px 12px;background:rgba(91,140,255,.1);border:1px solid rgba(91,140,255,.3);border-radius:8px;margin-bottom:10px;flex-wrap:wrap}
-.sel-bar.visible{display:flex}
-.sel-bar-count{font-size:.8rem;font-weight:600;color:var(--accent)}
-.btn-del-sel{background:rgba(255,107,107,.18);border:1px solid rgba(255,107,107,.4);color:var(--danger);font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:600;padding:5px 13px;border-radius:7px;cursor:pointer;transition:background var(--tr)}
-.btn-del-sel:hover{background:rgba(255,107,107,.32)}
-.btn-sel-all{background:rgba(91,140,255,.15);border:1px solid rgba(91,140,255,.35);color:var(--accent);font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:600;padding:5px 13px;border-radius:7px;cursor:pointer;transition:background var(--tr)}
-.btn-sel-all:hover{background:rgba(91,140,255,.28)}
-/* ── FILTRO DATA ── */
-.date-filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-.date-filter-label{font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap}
-.date-input-filter{background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.8rem;padding:5px 9px;border-radius:7px;outline:none;cursor:pointer;transition:border-color var(--tr)}
-.date-input-filter:focus{border-color:var(--accent)}
-.btn-limpar-filtro{background:none;border:1px solid var(--border);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.74rem;padding:4px 10px;border-radius:7px;cursor:pointer;transition:border-color var(--tr),color var(--tr)}
-.btn-limpar-filtro:hover{border-color:var(--danger);color:var(--danger)}
 </style>
 </head>
 <body>
@@ -454,7 +438,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 <input type="file" id="importFileInput"  accept=".json"           onchange="importData(event)"  style="display:none"/>
 <input type="file" id="importXlsxInput" accept=".xlsx,.xls,.ods" onchange="importXlsx(event)"  style="display:none"/>
-<input type="file" id="importXlsxExtratoInput" accept=".xlsx,.xls,.ods" onchange="importXlsxExtrato(event)" style="display:none"/>
 <div style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:5px;font-size:.62rem;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:10;letter-spacing:.3px">
   Desenvolvido por <strong style="color:var(--accent)">Levy Lima</strong> — Teste Beta Granafy
 </div>
@@ -802,9 +785,6 @@ const COLS_CARTAO=[
 ];
 function getCartaoById(id){return(data.clients[activeClient]?.cartoes||[]).find(c=>c.id===id);}
 let _ccTipo='lancamento',_ccFiltro=new Set(),_ccPeriodo='';
-let _ccDataDe='',_ccDataAte='';  // filtro de data cartão
-let _exDataDe='',_exDataAte='';  // filtro de data extrato
-let _ccSel=new Set(),_exSel=new Set(); // seleção múltipla
 
 function toggleFiltroCartao(id){
   if(id==='__todos')_ccFiltro.clear();
@@ -848,16 +828,10 @@ function renderCartao(){
       </div>
     </div>
     <div class="form-card"><h3>📄 Importar fatura via planilha</h3>
-      <p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Selecione o cartão, baixe o modelo Excel, preencha e importe. Valores <strong>positivos = lançamento</strong>, <strong>negativos = estorno</strong>.</p>
-      <div class="form-row" style="margin-bottom:12px;align-items:flex-end">
-        <div class="form-group" style="max-width:280px">
-          <label>Cartão de destino</label>
-          <select id="cc-import-cartao">${c.cartoes.length===0?'<option value="">— sem cartão cadastrado —</option>':cartaoOpts}</select>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:1px">
-          <button class="btn-sm" onclick="exportCsvTemplate()">⬇ Baixar modelo (.xlsx)</button>
-          <button class="btn-sm" onclick="document.getElementById('importXlsxInput').click()">⬆ Importar planilha (.xlsx)</button>
-        </div>
+      <p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Baixe o modelo Excel, preencha e importe.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-sm" onclick="exportCsvTemplate()">⬇ Baixar modelo (.xlsx)</button>
+        <button class="btn-sm" onclick="document.getElementById('importXlsxInput').click()">⬆ Importar planilha (.xlsx)</button>
       </div>
     </div>
     <div class="form-card"><h3>+ Novo lançamento / estorno</h3>
@@ -904,11 +878,9 @@ function _renderCartaoFiltroETabela(){
   // Períodos disponíveis
   const periodos=[...new Set(c.cartao.map(it=>(it.data||'').slice(0,7)).filter(Boolean))].sort().reverse();
 
-  // Aplica filtros: período + cartão + datas
+  // Aplica filtros: período + cartão
   let itens=_ccFiltro.size===0?c.cartao:c.cartao.filter(it=>_ccFiltro.has(it.cartaoId));
   if(_ccPeriodo)itens=itens.filter(it=>(it.data||'').startsWith(_ccPeriodo));
-  if(_ccDataDe)itens=itens.filter(it=>(it.data||'')>=_ccDataDe);
-  if(_ccDataAte)itens=itens.filter(it=>(it.data||'')<=_ccDataAte);
 
   // Summary dinâmico
   const lancs=itens.filter(i=>i.tipo!=='estorno');
@@ -944,31 +916,14 @@ function _renderCartaoFiltroETabela(){
   if(_ccFiltro.size>0)filterHtml+=`<span style="font-size:.72rem;color:var(--muted);margin-left:4px">${_ccFiltro.size} selecionado(s)</span>`;
   filterHtml+='</div>';
 
-  // Filtro por data
-  const dataFiltroHtml=`<div class="date-filter-row">
-    <span class="date-filter-label">📅 De:</span>
-    <input type="date" class="date-input-filter" id="cc-de" value="${_ccDataDe}" onchange="_ccDataDe=this.value;_renderCartaoFiltroETabela()"/>
-    <span class="date-filter-label">Até:</span>
-    <input type="date" class="date-input-filter" id="cc-ate" value="${_ccDataAte}" onchange="_ccDataAte=this.value;_renderCartaoFiltroETabela()"/>
-    ${(_ccDataDe||_ccDataAte)?'<button class="btn-limpar-filtro" onclick="_ccDataDe=\'\';_ccDataAte=\'\';_renderCartaoFiltroETabela()">✕ Limpar datas</button>':''}
-  </div>`;
-
-  const selBarHtml=`<div class="sel-bar${_ccSel.size>0?' visible':''}" id="cc-sel-bar">
-    <span class="sel-bar-count">${_ccSel.size} selecionado(s)</span>
-    <button class="btn-sel-all" onclick="ccSelecionarTodos(${itens.length})">Selecionar todos (${itens.length})</button>
-    <button class="btn-del-sel" onclick="ccApagarSelecionados()">🗑 Apagar selecionados</button>
-    <button class="btn-limpar-filtro" onclick="_ccSel.clear();_renderCartaoFiltroETabela()">✕ Cancelar</button>
-  </div>`;
-
   const area=document.getElementById('cc-filter-table-area');if(!area)return;
-  area.innerHTML=periodoHtml+filterHtml+dataFiltroHtml+selBarHtml+'<p class="section-title">Histórico de lançamentos</p>'
+  area.innerHTML=periodoHtml+filterHtml+'<p class="section-title">Histórico de lançamentos</p>'
     +buildTable('cartao',cols,itens,(item)=>{
       const realIdx=c.cartao.indexOf(item);
-      const checked=_ccSel.has(realIdx);
-      return cols.map(col=>{
-        if(col.key==='_del') return `<td style="white-space:nowrap"><input type="checkbox" class="sel-check" ${checked?'checked':''} onchange="ccToggleSel(${realIdx},this.checked)"/><button class="btn-edit" onclick="openModal('edit_cartao',${realIdx})" title="Editar" style="margin-left:4px">✏️</button><button class="btn-delete" onclick="deleteCartaoItem(${realIdx})" title="Excluir">🗑</button></td>`;
-        return `<td>${col.render(item,realIdx)}</td>`;
-      }).join('');
+      return cols.map(col=>col.key==='_del'
+        ?`<td><button class="btn-edit" onclick="openModal('edit_cartao',${realIdx})" title="Editar">✏️</button><button class="btn-delete" onclick="deleteCartaoItem(${realIdx})" title="Excluir">🗑</button></td>`
+        :`<td>${col.render(item,realIdx)}</td>`
+      ).join('');
     },r=>r.tipo==='estorno'?'row-estorno':'');
   initDrag('cartao',COLS_CARTAO,()=>_renderCartaoFiltroETabela());
 }
@@ -1032,7 +987,6 @@ function exportCsvTemplate(){
 function importXlsx(event){
   const file=event.target.files[0];if(!file)return;
   if(!activeClient)return alert('Selecione um cliente primeiro.');
-  const importCartaoId=document.getElementById('cc-import-cartao')?.value||'';
   const reader=new FileReader();
   reader.onload=e=>{
     const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
@@ -1060,7 +1014,7 @@ function importXlsx(event){
       let dataFmt='';
       if(typeof rawDate==='string'){const dm=rawDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);if(dm)dataFmt=`${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;}
       else if(typeof rawDate==='number'){const d=new Date(Math.round((rawDate-25569)*86400*1000));dataFmt=d.toISOString().slice(0,10);}
-      data.clients[activeClient].cartao.push({id:uid(),cartaoId:importCartaoId,desc,cat,valor,data:dataFmt,tipo});count++;
+      data.clients[activeClient].cartao.push({id:uid(),cartaoId:'',desc,cat,valor,data:dataFmt,tipo});count++;
     });
     saveData();renderCartao();alert(`${count} lançamento(s) importado(s)!`);
   };
@@ -1457,19 +1411,6 @@ function renderExtrato(){
       <div class="summary-card"><div class="s-label">Total débitos</div><div class="s-val red">${fmt(tDb)}</div></div>
       <div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">${lncs.length}</div></div>
     </div>
-    <div class="form-card"><h3>📄 Importar extrato via planilha</h3>
-      <p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Valores <strong>positivos = Crédito</strong> e <strong>negativos = Débito</strong>. Categoria pode ser editada após a importação clicando em ✏️.</p>
-      <div class="form-row" style="margin-bottom:12px;align-items:flex-end">
-        <div class="form-group" style="max-width:300px">
-          <label>Conta de destino</label>
-          <select id="ex-import-conta">${contaOpts}</select>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:1px">
-          <button class="btn-sm" onclick="exportExtratoTemplate()">⬇ Baixar modelo (.xlsx)</button>
-          <button class="btn-sm" onclick="document.getElementById('importXlsxExtratoInput').click()">⬆ Importar planilha (.xlsx)</button>
-        </div>
-      </div>
-    </div>
     <div class="form-card"><h3>+ Novo lançamento</h3>
       <div class="tipo-toggle" id="exTipoToggle">
         <button class="tipo-btn credito active" id="ex-tc" onclick="setTipoExtrato('credito')">↑ Crédito</button>
@@ -1499,34 +1440,12 @@ function renderExtrato(){
       </div>
       <button class="btn-add" onclick="addExtrato()">Adicionar lançamento</button>
     </div>
-    <div class="date-filter-row">
-      <span class="date-filter-label">📅 De:</span>
-      <input type="date" class="date-input-filter" id="ex-de" value="${_exDataDe}" onchange="_exDataDe=this.value;renderExtrato()"/>
-      <span class="date-filter-label">Até:</span>
-      <input type="date" class="date-input-filter" id="ex-ate" value="${_exDataAte}" onchange="_exDataAte=this.value;renderExtrato()"/>
-      ${(_exDataDe||_exDataAte)?'<button class="btn-limpar-filtro" onclick="_exDataDe=\'\';_exDataAte=\'\';renderExtrato()">✕ Limpar datas</button>':''}
-    </div>
-    <div class="sel-bar${_exSel.size>0?' visible':''}" id="ex-sel-bar">
-      <span class="sel-bar-count">${_exSel.size} selecionado(s)</span>
-      <button class="btn-sel-all" onclick="exSelecionarTodos()">Selecionar todos</button>
-      <button class="btn-del-sel" onclick="exApagarSelecionados()">🗑 Apagar selecionados</button>
-      <button class="btn-limpar-filtro" onclick="_exSel.clear();renderExtrato()">✕ Cancelar</button>
-    </div>
-    <p class="section-title">Extrato da conta corrente</p>\`;
-  let lncsFiltradas=lncs;
-  if(_exDataDe)lncsFiltradas=lncsFiltradas.filter(l=>(l.data||'')>=_exDataDe);
-  if(_exDataAte)lncsFiltradas=lncsFiltradas.filter(l=>(l.data||'')<=_exDataAte);
-  if(lncsFiltradas.length===0){html+=\`<div class="empty-state" style="padding:26px"><div class="icon">🏦</div>Nenhum lançamento${(_exDataDe||_exDataAte)?' no período selecionado.':'.'}</div>\`;}
+    <p class="section-title">Extrato da conta corrente</p>`;
+  if(lncs.length===0){html+=`<div class="empty-state" style="padding:26px"><div class="icon">🏦</div>Nenhum lançamento.</div>`;}
   else{
-    const sorted=lncsFiltradas.map((l,i)=>({...l,_i:lncs.indexOf(l)})).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+    const sorted=lncs.map((l,i)=>({...l,_i:i})).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
     let acc=0;const sm={};[...sorted].reverse().forEach(l=>{acc+=l.tipo==='credito'?Number(l.valor):-Number(l.valor);sm[l._i]=acc;});
-    html+=buildTable('extrato',cols,sorted.map(l=>({...l,_saldo:sm[l._i]})),(item)=>{
-      const checked=_exSel.has(item._i);
-      return cols.map(col=>{
-        if(col.key==='_del') return \`<td style="white-space:nowrap"><input type="checkbox" class="sel-check" \${checked?'checked':''} onchange="exToggleSel(\${item._i},this.checked)"/><button class="btn-edit" onclick="openModal('edit_extrato',\${item._i})" title="Editar" style="margin-left:4px">✏️</button><button class="btn-delete" onclick="deleteExtrato(\${item._i})" title="Excluir">🗑</button></td>\`;
-        return \`<td>\${col.render(item)}</td>\`;
-      }).join('');
-    },item=>\`row-\${item.tipo}\`);
+    html+=buildTable('extrato',cols,sorted.map(l=>({...l,_saldo:sm[l._i]})),(item)=>cols.map(col=>`<td>${col.render(item)}</td>`).join(''),item=>`row-${item.tipo}`);
   }
   document.getElementById('extrato-content').innerHTML=html;
   const di=document.getElementById('ex-data');if(di)di.value=new Date().toISOString().slice(0,10);
@@ -1539,95 +1458,6 @@ function renderExtrato(){
     setMoneyInput(inp,fatura);
   });
   initDrag('extrato',COLS_EXTRATO,renderExtrato);
-}
-// ── SELEÇÃO MÚLTIPLA CARTÃO ──────────────────────────────────
-function ccToggleSel(idx,checked){checked?_ccSel.add(idx):_ccSel.delete(idx);_renderCartaoFiltroETabela();}
-function ccSelecionarTodos(n){
-  const c=data.clients[activeClient];
-  const itens=c.cartao.map((_,i)=>i).filter(i=>{
-    const it=c.cartao[i];
-    const okCartao=_ccFiltro.size===0||_ccFiltro.has(it.cartaoId);
-    const okPer=!_ccPeriodo||(it.data||'').startsWith(_ccPeriodo);
-    const okDe=!_ccDataDe||(it.data||'')>=_ccDataDe;
-    const okAte=!_ccDataAte||(it.data||'')<=_ccDataAte;
-    return okCartao&&okPer&&okDe&&okAte;
-  });
-  itens.forEach(i=>_ccSel.add(i));
-  _renderCartaoFiltroETabela();
-}
-function ccApagarSelecionados(){
-  if(_ccSel.size===0)return;
-  if(!confirm('Apagar '+_ccSel.size+' lançamento(s) selecionado(s)?'))return;
-  const indices=[..._ccSel].sort((a,b)=>b-a);
-  indices.forEach(i=>data.clients[activeClient].cartao.splice(i,1));
-  _ccSel.clear();saveData();renderCartao();
-}
-// ── SELEÇÃO MÚLTIPLA EXTRATO ─────────────────────────────────
-function exToggleSel(idx,checked){checked?_exSel.add(idx):_exSel.delete(idx);renderExtrato();}
-function exSelecionarTodos(){
-  const c=data.clients[activeClient];
-  c.extrato.forEach((_,i)=>{
-    const l=c.extrato[i];
-    const okDe=!_exDataDe||(l.data||'')>=_exDataDe;
-    const okAte=!_exDataAte||(l.data||'')<=_exDataAte;
-    if(okDe&&okAte)_exSel.add(i);
-  });
-  renderExtrato();
-}
-function exApagarSelecionados(){
-  if(_exSel.size===0)return;
-  if(!confirm('Apagar '+_exSel.size+' lançamento(s) selecionado(s)?'))return;
-  const indices=[..._exSel].sort((a,b)=>b-a);
-  indices.forEach(i=>data.clients[activeClient].extrato.splice(i,1));
-  _exSel.clear();saveData();renderExtrato();
-}
-// ── IMPORTAR EXTRATO XLSX ─────────────────────────────────────
-function importXlsxExtrato(event){
-  const file=event.target.files[0];if(!file)return;
-  if(!activeClient)return alert('Selecione um cliente primeiro.');
-  const contaId=document.getElementById('ex-import-conta')?.value||'';
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-    const header=(rows[0]||[]).map(h=>String(h).toLowerCase().trim());
-    const iDate=header.findIndex(h=>h.includes('data')||h.includes('date'));
-    const iDesc=header.findIndex(h=>h.includes('desc'));
-    const iVal=header.findIndex(h=>h.includes('valor')||h.includes('value')||h.includes('amount'));
-    const iCat=header.findIndex(h=>h.includes('cat'));
-    if(iDate<0||iDesc<0||iVal<0)return alert('Planilha inválida. Colunas obrigatórias: data, descricao, valor.');
-    let count=0;
-    rows.slice(1).forEach(row=>{
-      const rawDate=String(row[iDate]||'').trim();
-      const desc=String(row[iDesc]||'').trim();
-      const rawVal=row[iVal];
-      let valorNum=typeof rawVal==='number'?rawVal:parseFloat(String(rawVal).replace(/[^0-9,.\-]/g,'').replace(',','.'))||0;
-      if(!desc||valorNum===0)return;
-      const tipo=valorNum>=0?'credito':'debito';
-      const valor=Math.abs(valorNum);
-      const cat=iCat>=0&&String(row[iCat]||'').trim()?String(row[iCat]).trim():'Outros';
-      let dataFmt='';
-      if(typeof rawDate==='string'){
-        const dm=rawDate.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-        if(dm)dataFmt=dm[3]+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
-        else if(rawDate.match(/^\d{4}-\d{2}-\d{2}$/))dataFmt=rawDate.slice(0,10);
-      }else if(typeof rawDate==='number'){
-        const d=new Date(Math.round((rawDate-25569)*86400*1000));dataFmt=d.toISOString().slice(0,10);
-      }
-      data.clients[activeClient].extrato.push({id:uid(),data:dataFmt,desc,cat,tipo,valor,contaId});
-      count++;
-    });
-    saveData();renderExtrato();alert(count+' lançamento(s) importado(s) com sucesso!');
-  };
-  reader.readAsArrayBuffer(file);event.target.value='';
-}
-function exportExtratoTemplate(){
-  const rows=[['data','descricao','valor','categoria'],['20/03/2026','Salário recebido',3500.00,'Salário'],['21/03/2026','Aluguel',-1200.00,'Aluguel'],['22/03/2026','Supermercado',-450.00,'Alimentação'],['22/03/2026','Freelance',800.00,'Freelance']];
-  const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:12},{wch:36},{wch:12},{wch:22}];
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Extrato');
-  const wsInfo=XLSX.utils.aoa_to_sheet([['INSTRUÇÕES'],[''],['data','DD/MM/AAAA'],['descricao','Descrição do lançamento'],['valor','Positivo = Crédito | Negativo = Débito'],['categoria','Opcional — editável após importação']]);
-  XLSX.utils.book_append_sheet(wb,wsInfo,'Instruções');XLSX.writeFile(wb,'modelo_extrato_granafy.xlsx');
 }
 function addContaCC(){
   const banco=document.getElementById('co-banco').value.trim();if(!banco)return alert('Informe o banco/instituição.');
