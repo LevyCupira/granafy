@@ -1542,9 +1542,7 @@ function importXlsxExtrato(event){
       count++;
     });
     saveData();renderExtrato();
-    alert(count+' lançamento(s) importado(s) com sucesso!
-
-Dica: clique em ✏️ em qualquer linha para editar a categoria.');
+    alert(count+' lançamento(s) importado(s) com sucesso! Dica: clique em ✏️ em qualquer linha para editar a categoria.');
   };
   reader.readAsArrayBuffer(file);event.target.value='';
 }
