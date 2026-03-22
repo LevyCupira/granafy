@@ -1413,20 +1413,16 @@ function renderExtrato(){
       <div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">${lncs.length}</div></div>
     </div>
     <div class="form-card"><h3>📄 Importar extrato via planilha</h3>
-      <p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Baixe o modelo Excel, preencha com os dados do extrato do banco e importe. Valores <strong>positivos</strong> serão lançados como crédito e <strong>negativos</strong> como débito. A categoria pode ser editada após a importação.</p>
-      <div class="form-row" style="margin-bottom:12px">
-        <div class="form-group" style="max-width:280px">
+      <p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Baixe o modelo Excel, preencha com os dados do extrato e importe. Valores <strong>positivos = Crédito</strong> e <strong>negativos = Débito</strong>. Categoria pode ser editada após a importação clicando em ✏️.</p>
+      <div class="form-row" style="margin-bottom:12px;align-items:flex-end">
+        <div class="form-group" style="max-width:300px">
           <label>Conta de destino</label>
-          <select id="ex-import-conta" style="background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.84rem;padding:7px 10px;border-radius:7px;outline:none">
-            ${c.contas.length===0
-              ? '<option value="">— sem conta vinculada —</option>'
-              : c.contas.map(ct=>`<option value="${ct.id}">${esc(ct.banco)}${ct.agencia?' | Ag: '+esc(ct.agencia):''}${ct.numero?' | CC: '+esc(ct.numero):''}</option>`).join('')}
-          </select>
+          <select id="ex-import-conta">${contaOpts}</select>
         </div>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn-sm" onclick="exportExtratoTemplate()">⬇ Baixar modelo (.xlsx)</button>
-        <button class="btn-sm" onclick="document.getElementById('importXlsxExtratoInput').click()">⬆ Importar planilha (.xlsx)</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:1px">
+          <button class="btn-sm" onclick="exportExtratoTemplate()">⬇ Baixar modelo (.xlsx)</button>
+          <button class="btn-sm" onclick="document.getElementById('importXlsxExtratoInput').click()">⬆ Importar planilha (.xlsx)</button>
+        </div>
       </div>
     </div>
     <div class="form-card"><h3>+ Novo lançamento</h3>
