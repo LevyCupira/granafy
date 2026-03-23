@@ -610,6 +610,10 @@ function renderTab(tab){
 
 // ════ CLIENTES ════
 function addClient(){
+  // Bloqueia para usuários que não são master/admin
+  if(GN_SESSION&&GN_SESSION.perfil!=='master'&&GN_SESSION.perfil!=='admin'){
+    return alert('Apenas o assessor (Master) pode adicionar clientes.');
+  }
   const inp=document.getElementById('newClientName'),name=inp.value.trim();
   if(!name)return alert('Digite o nome do cliente.');
   const id=uid();
@@ -2231,6 +2235,9 @@ function gnMostrarApp(){
   const btnMaster=document.getElementById('btn-master-panel');if(btnMaster)btnMaster.style.display=GN_SESSION.perfil==='master'?'':'none';
   const btnDash=document.getElementById('btn-dashboard');if(btnDash)btnDash.style.display=GN_SESSION.perfil==='master'?'':'none';
   const btnAssess=document.getElementById('btn-assessorados');if(btnAssess)btnAssess.style.display=GN_SESSION.perfil==='master'?'':'none';
+  // Oculta área "Novo cliente" para usuários que não são master/admin
+  const novoClienteArea=document.querySelector('.new-client-area');
+  if(novoClienteArea)novoClienteArea.style.display=(GN_SESSION.perfil==='master'||GN_SESSION.perfil==='admin')?'flex':'none';
   const btnPerfil=document.getElementById('btn-meu-perfil');if(btnPerfil)btnPerfil.style.display='';
   const dot=document.getElementById('sync-dot');if(dot){dot.className='sync-dot saved';dot.title='Conectado ao Drive';}
   // Re-renderiza clientes
@@ -2513,6 +2520,13 @@ async function mpCriarUsuario(){
     const novoEmail=document.getElementById('mp-novo-email')?.value.trim()||'';
     const r=await gnAPI('criarUsuario',{token:GN_SESSION.token,novoUsuario:usuario,novoNome:nome,novoEmail,novaSenha:senha});
     if(!r.ok){if(errEl)errEl.textContent=r.erro;return;}
+    // Cria automaticamente um cliente com o nome do usuário nos dados dele
+    if(r.userId){
+      const dadosIniciais={clients:{}};
+      const clienteId=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      dadosIniciais.clients[clienteId]={name:nome,cartoes:[],cartao:[],dividas:[],extrato:[],contas:[]};
+      await gnAPI('salvarOutro',{token:GN_SESSION.token,userId:r.userId,dados:dadosIniciais});
+    }
     renderMasterPanel();
   }catch(e){if(errEl)errEl.textContent='Erro: '+e.message;}
 }
