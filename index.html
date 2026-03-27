@@ -356,8 +356,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="gn-screen" id="gn-s-login">
     <div class="gn-title">Bem-vindo de volta</div>
     <p class="gn-sub">Entre com suas credenciais para acessar o Granafy.</p>
-    <div class="gn-field"><label>Usuário ou e-mail</label><input type="text" id="gn-login-usuario" placeholder="joao.silva ou joao@email.com" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('gn-login-senha').focus()"/></div>
-    <div class="gn-field"><label>Senha</label><input type="password" id="gn-login-senha" placeholder="Sua senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')gnLogin()"/></div>
+    <div class="gn-field"><label>Usuário ou e-mail</label><input type="text" id="gn-login-usuario" placeholder="joao.silva ou joao@email.com" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')document.getElementById('gn-login-senha').focus()"/></div>
+    <div class="gn-field"><label>Senha</label><input type="password" id="gn-login-senha" placeholder="Sua senha" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')gnLogin()"/></div>
     <button class="gn-btn" id="gn-btn-entrar" onclick="gnLogin()">Entrar</button>
     <div class="gn-err" id="gn-login-err"></div>
     <button class="gn-link" onclick="gnTela('setup')">Primeiro acesso? Configure aqui</button>
