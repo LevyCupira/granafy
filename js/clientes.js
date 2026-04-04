@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 var _ccFiltro = new Set();
 var _dvHistOpen = new Set();
 
@@ -48,12 +49,30 @@ async function addClient() {
   if (inserted && inserted.id) {
     selectClient(inserted.id);
   }
+=======
+// ════════════════════════════════════════════════════
+// CLIENTES.JS — CRUD de clientes e dropdown
+// ════════════════════════════════════════════════════
+
+var _ccFiltro  = new Set();
+var _dvHistOpen = new Set();
+
+function addClient() {
+  const inp = document.getElementById('newClientName'), name = inp.value.trim();
+  if (!name) return alert('Digite o nome do cliente.');
+  const id = uid();
+  data.clients[id] = { name, cartoes: [], cartao: [], dividas: [], extrato: [], contas: [] };
+  saveData(); inp.value = ''; renderClientList(); selectClient(id);
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
 }
 
 function renderClientList() {
   const menu = document.getElementById('clientDropdownMenu');
   const entries = Object.entries(data.clients);
+<<<<<<< HEAD
 
+=======
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   menu.innerHTML = entries.length === 0
     ? '<div class="client-dropdown-empty">Nenhum cliente cadastrado.</div>'
     : entries.map(([id, c]) =>
@@ -68,12 +87,19 @@ function renderClientList() {
         + '</div>'
       ).join('');
 
+<<<<<<< HEAD
   const av = document.getElementById('toggleAvatar');
   const lbl = document.getElementById('toggleLabel');
 
   if (activeClient && data.clients[activeClient]) {
     lbl.textContent = data.clients[activeClient].name;
     av.textContent = initials(data.clients[activeClient].name);
+=======
+  const av = document.getElementById('toggleAvatar'), lbl = document.getElementById('toggleLabel');
+  if (activeClient && data.clients[activeClient]) {
+    lbl.textContent = data.clients[activeClient].name;
+    av.textContent  = initials(data.clients[activeClient].name);
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
     av.style.display = 'flex';
   } else {
     lbl.textContent = 'Selecionar cliente…';
@@ -81,6 +107,7 @@ function renderClientList() {
   }
 }
 
+<<<<<<< HEAD
 async function deleteClient(id) {
   const c = data.clients[id];
   if (!c) return;
@@ -100,12 +127,20 @@ async function deleteClient(id) {
     return;
   }
 
+=======
+function deleteClient(id) {
+  const c = data.clients[id]; if (!c) return;
+  if (!confirm('Excluir o cliente "' + c.name + '" e todos os seus dados?\n\nEsta ação não pode ser desfeita.')) return;
+  delete data.clients[id];
+  saveData();
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   if (activeClient === id) {
     activeClient = null;
     localStorage.removeItem('fb_activeClient');
     document.getElementById('clientTitle').textContent = 'Selecione um cliente';
     document.getElementById('toggleAvatar').style.display = 'none';
     document.getElementById('toggleLabel').textContent = 'Selecionar cliente…';
+<<<<<<< HEAD
 
     ['cartao-content','dividas-content','extrato-content','resumo-content','dre-content','graficos-content'].forEach(tabId => {
       document.getElementById(tabId).innerHTML = '<div class="empty-state"><div class="icon">👈</div>Selecione um cliente.</div>';
@@ -113,10 +148,17 @@ async function deleteClient(id) {
   }
 
   await loadData();
+=======
+    ['cartao-content','dividas-content','extrato-content','resumo-content','dre-content','graficos-content'].forEach(id => {
+      document.getElementById(id).innerHTML = '<div class="empty-state"><div class="icon">👈</div>Selecione um cliente.</div>';
+    });
+  }
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   renderClientList();
 }
 
 function toggleDropdown() {
+<<<<<<< HEAD
   const m = document.getElementById('clientDropdownMenu');
   const t = document.getElementById('clientDropdownToggle');
   const o = m.classList.toggle('open');
@@ -144,3 +186,25 @@ function selectClient(id) {
   document.getElementById('clientTitle').textContent = c.name;
   renderTab(activeTab);
 }
+=======
+  const m = document.getElementById('clientDropdownMenu'), t = document.getElementById('clientDropdownToggle');
+  const o = m.classList.toggle('open'); t.classList.toggle('open', o);
+}
+
+function selectClient(id) {
+  activeClient = id; localStorage.setItem('fb_activeClient', id);
+  document.getElementById('clientDropdownMenu').classList.remove('open');
+  document.getElementById('clientDropdownToggle').classList.remove('open');
+  const c = data.clients[id];
+  if (!c.cartoes)  c.cartoes  = [];
+  if (!c.cartao)   c.cartao   = [];
+  if (!c.dividas)  c.dividas  = [];
+  if (!Array.isArray(c.extrato)) c.extrato = [];
+  if (!Array.isArray(c.contas))  c.contas  = [];
+  _ccFiltro   = new Set();
+  _dvHistOpen = new Set();
+  renderClientList();
+  document.getElementById('clientTitle').textContent = c.name;
+  renderTab(activeTab);
+}
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022

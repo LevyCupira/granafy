@@ -23,6 +23,7 @@ function setTipoCartao(tipo) {
   var lanc = document.getElementById('tc-lanc');
   var est  = document.getElementById('tc-estorno');
   if (lanc) lanc.classList.toggle('active', tipo === 'lancamento');
+<<<<<<< HEAD
   if (est)  est.classList.toggle('active', tipo === 'estorno');
 }
 
@@ -33,11 +34,20 @@ function toggleFiltroCartao(id) {
     if (_ccFiltro.has(id)) _ccFiltro.delete(id);
     else _ccFiltro.add(id);
   }
+=======
+  if (est)  est.classList.toggle('active',  tipo === 'estorno');
+}
+
+function toggleFiltroCartao(id) {
+  if (id === '__todos') { _ccFiltro.clear(); }
+  else { if (_ccFiltro.has(id)) _ccFiltro.delete(id); else _ccFiltro.add(id); }
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   _renderCartaoFiltroETabela();
 }
 
 function renderCartao() {
   var c = data.clients[activeClient];
+<<<<<<< HEAD
   if (!c) {
     document.getElementById('cartao-content').innerHTML =
       '<div class="empty-state"><div class="icon">👈</div>Selecione um cliente.</div>';
@@ -51,6 +61,11 @@ function renderCartao() {
     if (!c.cartoes.find(cc => cc.id === id)) _ccFiltro.delete(id);
   });
 
+=======
+  _ccFiltro.forEach(id => { if (!c.cartoes.find(cc => cc.id === id)) _ccFiltro.delete(id); });
+
+  var cols = getColOrder('cartao', COLS_CARTAO);
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   var cats = loadCatsCartao();
   var cardsHtml = c.cartoes.length === 0
     ? '<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">Nenhum cartão cadastrado.</p>'
@@ -64,7 +79,11 @@ function renderCartao() {
       ).join('') + '</div>';
 
   var cartaoOpts = c.cartoes.map(cc => '<option value="' + cc.id + '">' + esc(cc.nome) + '</option>').join('');
+<<<<<<< HEAD
   var catOpts = cats.map(cat => '<option>' + esc(cat) + '</option>').join('');
+=======
+  var catOpts    = cats.map(cat => '<option>' + esc(cat) + '</option>').join('');
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
 
   var html = '<div id="cc-summary-area"></div>'
     + '<div class="form-card"><h3>💳 Cartões cadastrados</h3>' + cardsHtml
@@ -96,6 +115,7 @@ function renderCartao() {
     + '<div class="form-group" style="max-width:165px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cartao\')">(+ gerir)</span></label><select id="cc-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:138px"><label>Valor (R$)</label><input type="text" id="cc-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div><button class="btn-add" onclick="addCartaoItem()">Adicionar</button></div>'
+<<<<<<< HEAD
     + '<div class="form-card"><h3>💰 Pagar fatura</h3>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:180px"><label>Cartão</label><select id="pg-cartao">' + (c.cartoes.length === 0 ? '<option value="">— sem cartão —</option>' : cartaoOpts) + '</select></div>'
@@ -109,12 +129,19 @@ function renderCartao() {
   document.getElementById('cartao-content').innerHTML = html;
   var di = document.getElementById('cc-data');
   if (di) di.value = new Date().toISOString().slice(0, 10);
+=======
+    + '<div id="cc-filter-table-area"></div>';
+
+  document.getElementById('cartao-content').innerHTML = html;
+  var di = document.getElementById('cc-data'); if (di) di.value = new Date().toISOString().slice(0, 10);
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   setTipoCartao(_ccTipo);
   initMoneyInputs(document.getElementById('cartao-content'));
   _renderCartaoFiltroETabela();
 }
 
 function _renderCartaoFiltroETabela() {
+<<<<<<< HEAD
   var c = data.clients[activeClient];
   if (!c) return;
 
@@ -122,11 +149,16 @@ function _renderCartaoFiltroETabela() {
   if (!Array.isArray(c.cartao)) c.cartao = [];
 
   var cols = getColOrder('cartao', COLS_CARTAO);
+=======
+  var c = data.clients[activeClient]; if (!c) return;
+  var cols  = getColOrder('cartao', COLS_CARTAO);
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   var itens = _ccFiltro.size === 0 ? c.cartao : c.cartao.filter(it => _ccFiltro.has(it.cartaoId));
 
   var lancs = itens.filter(i => i.tipo !== 'estorno');
   var ests  = itens.filter(i => i.tipo === 'estorno');
   var tL = lancs.reduce((s, i) => s + Number(i.valor), 0);
+<<<<<<< HEAD
   var tE = ests.reduce((s, i) => s + Number(i.valor), 0);
 
   var sumEl = document.getElementById('cc-summary-area');
@@ -138,15 +170,30 @@ function _renderCartaoFiltroETabela() {
       + '<div class="summary-card"><div class="s-label">Qtd. itens</div><div class="s-val blue">' + itens.length + '</div></div>'
       + '</div>';
   }
+=======
+  var tE = ests.reduce((s,  i) => s + Number(i.valor), 0);
+
+  var sumEl = document.getElementById('cc-summary-area');
+  if (sumEl) sumEl.innerHTML = '<div class="summary-grid">'
+    + '<div class="summary-card"><div class="s-label">Total fatura' + (_ccFiltro.size ? ' <span style="color:var(--accent);font-size:.6rem">(filtrado)</span>' : '') + '</div><div class="s-val red">' + fmt(tL - tE) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">' + fmt(tL) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Estornos</div><div class="s-val green">' + fmt(tE) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Qtd. itens</div><div class="s-val blue">' + itens.length + '</div></div>'
+    + '</div>';
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
 
   var todoAtivo = _ccFiltro.size === 0;
   var filterHtml = '<div class="cc-filter-row"><span class="cc-filter-label">🔍 Filtrar por cartão:</span>'
     + '<span class="cc-chip todos' + (todoAtivo ? ' active' : '') + '" onclick="toggleFiltroCartao(\'__todos\')">Todos</span>';
+<<<<<<< HEAD
 
+=======
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
   c.cartoes.forEach(cc => {
     var ativo = _ccFiltro.has(cc.id);
     filterHtml += '<span class="cc-chip' + (ativo ? ' active' : '') + '" onclick="toggleFiltroCartao(\'' + cc.id + '\')">💳 ' + esc(cc.nome) + (cc.digits ? ' ••' + esc(cc.digits) : '') + '</span>';
   });
+<<<<<<< HEAD
 
   if (_ccFiltro.size > 0) {
     filterHtml += '<span style="font-size:.72rem;color:var(--muted);margin-left:4px">' + _ccFiltro.size + ' selecionado(s)</span>';
@@ -159,6 +206,13 @@ function _renderCartaoFiltroETabela() {
 
   area.innerHTML = filterHtml
     + '<p class="section-title">Histórico de lançamentos</p>'
+=======
+  if (_ccFiltro.size > 0) filterHtml += '<span style="font-size:.72rem;color:var(--muted);margin-left:4px">' + _ccFiltro.size + ' selecionado(s)</span>';
+  filterHtml += '</div>';
+
+  var area = document.getElementById('cc-filter-table-area'); if (!area) return;
+  area.innerHTML = filterHtml + '<p class="section-title">Histórico de lançamentos</p>'
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
     + buildTable('cartao', cols, itens, function(item) {
         var realIdx = c.cartao.indexOf(item);
         return cols.map(col => col.key === '_del'
@@ -166,6 +220,7 @@ function _renderCartaoFiltroETabela() {
           : '<td>' + col.render(item, realIdx) + '</td>'
         ).join('');
       }, r => r.tipo === 'estorno' ? 'row-estorno' : '');
+<<<<<<< HEAD
 
   initDrag('cartao', COLS_CARTAO, () => _renderCartaoFiltroETabela());
 }
@@ -269,6 +324,45 @@ async function deleteCartaoItem(i) {
 
   await loadData();
   renderCartao();
+=======
+  initDrag('cartao', COLS_CARTAO, () => _renderCartaoFiltroETabela());
+}
+
+function addCartaoCard() {
+  var nome     = document.getElementById('cc-nome').value.trim();
+  var digits   = document.getElementById('cc-digits').value.replace(/\D/g, '').slice(0, 4);
+  var bandeira = document.getElementById('cc-bandeira').value;
+  var limite   = parseMoney(document.getElementById('cc-limite'));
+  var venc     = parseInt(document.getElementById('cc-venc').value) || 0;
+  if (!nome) return alert('Informe o nome do cartão.');
+  data.clients[activeClient].cartoes.push({ id: uid(), nome, digits, bandeira, limite, venc });
+  saveData(); renderCartao();
+}
+
+function deleteCartaoCard(id) {
+  if (!confirm('Remover cartão?')) return;
+  var c = data.clients[activeClient];
+  c.cartoes = c.cartoes.filter(cc => cc.id !== id);
+  c.cartao  = c.cartao.map(it => it.cartaoId === id ? Object.assign({}, it, { cartaoId: '' }) : it);
+  saveData(); renderCartao();
+}
+
+function addCartaoItem() {
+  var d_      = document.getElementById('cc-data').value;
+  var cartaoId = (document.getElementById('cc-cartao-sel') && document.getElementById('cc-cartao-sel').value) || '';
+  var desc    = document.getElementById('cc-desc').value.trim();
+  var cat     = document.getElementById('cc-cat').value;
+  var valor   = parseMoney(document.getElementById('cc-valor'));
+  if (!desc || !valor) return alert('Preencha descrição e valor.');
+  data.clients[activeClient].cartao.push({ id: uid(), cartaoId, desc, cat, valor, data: d_, tipo: _ccTipo });
+  saveData(); renderCartao();
+}
+
+function deleteCartaoItem(i) {
+  if (!confirm('Remover item?')) return;
+  data.clients[activeClient].cartao.splice(i, 1);
+  saveData(); renderCartao();
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
 }
 
 function exportCsvTemplate() {
@@ -285,6 +379,7 @@ function exportCsvTemplate() {
   XLSX.writeFile(wb, 'modelo_fatura_granafy.xlsx');
 }
 
+<<<<<<< HEAD
 async function importXlsx(event) {
   var file = event.target.files[0];
   if (!file) return;
@@ -296,12 +391,23 @@ async function importXlsx(event) {
     var ws = wb.Sheets[wb.SheetNames[0]];
     var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
+=======
+function importXlsx(event) {
+  var file = event.target.files[0]; if (!file) return;
+  if (!activeClient) return alert('Selecione um cliente primeiro.');
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var wb   = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+    var ws   = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
     var header = (rows[0] || []).map(h => String(h).toLowerCase().trim());
     var iDate = header.findIndex(h => h.includes('data') || h.includes('date'));
     var iDesc = header.findIndex(h => h.includes('desc'));
     var iVal  = header.findIndex(h => h.includes('valor') || h.includes('value') || h.includes('amount'));
     var iCat  = header.findIndex(h => h.includes('cat'));
     var iTipo = header.findIndex(h => h.includes('tipo') || h.includes('type'));
+<<<<<<< HEAD
 
     if (iDate < 0 || iDesc < 0 || iVal < 0) {
       return alert('Planilha inválida. Colunas obrigatórias: data, descricao, valor.');
@@ -329,10 +435,30 @@ async function importXlsx(event) {
       if (typeof rawDate === 'string') {
         var dm = rawDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
         if (dm) dataFmt = dm[3] + '-' + dm[2].padStart(2, '0') + '-' + dm[1].padStart(2, '0');
+=======
+    if (iDate < 0 || iDesc < 0 || iVal < 0) return alert('Planilha inválida. Colunas obrigatórias: data, descricao, valor.');
+    var count = 0;
+    rows.slice(1).forEach(function(row) {
+      var rawDate = String(row[iDate] || '').trim();
+      var desc    = String(row[iDesc] || '').trim();
+      var valor   = 0;
+      var rawVal  = row[iVal];
+      if (typeof rawVal === 'number') valor = rawVal;
+      else valor = parseFloat(String(rawVal).replace(/[^0-9,.-]/g,'').replace(',','.')) || 0;
+      if (!desc || valor <= 0) return;
+      var cat     = iCat  >= 0 ? String(row[iCat]  || 'Outros').trim() : 'Outros';
+      var tipoRaw = iTipo >= 0 ? String(row[iTipo] || '').toLowerCase().trim() : '';
+      var tipo    = tipoRaw === 'estorno' ? 'estorno' : 'lancamento';
+      var dataFmt = '';
+      if (typeof rawDate === 'string') {
+        var dm = rawDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (dm) dataFmt = dm[3] + '-' + dm[2].padStart(2,'0') + '-' + dm[1].padStart(2,'0');
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
       } else if (typeof rawDate === 'number') {
         var d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
         dataFmt = d.toISOString().slice(0, 10);
       }
+<<<<<<< HEAD
 
       const { error } = await supabaseClient
         .from('lancamentos_cartao')
@@ -397,3 +523,12 @@ async function pagarFaturaCartao() {
   await loadData();
   renderCartao();
 }
+=======
+      data.clients[activeClient].cartao.push({ id: uid(), cartaoId: '', desc, cat, valor, data: dataFmt, tipo });
+      count++;
+    });
+    saveData(); renderCartao(); alert(count + ' lançamento(s) importado(s) com sucesso!');
+  };
+  reader.readAsArrayBuffer(file); event.target.value = '';
+}
+>>>>>>> a4264527528a921b134b61eadc044f8d00849022
