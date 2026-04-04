@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Granafy</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+<link rel="icon" href="data:,">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-text">Granafy</span>
+      <span>Gestão Financeira</span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="snav-btn" onclick="openModal('settings')">⚙️ Configurações</button>
+<button class="snav-btn" onclick="openModal('backup')">💾 Backup</button>
+    </nav>
+    <div class="sidebar-body">
+      <div>
+        <p class="sidebar-section-label">Cliente ativo</p>
+        <div class="client-dropdown-wrap" id="clientDropdownWrap">
+          <button class="client-dropdown-toggle" id="clientDropdownToggle" onclick="toggleDropdown()">
+            <span class="toggle-left">
+              <span class="avatar" id="toggleAvatar" style="display:none"></span>
+              <span class="toggle-label" id="toggleLabel">Selecionar cliente…</span>
+            </span>
+            <span class="chevron">▼</span>
+          </button>
+          <div class="client-dropdown-menu" id="clientDropdownMenu"></div>
+        </div>
+      </div>
+      <div class="new-client-area">
+        <p class="sidebar-section-label">Novo cliente</p>
+        <input type="text" id="newClientName" placeholder="Nome do cliente…"/>
+        <button onclick="addClient()">+ Adicionar cliente</button>
+      </div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="main-header">
+      <h2 id="clientTitle">Selecione um cliente</h2>
+      <div class="tabs" id="tabsContainer"></div>
+    </div>
+    <div class="main-content">
+      <div id="tab-cartao"   class="tab-panel active"><div id="cartao-content"  ><div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div></div></div>
+      <div id="tab-dividas"  class="tab-panel">       <div id="dividas-content" ><div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div></div></div>
+      <div id="tab-extrato"  class="tab-panel">       <div id="extrato-content" ><div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div></div></div>
+      <div id="tab-resumo"   class="tab-panel">       <div id="resumo-content"  ><div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div></div></div>
+      <div id="tab-dre"      class="tab-panel">       <div id="dre-content"     ><div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div></div></div>
+      <div id="tab-graficos" class="tab-panel">       <div id="graficos-content"><div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div></div></div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" onclick="closeModal()">✖</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<input type="file" id="importFileInput"  accept=".json"           onchange="importData(event)"  style="display:none"/>
+<input type="file" id="importXlsxInput" accept=".xlsx,.xls,.ods" onchange="importXlsx(event)"  style="display:none"/>
+
+<div class="footer-bar">
+  Desenvolvido por <strong>Levy Lima</strong> — Granafy Beta Test
+</div>
+
+<!-- Bibliotecas externas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase.js"></script>
+<script src="js/migracao.js"></script>
+
+<!-- Modulos Granafy (ordem importa!) -->
+<script src="js/utils.js"></script>
+<script src="js/clientes.js"></script>
+<script src="js/categorias.js"></script>
+<script src="js/cartao.js"></script>
+<script src="js/dividas.js"></script>
+<script src="js/extrato.js"></script>
+<script src="js/resumo.js"></script>
+<script src="js/dre.js"></script>
+<script src="js/graficos.js"></script>
+<script src="js/pdf.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/data.js"></script>
+<script src="js/migracao-cartao-segura.js"></script>
+</body>
+</html>
