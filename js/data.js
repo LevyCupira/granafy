@@ -1,6 +1,5 @@
 // ════════════════════════════════════════════════════
-<<<<<<< HEAD
-// DATA.JS — Estado global e bootstrap via Supabase
+// DATA.JS — SUPABASE (VERSÃO LIMPA)
 // ════════════════════════════════════════════════════
 
 var data = { clients: {} };
@@ -11,11 +10,11 @@ async function loadData() {
   data = { clients: {} };
 
   const [
-    { data: clientesRows, error: clientesError },
-    { data: dividasRows, error: dividasError },
-    { data: lancRows, error: lancError },
-    { data: cartoesRows, error: cartoesError },
-    { data: lancCartaoRows, error: lancCartaoError }
+    { data: clientesRows },
+    { data: dividasRows },
+    { data: lancRows },
+    { data: cartoesRows },
+    { data: lancCartaoRows }
   ] = await Promise.all([
     supabaseClient.from('clientes').select('*').order('nome', { ascending: true }),
     supabaseClient.from('dividas').select('*'),
@@ -24,20 +23,10 @@ async function loadData() {
     supabaseClient.from('lancamentos_cartao').select('*')
   ]);
 
-  if (clientesError) {
-    console.error('Erro ao carregar clientes do Supabase:', clientesError);
-    return;
-  }
-  if (dividasError) console.error('Erro ao carregar dívidas do Supabase:', dividasError);
-  if (lancError) console.error('Erro ao carregar lançamentos do Supabase:', lancError);
-  if (cartoesError) console.error('Erro ao carregar cartões do Supabase:', cartoesError);
-  if (lancCartaoError) console.error('Erro ao carregar lançamentos de cartão do Supabase:', lancCartaoError);
-
   const dividasPorCliente = {};
-  for (const d of (dividasRows || [])) {
-    const clienteId = d.cliente_id;
-    if (!dividasPorCliente[clienteId]) dividasPorCliente[clienteId] = [];
-    dividasPorCliente[clienteId].push({
+  (dividasRows || []).forEach(d => {
+    if (!dividasPorCliente[d.cliente_id]) dividasPorCliente[d.cliente_id] = [];
+    dividasPorCliente[d.cliente_id].push({
       id: d.id,
       org: d.credor || '',
       tipo: d.tipo_divida || '',
@@ -50,252 +39,46 @@ async function loadData() {
       restantes: Number(d.parcelas_restantes || 0),
       pagamentos: []
     });
-  }
+  });
 
-  const lancamentosPorCliente = {};
-  for (const l of (lancRows || [])) {
-    const clienteId = l.cliente_id;
-    if (!lancamentosPorCliente[clienteId]) lancamentosPorCliente[clienteId] = [];
-    lancamentosPorCliente[clienteId].push({
+  const extratoPorCliente = {};
+  (lancRows || []).forEach(l => {
+    if (!extratoPorCliente[l.cliente_id]) extratoPorCliente[l.cliente_id] = [];
+    extratoPorCliente[l.cliente_id].push({
       id: l.id,
-      data: l.data_lancamento || l.data || null,
+      data: l.data || null,
       desc: l.descricao || '',
       cat: l.categoria || '',
       tipo: l.tipo || '',
       valor: Number(l.valor || 0)
     });
-  }
+  });
 
   const cartoesPorCliente = {};
-  for (const cc of (cartoesRows || [])) {
-    const clienteId = cc.cliente_id;
-    if (!cartoesPorCliente[clienteId]) cartoesPorCliente[clienteId] = [];
-    cartoesPorCliente[clienteId].push({
-      id: cc.id,
-      nome: cc.nome || '',
-      digits: cc.digits || '',
-      bandeira: cc.bandeira || '',
-      limite: Number(cc.limite || 0),
-      venc: Number(cc.venc || 0)
-    });
-  }
+  (cartoesRows || []).forEach(cc => {
+    if (!cartoesPorCliente[cc.cliente_id]) cartoesPorCliente[cc.cliente_id] = [];
+    cartoesPorCliente[cc.cliente_id].push(cc);
+  });
 
-  const lancamentosCartaoPorCliente = {};
-  for (const it of (lancCartaoRows || [])) {
-    const clienteId = it.cliente_id;
-    if (!lancamentosCartaoPorCliente[clienteId]) lancamentosCartaoPorCliente[clienteId] = [];
-    lancamentosCartaoPorCliente[clienteId].push({
-      id: it.id,
-      cartaoId: it.cartao_id || null,
-      data: it.data || null,
-      desc: it.descricao || '',
-      cat: it.categoria || '',
-      tipo: it.tipo || '',
-      valor: Number(it.valor || 0)
-    });
-  }
+  const lancCartaoPorCliente = {};
+  (lancCartaoRows || []).forEach(l => {
+    if (!lancCartaoPorCliente[l.cliente_id]) lancCartaoPorCliente[l.cliente_id] = [];
+    lancCartaoPorCliente[l.cliente_id].push(l);
+  });
 
-  for (const c of (clientesRows || [])) {
+  (clientesRows || []).forEach(c => {
     data.clients[c.id] = {
       id: c.id,
       name: c.nome || '',
-      cpf: c.cpf || '',
-      telefone: c.telefone || '',
-      email: c.email || '',
-      observacoes: c.observacoes || '',
       cartoes: cartoesPorCliente[c.id] || [],
-      cartao: lancamentosCartaoPorCliente[c.id] || [],
+      cartao: lancCartaoPorCliente[c.id] || [],
       contas: [],
       dividas: dividasPorCliente[c.id] || [],
-      extrato: lancamentosPorCliente[c.id] || []
+      extrato: extratoPorCliente[c.id] || []
     };
-  }
-
-  localStorage.setItem('fb_data_cache', JSON.stringify(data));
+  });
 }
 
 function saveData() {
-  localStorage.setItem('fb_data_cache', JSON.stringify(data));
-=======
-// DATA.JS — Estado global e persistência (localStorage)
-// ════════════════════════════════════════════════════
-
-var data = {};
-var activeClient = null;
-var activeTab = 'cartao';
-
-function loadData() {
-  try { data = JSON.parse(localStorage.getItem('fb_data')) || { clients: {} }; }
-  catch { data = { clients: {} }; }
+  // Não usamos mais localStorage
 }
-
-function saveData() {
-  localStorage.setItem('fb_data', JSON.stringify(data));
->>>>>>> a4264527528a921b134b61eadc044f8d00849022
-}
-
-// ── Motor de abas móveis ──
-var TAB_DEFS = [
-  { key: 'cartao',   label: '💳 Cartão de Crédito' },
-  { key: 'dividas',  label: '📋 Empréstimo e Renegociação' },
-  { key: 'extrato',  label: '🏦 Conta Corrente' },
-  { key: 'resumo',   label: '📊 Receita & Despesas' },
-  { key: 'dre',      label: '📑 DRE' },
-  { key: 'graficos', label: '📈 Gráficos' }
-];
-
-function getTabOrder() {
-  try {
-<<<<<<< HEAD
-    const sv = JSON.parse(localStorage.getItem('fb_tab_order'));
-    if (!sv) return TAB_DEFS;
-=======
-    const sv = JSON.parse(localStorage.getItem('fb_tab_order')); if (!sv) return TAB_DEFS;
->>>>>>> a4264527528a921b134b61eadc044f8d00849022
-    const map = Object.fromEntries(TAB_DEFS.map(t => [t.key, t]));
-    const ord = sv.filter(k => map[k]).map(k => map[k]);
-    TAB_DEFS.forEach(t => { if (!sv.includes(t.key)) ord.push(t); });
-    return ord;
-<<<<<<< HEAD
-  } catch {
-    return TAB_DEFS;
-  }
-}
-
-function renderTabs() {
-  const box = document.getElementById('tabsContainer');
-  box.innerHTML = '';
-  let src = null;
-
-  getTabOrder().forEach(tab => {
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (tab.key === activeTab ? ' active' : '');
-    btn.textContent = tab.label;
-    btn.draggable = true;
-    btn.dataset.tabKey = tab.key;
-
-    btn.addEventListener('click', () => switchTab(tab.key));
-    btn.addEventListener('dragstart', e => {
-      src = tab.key;
-      btn.classList.add('tab-dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    btn.addEventListener('dragend', () => {
-      btn.classList.remove('tab-dragging');
-      box.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-drag-over'));
-    });
-    btn.addEventListener('dragover', e => {
-      e.preventDefault();
-      box.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-drag-over'));
-      if (tab.key !== src) btn.classList.add('tab-drag-over');
-    });
-    btn.addEventListener('dragleave', () => btn.classList.remove('tab-drag-over'));
-    btn.addEventListener('drop', e => {
-      e.preventDefault();
-      btn.classList.remove('tab-drag-over');
-      if (!src || src === tab.key) return;
-      const ord = getTabOrder().map(t => t.key);
-      const fi = ord.indexOf(src);
-      const ti = ord.indexOf(tab.key);
-      if (fi < 0 || ti < 0) return;
-      ord.splice(fi, 1);
-      ord.splice(ti, 0, src);
-      localStorage.setItem('fb_tab_order', JSON.stringify(ord));
-      renderTabs();
-    });
-
-=======
-  } catch { return TAB_DEFS; }
-}
-
-function renderTabs() {
-  const box = document.getElementById('tabsContainer'); box.innerHTML = '';
-  let src = null;
-  getTabOrder().forEach(tab => {
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (tab.key === activeTab ? ' active' : '');
-    btn.textContent = tab.label; btn.draggable = true; btn.dataset.tabKey = tab.key;
-    btn.addEventListener('click', () => switchTab(tab.key));
-    btn.addEventListener('dragstart', e => { src = tab.key; btn.classList.add('tab-dragging'); e.dataTransfer.effectAllowed = 'move'; });
-    btn.addEventListener('dragend',   () => { btn.classList.remove('tab-dragging'); box.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-drag-over')); });
-    btn.addEventListener('dragover',  e => { e.preventDefault(); box.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-drag-over')); if (tab.key !== src) btn.classList.add('tab-drag-over'); });
-    btn.addEventListener('dragleave', () => btn.classList.remove('tab-drag-over'));
-    btn.addEventListener('drop', e => {
-      e.preventDefault(); btn.classList.remove('tab-drag-over');
-      if (!src || src === tab.key) return;
-      const ord = getTabOrder().map(t => t.key);
-      const fi = ord.indexOf(src), ti = ord.indexOf(tab.key); if (fi < 0 || ti < 0) return;
-      ord.splice(fi, 1); ord.splice(ti, 0, src);
-      localStorage.setItem('fb_tab_order', JSON.stringify(ord)); renderTabs();
-    });
->>>>>>> a4264527528a921b134b61eadc044f8d00849022
-    box.appendChild(btn);
-  });
-}
-
-function switchTab(tab) {
-  activeTab = tab;
-<<<<<<< HEAD
-  document.querySelectorAll('#tabsContainer .tab-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.tabKey === tab)
-  );
-=======
-  document.querySelectorAll('#tabsContainer .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tabKey === tab));
->>>>>>> a4264527528a921b134b61eadc044f8d00849022
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  renderTab(tab);
-}
-
-function renderTab(tab) {
-  if (!activeClient) return;
-  if (tab === 'cartao')   renderCartao();
-  if (tab === 'dividas')  renderDividas();
-  if (tab === 'extrato')  renderExtrato();
-  if (tab === 'resumo')   renderResumo();
-  if (tab === 'dre')      renderDRE();
-  if (tab === 'graficos') renderGraficos();
-}
-
-// ── Inicialização ──
-<<<<<<< HEAD
-(async function init() {
-  const savedTheme = localStorage.getItem('fb_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-
-  await loadData();
-  renderTabs();
-  renderClientList();
-
-  const saved = localStorage.getItem('fb_activeClient');
-  if (saved && data.clients[saved]) {
-    selectClient(saved);
-  }
-
-=======
-(function init() {
-  const savedTheme = localStorage.getItem('fb_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  loadData();
-  renderTabs();
-  renderClientList();
-  const saved = localStorage.getItem('fb_activeClient');
-  if (saved && data.clients[saved]) selectClient(saved);
->>>>>>> a4264527528a921b134b61eadc044f8d00849022
-  document.addEventListener('click', e => {
-    const wrap = document.getElementById('clientDropdownWrap');
-    if (wrap && !wrap.contains(e.target)) {
-      document.getElementById('clientDropdownMenu').classList.remove('open');
-      document.getElementById('clientDropdownToggle').classList.remove('open');
-    }
-  });
-<<<<<<< HEAD
-
-  document.getElementById('newClientName').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addClient();
-  });
-})();
-=======
-  document.getElementById('newClientName').addEventListener('keydown', e => { if (e.key === 'Enter') addClient(); });
-})();
->>>>>>> a4264527528a921b134b61eadc044f8d00849022
