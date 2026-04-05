@@ -82,3 +82,34 @@ async function loadData() {
 function saveData() {
   // Não usamos mais localStorage
 }
+
+(async function init() {
+  const savedTheme = localStorage.getItem('fb_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+
+  await loadData();
+  renderTabs();
+  renderClientList();
+
+  const saved = localStorage.getItem('fb_activeClient');
+  if (saved && data.clients[saved]) {
+    selectClient(saved);
+  }
+
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('clientDropdownWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      const menu = document.getElementById('clientDropdownMenu');
+      const toggle = document.getElementById('clientDropdownToggle');
+      if (menu) menu.classList.remove('open');
+      if (toggle) toggle.classList.remove('open');
+    }
+  });
+
+  const input = document.getElementById('newClientName');
+  if (input) {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') addClient();
+    });
+  }
+})();
