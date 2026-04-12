@@ -406,6 +406,7 @@ async function criarUsuario() {
     email,
     password,
     options: {
+      emailRedirectTo: window.location.origin + window.location.pathname,
       data: {
         nome,
         telefone
