@@ -53,7 +53,7 @@ function applySidebarMenuState(minimized) {
   if (!sidebar || !btn) return;
 
   sidebar.classList.toggle('minimized', !!minimized);
-  btn.textContent = minimized ? 'Abrir' : 'Recolher';
+  btn.textContent = minimized ? 'Menu' : 'Recolher';
   btn.title = minimized ? 'Abrir menu' : 'Minimizar menu';
   btn.setAttribute('aria-expanded', minimized ? 'false' : 'true');
 }
@@ -68,8 +68,11 @@ function toggleSidebarMenu() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  var minimized = false;
-  try { minimized = localStorage.getItem('granafy_sidebar_minimized') === '1'; } catch (e) {}
+  var minimized = true;
+  try {
+    var saved = localStorage.getItem('granafy_sidebar_minimized');
+    minimized = saved === null ? true : saved === '1';
+  } catch (e) {}
   applySidebarMenuState(minimized);
 });
 

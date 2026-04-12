@@ -54,6 +54,268 @@ function importData(event) {
   reader.readAsText(file); event.target.value = '';
 }
 
+async function importData(event) {
+  var file = event.target.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      var uid = typeof currentUserId === 'function' ? currentUserId() : null;
+      if (!uid) throw new Error('Entre com o login do cliente antes de importar o backup.');
+
+      var imp = JSON.parse(e.target.result);
+      if (!imp.clients) throw new Error('Estrutura invalida.');
+      if (!confirm('Importar este JSON para o Supabase no login atual? Dados iguais serao ignorados para evitar duplicidade.')) return;
+
+      var resumo = await importarBackupJsonParaSupabase(imp);
+      await loadData();
+      renderClientList();
+      if (typeof clearActiveClientView === 'function') clearActiveClientView();
+
+      closeModal();
+      alert('Backup importado para o Supabase!\n\n'
+        + 'Clientes criados: ' + resumo.clientes + '\n'
+        + 'Dividas: ' + resumo.dividas + '\n'
+        + 'Lancamentos do extrato: ' + resumo.lancamentos + '\n'
+        + 'Cartoes: ' + resumo.cartoes + '\n'
+        + 'Lancamentos de cartao: ' + resumo.lancamentosCartao + '\n'
+        + 'Ignorados por duplicidade: ' + resumo.ignorados);
+    } catch(err) {
+      alert('Erro ao importar: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function importarBackupJsonParaSupabase(backup) {
+  var resumo = { clientes: 0, dividas: 0, lancamentos: 0, cartoes: 0, lancamentosCartao: 0, ignorados: 0 };
+  var clientes = backup.clients || {};
+
+  for (const [, cliente] of Object.entries(clientes)) {
+    var nomeCliente = String(cliente.name || '').trim();
+    if (!nomeCliente) continue;
+
+    var clienteId = await garantirClienteImportado(nomeCliente, resumo);
+    var mapaCartoes = await importarCartoesCliente(clienteId, cliente.cartoes || [], resumo);
+
+    await importarDividasCliente(clienteId, cliente.dividas || [], resumo);
+    await importarExtratoCliente(clienteId, cliente.extrato || [], resumo);
+    await importarLancamentosCartaoCliente(clienteId, cliente.cartao || [], mapaCartoes, resumo);
+  }
+
+  return resumo;
+}
+
+async function garantirClienteImportado(nomeCliente, resumo) {
+  var busca = applyUserScope(
+    supabaseClient
+      .from('clientes')
+      .select('id,nome')
+      .eq('nome', nomeCliente)
+      .limit(1)
+  );
+
+  var existente = await busca.maybeSingle();
+  if (existente.error) throw new Error('Erro ao buscar cliente "' + nomeCliente + '": ' + existente.error.message);
+  if (existente.data) {
+    resumo.ignorados++;
+    return existente.data.id;
+  }
+
+  var criado = await supabaseClient
+    .from('clientes')
+    .insert([Object.assign({ nome: nomeCliente }, getUserScopePayload())])
+    .select('id')
+    .single();
+
+  if (criado.error) throw new Error('Erro ao criar cliente "' + nomeCliente + '": ' + criado.error.message);
+  resumo.clientes++;
+  return criado.data.id;
+}
+
+function queryCampoOpcional(query, campo, valor) {
+  return valor === null || valor === undefined || valor === ''
+    ? query.is(campo, null)
+    : query.eq(campo, valor);
+}
+
+async function importarCartoesCliente(clienteId, cartoes, resumo) {
+  var mapa = {};
+
+  for (const cartao of cartoes) {
+    var nome = String(cartao.nome || '').trim() || 'Cartao';
+    var digits = String(cartao.digits || '').trim() || null;
+
+    var busca = applyUserScope(
+      supabaseClient
+        .from('cartoes')
+        .select('id,nome,digits')
+        .eq('cliente_id', clienteId)
+        .eq('nome', nome)
+        .limit(1)
+    );
+    busca = queryCampoOpcional(busca, 'digits', digits);
+
+    var existente = await busca.maybeSingle();
+    if (existente.error) throw new Error('Erro ao buscar cartao "' + nome + '": ' + existente.error.message);
+
+    if (existente.data) {
+      mapa[cartao.id] = existente.data.id;
+      resumo.ignorados++;
+      continue;
+    }
+
+    var criado = await supabaseClient
+      .from('cartoes')
+      .insert([Object.assign({
+        cliente_id: clienteId,
+        nome: nome,
+        digits: digits,
+        bandeira: cartao.bandeira || null,
+        limite: Number(cartao.limite || 0),
+        venc: Number(cartao.venc || 0)
+      }, getUserScopePayload())])
+      .select('id')
+      .single();
+
+    if (criado.error) throw new Error('Erro ao criar cartao "' + nome + '": ' + criado.error.message);
+    mapa[cartao.id] = criado.data.id;
+    resumo.cartoes++;
+  }
+
+  return mapa;
+}
+
+async function importarDividasCliente(clienteId, dividas, resumo) {
+  for (const d of dividas) {
+    var payload = {
+      cliente_id: clienteId,
+      credor: d.org || null,
+      tipo_divida: d.tipo || null,
+      data_inicio: d.dataInicio || d.data_inicio || null,
+      valor_total: Number(d.total || 0),
+      valor_pago: Number(d.pago || 0),
+      parcelas_total: Number(d.parcelas || 0),
+      parcelas_restantes: Number(d.restantes || d.parcelas || 0),
+      valor_parcela: Number(d.valorParcela || d.valor_parcela || 0),
+      taxa: Number(d.taxa || 0),
+      observacoes: d.obs || d.observacoes || null
+    };
+
+    var busca = applyUserScope(
+      supabaseClient
+        .from('dividas')
+        .select('id')
+        .eq('cliente_id', clienteId)
+        .eq('valor_total', payload.valor_total)
+        .limit(1)
+    );
+    busca = queryCampoOpcional(busca, 'credor', payload.credor);
+    busca = queryCampoOpcional(busca, 'tipo_divida', payload.tipo_divida);
+
+    var existente = await busca.maybeSingle();
+    if (existente.error) throw new Error('Erro ao buscar divida de "' + (payload.credor || '-') + '": ' + existente.error.message);
+    if (existente.data) {
+      resumo.ignorados++;
+      continue;
+    }
+
+    var inserido = await supabaseClient
+      .from('dividas')
+      .insert([Object.assign(payload, getUserScopePayload())]);
+
+    if (inserido.error) throw new Error('Erro ao importar divida de "' + (payload.credor || '-') + '": ' + inserido.error.message);
+    resumo.dividas++;
+  }
+}
+
+async function importarExtratoCliente(clienteId, lancamentos, resumo) {
+  for (const l of lancamentos) {
+    var payload = {
+      cliente_id: clienteId,
+      data_lancamento: l.data || l.data_lancamento || null,
+      descricao: l.desc || l.descricao || null,
+      categoria: l.cat || l.categoria || null,
+      tipo: l.tipo || null,
+      valor: Number(l.valor || 0)
+    };
+
+    var busca = applyUserScope(
+      supabaseClient
+        .from('lancamentos')
+        .select('id')
+        .eq('cliente_id', clienteId)
+        .eq('tipo', payload.tipo)
+        .eq('valor', payload.valor)
+        .limit(1)
+    );
+    busca = queryCampoOpcional(busca, 'descricao', payload.descricao);
+    busca = queryCampoOpcional(busca, 'data_lancamento', payload.data_lancamento);
+
+    var existente = await busca.maybeSingle();
+    if (existente.error) throw new Error('Erro ao buscar lancamento "' + (payload.descricao || '-') + '": ' + existente.error.message);
+    if (existente.data) {
+      resumo.ignorados++;
+      continue;
+    }
+
+    var inserido = await supabaseClient
+      .from('lancamentos')
+      .insert([Object.assign(payload, getUserScopePayload())]);
+
+    if (inserido.error) throw new Error('Erro ao importar lancamento "' + (payload.descricao || '-') + '": ' + inserido.error.message);
+    resumo.lancamentos++;
+  }
+}
+
+async function importarLancamentosCartaoCliente(clienteId, lancamentos, mapaCartoes, resumo) {
+  for (const l of lancamentos) {
+    var cartaoId = l.cartaoId ? mapaCartoes[l.cartaoId] || null : null;
+    if (!cartaoId) {
+      resumo.ignorados++;
+      continue;
+    }
+
+    var payload = {
+      cliente_id: clienteId,
+      cartao_id: cartaoId,
+      data: l.data || null,
+      descricao: l.desc || l.descricao || null,
+      categoria: l.cat || l.categoria || null,
+      tipo: l.tipo === 'estorno' ? 'estorno' : 'lancamento',
+      valor: Number(l.valor || 0)
+    };
+
+    var busca = applyUserScope(
+      supabaseClient
+        .from('lancamentos_cartao')
+        .select('id')
+        .eq('cliente_id', clienteId)
+        .eq('cartao_id', cartaoId)
+        .eq('tipo', payload.tipo)
+        .eq('valor', payload.valor)
+        .limit(1)
+    );
+    busca = queryCampoOpcional(busca, 'descricao', payload.descricao);
+    busca = queryCampoOpcional(busca, 'data', payload.data);
+
+    var existente = await busca.maybeSingle();
+    if (existente.error) throw new Error('Erro ao buscar lancamento de cartao "' + (payload.descricao || '-') + '": ' + existente.error.message);
+    if (existente.data) {
+      resumo.ignorados++;
+      continue;
+    }
+
+    var inserido = await supabaseClient
+      .from('lancamentos_cartao')
+      .insert([Object.assign(payload, getUserScopePayload())]);
+
+    if (inserido.error) throw new Error('Erro ao importar lancamento de cartao "' + (payload.descricao || '-') + '": ' + inserido.error.message);
+    resumo.lancamentosCartao++;
+  }
+}
+
 function renderSettingsModal(activeTabKey) {
   document.getElementById('modalTitle').textContent = '⚙️ Configurações';
   document.getElementById('modalBody').innerHTML =
