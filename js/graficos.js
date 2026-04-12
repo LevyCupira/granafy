@@ -11,7 +11,10 @@ function destroyChart(id) {
 function renderGraficos() {
   var c     = data.clients[activeClient];
   var todas = getTransacoes(activeClient);
-  var mesesSet = [...new Set(todas.map(l => (l.data || '').slice(0,7)).filter(Boolean))].sort();
+  var mesesSet = [...new Set([
+    ...todas.map(l => (l.data || '').slice(0,7)).filter(Boolean),
+    ...(c.cartao || []).map(l => (l.data || '').slice(0,7)).filter(Boolean)
+  ])].sort();
   var ultimos6 = mesesSet.slice(-6);
   var selEl    = document.getElementById('graficos-mes-sel');
   var mesFiltro = selEl ? selEl.value : '';
@@ -73,19 +76,28 @@ function renderGraficos() {
   if (cartoes.length === 0 || !c.cartao || c.cartao.length === 0) {
     document.getElementById('chart-fatura').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0"><div class="icon">💳</div>Nenhum lançamento de cartão.</div>';
   } else {
-    var labels3   = ultimos6.map(m => { var [y,mo] = m.split('-'); return mo + '/' + y.slice(2); });
-    var datasets3 = cartoes.slice(0,6).map((cc,i) => ({
+    var mesesCartao = [...new Set((c.cartao || []).map(it => (it.data || '').slice(0,7)).filter(Boolean))].sort();
+    var mesesFatura = mesFiltro ? [mesFiltro] : mesesCartao.slice(-6);
+    var labels3 = mesesFatura.map(m => { var [y,mo] = m.split('-'); return mo + '/' + y.slice(2); });
+    var cartoesComSemVinculo = cartoes.slice();
+    if ((c.cartao || []).some(it => !it.cartaoId)) {
+      cartoesComSemVinculo.push({ id: '__sem_cartao', nome: 'Sem cartão' });
+    }
+    var datasets3 = cartoesComSemVinculo.map((cc,i) => ({
       label: cc.nome,
-      data:  ultimos6.map(m => c.cartao.filter(it => it.cartaoId===cc.id && it.tipo!=='estorno' && (it.data||'').startsWith(m)).reduce((s,it) => s+Number(it.valor),0)),
+      data: mesesFatura.map(m => c.cartao
+        .filter(it => (cc.id === '__sem_cartao' ? !it.cartaoId : it.cartaoId === cc.id) && (it.data || '').startsWith(m))
+        .reduce((s,it) => s + (it.tipo === 'estorno' ? -Number(it.valor || 0) : Number(it.valor || 0)), 0)
+      ),
       backgroundColor: COLORS[i%COLORS.length]+'cc', borderColor: COLORS[i%COLORS.length], borderWidth:1.5, borderRadius:5
-    }));
+    })).filter(ds => ds.data.some(v => v !== 0));
     if (datasets3.every(d => d.data.every(v => v===0))) {
       document.getElementById('chart-fatura').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0"><div class="icon">📭</div>Sem dados de fatura no período.</div>';
     } else {
       _chartInstances['fatura'] = new Chart(document.getElementById('chart-fatura'), {
         type: 'bar',
         data: { labels: labels3, datasets: datasets3 },
-        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{boxWidth:12,font:{size:11}}}, tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.raw)}} }, scales:{ x:{stacked:true,grid:{color:gridColor},ticks:{font:{size:10}}}, y:{stacked:true,grid:{color:gridColor},ticks:{font:{size:10},callback:v=>'R$'+Number(v).toLocaleString('pt-BR',{notation:'compact',maximumFractionDigits:1})}} } }
+        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{boxWidth:12,font:{size:11}}}, tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.raw)}} }, scales:{ x:{stacked:false,grid:{color:gridColor},ticks:{font:{size:10}}}, y:{stacked:false,grid:{color:gridColor},ticks:{font:{size:10},callback:v=>'R$'+Number(v).toLocaleString('pt-BR',{notation:'compact',maximumFractionDigits:1})}} } }
       });
     }
   }

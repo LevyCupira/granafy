@@ -1,4 +1,10 @@
 window.migrarDadosCompletos = async function () {
+  const uid = currentUserId();
+  if (!uid) {
+    alert('Entre com um usuario antes de migrar os dados.');
+    return;
+  }
+
   const bruto = localStorage.getItem('fb_data');
   if (!bruto) {
     console.log('Sem dados no localStorage.');
@@ -12,11 +18,11 @@ window.migrarDadosCompletos = async function () {
   for (const [idLocal, cliente] of Object.entries(clientes)) {
     const nome = cliente.name || '';
 
-    const { data: clienteDB, error: erroCliente } = await supabaseClient
+    const { data: clienteDB, error: erroCliente } = await applyUserScope(supabaseClient
       .from('clientes')
       .select('id,nome')
       .eq('nome', nome)
-      .single();
+    ).single();
 
     if (erroCliente || !clienteDB) {
       console.warn('Cliente não encontrado no banco:', nome, erroCliente);
@@ -47,7 +53,7 @@ window.migrarDadosCompletos = async function () {
 
   const { error } = await supabaseClient
     .from('dividas')
-    .insert([payloadDivida]);
+    .insert([Object.assign(payloadDivida, getUserScopePayload())]);
 
   if (error) {
     console.error('Erro ao migrar dívida de', nome, d, error);
@@ -68,7 +74,7 @@ window.migrarDadosCompletos = async function () {
 
       const { error } = await supabaseClient
         .from('lancamentos')
-        .insert([payloadLancamento]);
+        .insert([Object.assign(payloadLancamento, getUserScopePayload())]);
 
       if (error) {
         console.error('Erro ao migrar lançamento de', nome, l, error);

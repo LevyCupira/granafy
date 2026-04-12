@@ -12,21 +12,42 @@ async function refreshClientsFromSupabase() {
   if (activeClient && data.clients[activeClient]) {
     document.getElementById('clientTitle').textContent = data.clients[activeClient].name;
     renderTab(activeTab);
+  } else {
+    clearActiveClientView();
   }
+}
+
+function clearActiveClientView() {
+  activeClient = null;
+  document.getElementById('clientTitle').textContent = 'Selecione um cliente';
+  document.getElementById('toggleAvatar').style.display = 'none';
+  document.getElementById('toggleLabel').textContent = 'Selecionar cliente...';
+
+  ['cartao-content','dividas-content','extrato-content','resumo-content','dre-content','graficos-content']
+    .forEach(tabId => {
+      var el = document.getElementById(tabId);
+      if (el) el.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
+    });
 }
 
 async function addClient() {
   const inp = document.getElementById('newClientName');
   const name = inp.value.trim();
+  const totalClientes = Object.keys(data.clients || {}).length;
 
   if (!name) {
     alert('Digite o nome do cliente.');
     return;
   }
 
+  if (totalClientes >= getClientLimit()) {
+    alert('Seu acesso permite cadastrar somente um cliente.');
+    return;
+  }
+
   const { data: inserted, error } = await supabaseClient
     .from('clientes')
-    .insert([{ nome: name }])
+    .insert([Object.assign({ nome: name }, getUserScopePayload())])
     .select()
     .single();
 
@@ -49,6 +70,8 @@ async function addClient() {
 function renderClientList() {
   const menu = document.getElementById('clientDropdownMenu');
   const entries = Object.entries(data.clients);
+  const limiteClientes = getClientLimit();
+  const canCreateClient = entries.length < limiteClientes;
 
   menu.innerHTML = entries.length === 0
     ? '<div class="client-dropdown-empty">Nenhum cliente cadastrado.</div>'
@@ -73,9 +96,30 @@ function renderClientList() {
     lbl.textContent = 'Selecionar cliente…';
     av.style.display = 'none';
   }
+
+  const inputNovo = document.getElementById('newClientName');
+  const areaNovo = document.querySelector('.new-client-area');
+  if (inputNovo && areaNovo) {
+    inputNovo.disabled = !canCreateClient;
+    inputNovo.placeholder = canCreateClient ? 'Nome do cliente...' : 'Limite de 1 cliente atingido';
+    const btnNovo = areaNovo.querySelector('button');
+    if (btnNovo) btnNovo.disabled = !canCreateClient;
+    let note = document.getElementById('clientLimitNote');
+    if (!canCreateClient) {
+      if (!note) {
+        note = document.createElement('small');
+        note.id = 'clientLimitNote';
+        areaNovo.appendChild(note);
+      }
+      note.textContent = 'Seu acesso permite cadastrar somente um cliente.';
+    } else if (note) {
+      note.remove();
+    }
+  }
 }
 
 async function deleteClient(id) {
+  if (!isOwnClient(id)) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   const c = data.clients[id];
   if (!c) return;
 
@@ -83,10 +127,12 @@ async function deleteClient(id) {
     return;
   }
 
-  const { error } = await supabaseClient
-    .from('clientes')
-    .delete()
-    .eq('id', id);
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('clientes')
+      .delete()
+      .eq('id', id)
+  );
 
   if (error) {
     console.error('Erro ao excluir cliente:', error);
@@ -95,8 +141,9 @@ async function deleteClient(id) {
   }
 
   if (activeClient === id) {
-    activeClient = null;
     localStorage.removeItem('fb_activeClient');
+    localStorage.removeItem(activeClientStorageKey());
+    clearActiveClientView();
 
     document.getElementById('clientTitle').textContent = 'Selecione um cliente';
     document.getElementById('toggleAvatar').style.display = 'none';
@@ -122,6 +169,7 @@ function toggleDropdown() {
 
 function selectClient(id) {
   activeClient = id;
+  localStorage.setItem(activeClientStorageKey(), id);
   localStorage.setItem('fb_activeClient', id);
 
   document.getElementById('clientDropdownMenu').classList.remove('open');
@@ -136,9 +184,20 @@ function selectClient(id) {
   if (!Array.isArray(c.contas)) c.contas = [];
 
   _ccFiltro = new Set();
+  _ccFiltroMes = '';
+  _ccFiltroTipo = 'todos';
+  _ccFiltroCat = '';
+  _ccFiltroBusca = '';
   _dvHistOpen = new Set();
+  _dvFiltroStatus = 'todos';
+  _dvFiltroTipo = '';
+  _dvFiltroBusca = '';
+  _exFiltroTipo = 'todos';
+  _exFiltroCat = '';
+  _exFiltroMes = '';
+  _exFiltroBusca = '';
 
   renderClientList();
-  document.getElementById('clientTitle').textContent = c.name;
+  document.getElementById('clientTitle').textContent = c.name + (isAdminUser() && !isOwnClient(id) ? ' · Outro login' : '');
   renderTab(activeTab);
 }

@@ -18,6 +18,31 @@ function getCartaoById(id) {
 
 var _ccTipo = 'lancamento';
 var _ccFiltro = new Set();
+var _ccFiltroMes = '';
+var _ccFiltroTipo = 'todos';
+var _ccFiltroCat = '';
+var _ccFiltroBusca = '';
+var _ccPanels = {
+  cadastrados: false,
+  importar: false,
+  novo: false
+};
+
+function toggleCartaoPanel(key) {
+  _ccPanels[key] = !_ccPanels[key];
+  renderCartao();
+}
+
+function cartaoPanel(key, title, body) {
+  var open = !!_ccPanels[key];
+  return '<div class="form-card collapsible-card' + (open ? ' open' : '') + '">'
+    + '<button type="button" class="collapse-head" onclick="toggleCartaoPanel(\'' + key + '\')" aria-expanded="' + open + '">'
+    + '<span>' + title + '</span>'
+    + '<span class="collapse-hint">' + (open ? 'Minimizar' : 'Abrir') + '</span>'
+    + '</button>'
+    + (open ? '<div class="collapse-body">' + body + '</div>' : '')
+    + '</div>';
+}
 
 function setTipoCartao(tipo) {
   _ccTipo = tipo;
@@ -34,6 +59,29 @@ function toggleFiltroCartao(id) {
     if (_ccFiltro.has(id)) _ccFiltro.delete(id);
     else _ccFiltro.add(id);
   }
+  _renderCartaoFiltroETabela();
+}
+
+function aplicarFiltrosCartao() {
+  var mes = document.getElementById('cc-filtro-mes');
+  var tipo = document.getElementById('cc-filtro-tipo');
+  var cat = document.getElementById('cc-filtro-cat');
+  var busca = document.getElementById('cc-filtro-busca');
+
+  _ccFiltroMes = mes ? mes.value : '';
+  _ccFiltroTipo = tipo ? tipo.value : 'todos';
+  _ccFiltroCat = cat ? cat.value : '';
+  _ccFiltroBusca = busca ? busca.value.trim().toLowerCase() : '';
+
+  _renderCartaoFiltroETabela();
+}
+
+function limparFiltrosCartao() {
+  _ccFiltro.clear();
+  _ccFiltroMes = '';
+  _ccFiltroTipo = 'todos';
+  _ccFiltroCat = '';
+  _ccFiltroBusca = '';
   _renderCartaoFiltroETabela();
 }
 
@@ -67,8 +115,7 @@ function renderCartao() {
   var cartaoOpts = c.cartoes.map(cc => '<option value="' + cc.id + '">' + esc(cc.nome) + '</option>').join('');
   var catOpts = cats.map(cat => '<option>' + esc(cat) + '</option>').join('');
 
-  var html = '<div id="cc-summary-area"></div>'
-    + '<div class="form-card"><h3>💳 Cartões cadastrados</h3>' + cardsHtml
+  var cardsPanelBody = cardsHtml
     + '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:2px">'
     + '<p style="font-size:.7rem;color:var(--muted);margin-bottom:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px">Cadastrar novo cartão</p>'
     + '<div class="form-row">'
@@ -78,15 +125,18 @@ function renderCartao() {
     + '<div class="form-group" style="max-width:140px"><label>Limite (R$)</label><input type="text" id="cc-limite" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group" style="max-width:110px"><label>Dia vencimento</label><input type="number" id="cc-venc" placeholder="Ex: 10" min="1" max="31"/></div>'
     + '</div><button class="btn-add" onclick="addCartaoCard()">Cadastrar cartão</button>'
-    + '</div></div>'
-    + '<div class="form-card"><h3>📄 Importar fatura via planilha</h3>'
-    + '<p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Baixe o modelo, preencha e importe.</p>'
+    + '</div>';
+
+  var importPanelBody = '<p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Baixe o modelo, preencha e importe.</p>'
+    + '<div class="form-row" style="margin-bottom:12px">'
+    + '<div class="form-group" style="max-width:220px"><label>Cartão da fatura</label><select id="cc-import-cartao">' + (c.cartoes.length === 0 ? '<option value="">— cadastre um cartão —</option>' : cartaoOpts) + '</select></div>'
+    + '</div>'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
     + '<button class="btn-sm" onclick="exportCsvTemplate()">⬇ Baixar modelo (.xlsx)</button>'
-    + '<button class="btn-sm" onclick="document.getElementById(\'importXlsxInput\').click()">⬆ Importar planilha</button>'
-    + '</div></div>'
-    + '<div class="form-card"><h3>+ Novo lançamento / estorno</h3>'
-    + '<div class="tipo-toggle" style="margin-bottom:12px">'
+    + '<button class="btn-sm" onclick="abrirImportacaoCartao()">⬆ Importar planilha</button>'
+    + '</div>';
+
+  var novoPanelBody = '<div class="tipo-toggle" style="margin-bottom:12px">'
     + '<button class="tipo-btn debito active" id="tc-lanc" onclick="setTipoCartao(\'lancamento\')">− Lançamento</button>'
     + '<button class="tipo-btn credito" id="tc-estorno" onclick="setTipoCartao(\'estorno\')">↩ Estorno</button>'
     + '</div>'
@@ -96,7 +146,12 @@ function renderCartao() {
     + '<div class="form-group"><label>Descrição</label><input type="text" id="cc-desc" placeholder="Ex: Supermercado…"/></div>'
     + '<div class="form-group" style="max-width:165px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cartao\')">(+ gerir)</span></label><select id="cc-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:138px"><label>Valor (R$)</label><input type="text" id="cc-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
-    + '</div><button class="btn-add" onclick="addCartaoItem()">Adicionar</button></div>'
+    + '</div><button class="btn-add" onclick="addCartaoItem()">Adicionar</button>';
+
+  var html = '<div id="cc-summary-area"></div>'
+    + cartaoPanel('cadastrados', '💳 Cartões cadastrados', cardsPanelBody)
+    + cartaoPanel('importar', '📄 Importar fatura via planilha', importPanelBody)
+    + cartaoPanel('novo', '+ Novo lançamento / estorno', novoPanelBody)
     + '<div class="form-card"><h3>💰 Pagar fatura</h3>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:180px"><label>Cartão</label><select id="pg-cartao">' + (c.cartoes.length === 0 ? '<option value="">— sem cartão —</option>' : cartaoOpts) + '</select></div>'
@@ -127,7 +182,17 @@ function _renderCartaoFiltroETabela() {
   if (!Array.isArray(c.cartao)) c.cartao = [];
 
   var cols = getColOrder('cartao', COLS_CARTAO);
-  var itens = _ccFiltro.size === 0 ? c.cartao : c.cartao.filter(it => _ccFiltro.has(it.cartaoId));
+  var meses = [...new Set(c.cartao.map(it => (it.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
+  var cats = [...new Set(c.cartao.map(it => it.cat || '').filter(Boolean))].sort();
+  var itensBase = _ccFiltro.size === 0 ? c.cartao : c.cartao.filter(it => _ccFiltro.has(it.cartaoId));
+  var itens = itensBase.filter(it => {
+    var texto = ((it.desc || '') + ' ' + (it.cat || '')).toLowerCase();
+    if (_ccFiltroMes && !(it.data || '').startsWith(_ccFiltroMes)) return false;
+    if (_ccFiltroTipo !== 'todos' && it.tipo !== _ccFiltroTipo) return false;
+    if (_ccFiltroCat && it.cat !== _ccFiltroCat) return false;
+    if (_ccFiltroBusca && !texto.includes(_ccFiltroBusca)) return false;
+    return true;
+  });
 
   var lancs = itens.filter(i => i.tipo !== 'estorno');
   var ests  = itens.filter(i => i.tipo === 'estorno');
@@ -145,6 +210,12 @@ function _renderCartaoFiltroETabela() {
   }
 
   var todoAtivo = _ccFiltro.size === 0;
+  var filtroMesOpts = meses.map(m => {
+    var parts = m.split('-');
+    return '<option value="' + m + '"' + (_ccFiltroMes === m ? ' selected' : '') + '>' + parts[1] + '/' + parts[0] + '</option>';
+  }).join('');
+  var filtroCatOpts = cats.map(cat => '<option value="' + esc(cat) + '"' + (_ccFiltroCat === cat ? ' selected' : '') + '>' + esc(cat) + '</option>').join('');
+
   var filterHtml = '<div class="cc-filter-row"><span class="cc-filter-label">🔍 Filtrar por cartão:</span>'
     + '<span class="cc-chip todos' + (todoAtivo ? ' active' : '') + '" onclick="toggleFiltroCartao(\'__todos\')">Todos</span>';
 
@@ -158,6 +229,15 @@ function _renderCartaoFiltroETabela() {
   }
 
   filterHtml += '</div>';
+  filterHtml += '<div class="form-card"><h3>Filtros</h3>'
+    + '<div class="form-row">'
+    + '<div class="form-group" style="max-width:150px"><label>Período</label><select id="cc-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="cc-filtro-tipo"><option value="todos"' + (_ccFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="lancamento"' + (_ccFiltroTipo === 'lancamento' ? ' selected' : '') + '>Lançamento</option><option value="estorno"' + (_ccFiltroTipo === 'estorno' ? ' selected' : '') + '>Estorno</option></select></div>'
+    + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="cc-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
+    + '<div class="form-group"><label>Busca</label><input type="text" id="cc-filtro-busca" value="' + esc(_ccFiltroBusca) + '" placeholder="Descrição ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosCartao()"/></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosCartao()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosCartao()">Limpar</button></div>'
+    + '</div>';
 
   var area = document.getElementById('cc-filter-table-area');
   if (!area) return;
@@ -176,6 +256,7 @@ function _renderCartaoFiltroETabela() {
 }
 
 async function addCartaoCard() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var nome = document.getElementById('cc-nome').value.trim();
   var digits = document.getElementById('cc-digits').value.replace(/\D/g, '').slice(0, 4);
   var bandeira = document.getElementById('cc-bandeira').value;
@@ -186,14 +267,14 @@ async function addCartaoCard() {
 
   const { error } = await supabaseClient
     .from('cartoes')
-    .insert([{
+    .insert([Object.assign({
       cliente_id: activeClient,
       nome,
       digits,
       bandeira,
       limite: Number(limite || 0),
       venc: Number(venc || 0)
-    }]);
+    }, getUserScopePayload())]);
 
   if (error) {
     console.error('Erro ao cadastrar cartão:', error);
@@ -206,12 +287,15 @@ async function addCartaoCard() {
 }
 
 async function deleteCartaoCard(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   if (!confirm('Remover cartão?')) return;
 
-  const { error } = await supabaseClient
-    .from('cartoes')
-    .delete()
-    .eq('id', id);
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('cartoes')
+      .delete()
+      .eq('id', id)
+  );
 
   if (error) {
     console.error('Erro ao excluir cartão:', error);
@@ -224,25 +308,27 @@ async function deleteCartaoCard(id) {
 }
 
 async function addCartaoItem() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var d_ = document.getElementById('cc-data').value;
   var cartaoId = (document.getElementById('cc-cartao-sel') && document.getElementById('cc-cartao-sel').value) || '';
   var desc = document.getElementById('cc-desc').value.trim();
   var cat = document.getElementById('cc-cat').value;
   var valor = parseMoney(document.getElementById('cc-valor'));
 
+  if (!cartaoId) return alert('Selecione um cartão para o lançamento.');
   if (!desc || !valor) return alert('Preencha descrição e valor.');
 
   const { error } = await supabaseClient
     .from('lancamentos_cartao')
-    .insert([{
+    .insert([Object.assign({
       cliente_id: activeClient,
-      cartao_id: cartaoId || null,
+      cartao_id: cartaoId,
       data: d_ || null,
       descricao: desc,
       categoria: cat || null,
       tipo: _ccTipo,
       valor: Number(valor || 0)
-    }]);
+    }, getUserScopePayload())]);
 
   if (error) {
     console.error('Erro ao cadastrar lançamento do cartão:', error);
@@ -255,16 +341,19 @@ async function addCartaoItem() {
 }
 
 async function deleteCartaoItem(i) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   if (!confirm('Remover item?')) return;
 
   var c = data.clients[activeClient];
   var item = c.cartao[i];
   if (!item || !item.id) return;
 
-  const { error } = await supabaseClient
-    .from('lancamentos_cartao')
-    .delete()
-    .eq('id', item.id);
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('lancamentos_cartao')
+      .delete()
+      .eq('id', item.id)
+  );
 
   if (error) {
     console.error('Erro ao excluir item do cartão:', error);
@@ -290,10 +379,25 @@ function exportCsvTemplate() {
   XLSX.writeFile(wb, 'modelo_fatura_granafy.xlsx');
 }
 
+function abrirImportacaoCartao() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var sel = document.getElementById('cc-import-cartao');
+  if (!sel || !sel.value) {
+    alert('Selecione ou cadastre um cartão antes de importar a fatura.');
+    return;
+  }
+  document.getElementById('importXlsxInput').click();
+}
+
 async function importXlsx(event) {
   var file = event.target.files[0];
   if (!file) return;
   if (!activeClient) return alert('Selecione um cliente primeiro.');
+  var importCartaoId = (document.getElementById('cc-import-cartao') && document.getElementById('cc-import-cartao').value) || '';
+  if (!importCartaoId) {
+    event.target.value = '';
+    return alert('Selecione o cartão da fatura antes de importar.');
+  }
 
   var reader = new FileReader();
   reader.onload = async function(e) {
@@ -341,15 +445,15 @@ async function importXlsx(event) {
 
       const { error } = await supabaseClient
         .from('lancamentos_cartao')
-        .insert([{
+        .insert([Object.assign({
           cliente_id: activeClient,
-          cartao_id: null,
+          cartao_id: importCartaoId,
           data: dataFmt || null,
           descricao: desc,
           categoria: cat,
           tipo: tipo,
           valor: Number(valor || 0)
-        }]);
+        }, getUserScopePayload())]);
 
       if (error) {
         console.error('Erro ao importar item da planilha:', row, error);
@@ -369,6 +473,7 @@ async function importXlsx(event) {
 }
 
 async function pagarFaturaCartao() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var cartaoId = document.getElementById('pg-cartao').value;
   var valor = parseMoney(document.getElementById('pg-valor'));
   var dataPg = document.getElementById('pg-data').value;
@@ -391,7 +496,7 @@ async function pagarFaturaCartao() {
 
   const { error } = await supabaseClient
     .from('lancamentos')
-    .insert([payload]);
+    .insert([Object.assign(payload, getUserScopePayload())]);
 
   if (error) {
     console.error(error);

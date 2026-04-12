@@ -11,6 +11,9 @@ function exportPDF() {
   var W = 210, M = 14, y = M;
   var hoje   = new Date().toLocaleDateString('pt-BR');
   var fmtVal = v => 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  var filtroEl = document.getElementById('graficos-mes-sel');
+  var mesFiltro = filtroEl ? filtroEl.value : '';
+  var periodoLabel = mesFiltro ? mesFiltro.split('-').reverse().join('/') : 'Todos os meses';
 
   // Cabeçalho
   doc.setFillColor(30,35,54); doc.rect(0,0,W,28,'F');
@@ -18,21 +21,24 @@ function exportPDF() {
   doc.text('Granafy', M, 12);
   doc.setFontSize(10); doc.setFont('helvetica','normal');
   doc.text('Relatório Financeiro — ' + c.name, M+30, 12);
+  doc.text('Período: ' + periodoLabel, M+30, 18);
   doc.text('Gerado em ' + hoje, W-M, 19, {align:'right'});
   doc.setFontSize(8); doc.setTextColor(150,175,220);
   doc.text('Desenvolvido por Levy Lima - Teste Beta Granafy', M, 23);
   y = 36;
 
-  var todas = getTransacoes(activeClient);
+  var todasBase = getTransacoes(activeClient);
+  var todas = mesFiltro ? todasBase.filter(l => (l.data || '').startsWith(mesFiltro)) : todasBase;
+  var cartaoFiltrado = mesFiltro ? (c.cartao || []).filter(it => (it.data || '').startsWith(mesFiltro)) : (c.cartao || []);
+  var extratoFiltrado = mesFiltro ? (c.extrato || []).filter(l => (l.data || '').startsWith(mesFiltro)) : (c.extrato || []);
   var tR = todas.filter(l=>l.tipo==='credito').reduce((s,l)=>s+l.valor,0);
   var tD = todas.filter(l=>l.tipo==='debito').reduce((s,l)=>s+l.valor,0);
   var saldo = tR-tD;
-  var faturaTotal = (c.cartao||[]).filter(it=>it.tipo!=='estorno').reduce((s,it)=>s+Number(it.valor),0)
-    - (c.cartao||[]).filter(it=>it.tipo==='estorno').reduce((s,it)=>s+Number(it.valor),0);
+  var faturaTotal = cartaoFiltrado.reduce((s,it)=>s+(it.tipo==='estorno'?-Number(it.valor || 0):Number(it.valor || 0)),0);
 
   // Resumo geral
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,35,54);
-  doc.text('RESUMO GERAL', M, y); y+=6;
+  doc.text('RESUMO GERAL - ' + periodoLabel, M, y); y+=6;
   doc.setDrawColor(91,140,255); doc.setLineWidth(.4); doc.line(M,y,W-M,y); y+=5;
   var cards = [['Total Receitas',fmtVal(tR),'#1fad90'],['Total Despesas',fmtVal(tD),'#e03b3b'],['Resultado',fmtVal(saldo),saldo>=0?'#1fad90':'#e03b3b'],['Fatura Cartão',fmtVal(faturaTotal),'#d4900a']];
   var cw = (W-M*2-9)/4;
@@ -66,7 +72,7 @@ function exportPDF() {
   y=doc.lastAutoTable.finalY+10;
 
   // Receitas e Despesas por mês
-  var meses = [...new Set(todas.map(l=>(l.data||'').slice(0,7)).filter(Boolean))].sort().reverse().slice(0,6);
+  var meses = mesFiltro ? [mesFiltro] : [...new Set(todas.map(l=>(l.data||'').slice(0,7)).filter(Boolean))].sort().reverse().slice(0,6);
   if (meses.length>0){
     if(y>230){doc.addPage();y=M;}
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,35,54);
@@ -78,7 +84,7 @@ function exportPDF() {
   }
 
   // Cartão de crédito
-  var cartao=c.cartao||[];
+  var cartao=cartaoFiltrado;
   if(cartao.length>0){
     if(y>230){doc.addPage();y=M;}
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,35,54);
@@ -90,7 +96,7 @@ function exportPDF() {
   }
 
   // Conta corrente
-  var extrato=c.extrato||[];
+  var extrato=extratoFiltrado;
   if(extrato.length>0){
     if(y>230){doc.addPage();y=M;}
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,35,54);

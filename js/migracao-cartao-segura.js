@@ -1,4 +1,10 @@
 window.migrarCartaoSemDuplicar = async function () {
+  const uid = currentUserId();
+  if (!uid) {
+    alert('Entre com um usuario antes de migrar os cartoes.');
+    return;
+  }
+
   const bruto = localStorage.getItem('fb_data');
   if (!bruto) {
     console.log('Nenhum fb_data encontrado no localStorage.');
@@ -13,11 +19,11 @@ window.migrarCartaoSemDuplicar = async function () {
     const nomeCliente = (cliente.name || '').trim();
     if (!nomeCliente) continue;
 
-    const { data: clienteDB, error: erroCliente } = await supabaseClient
+    const { data: clienteDB, error: erroCliente } = await applyUserScope(supabaseClient
       .from('clientes')
       .select('id,nome')
       .eq('nome', nomeCliente)
-      .maybeSingle();
+    ).maybeSingle();
 
     if (erroCliente) {
       console.error('Erro ao buscar cliente:', nomeCliente, erroCliente);
@@ -39,13 +45,13 @@ window.migrarCartaoSemDuplicar = async function () {
       const nome = (cc.nome || '').trim() || null;
       const digits = (cc.digits || '').trim() || null;
 
-      const { data: cartaoExistente, error: erroBuscaCartao } = await supabaseClient
+      const { data: cartaoExistente, error: erroBuscaCartao } = await applyUserScope(supabaseClient
         .from('cartoes')
         .select('id,nome,digits')
         .eq('cliente_id', clienteId)
         .eq('nome', nome)
         .eq('digits', digits)
-        .maybeSingle();
+      ).maybeSingle();
 
       if (erroBuscaCartao) {
         console.error('Erro ao buscar cartão:', nomeCliente, cc, erroBuscaCartao);
@@ -57,14 +63,14 @@ window.migrarCartaoSemDuplicar = async function () {
       } else {
         const { data: novoCartao, error: erroNovoCartao } = await supabaseClient
           .from('cartoes')
-          .insert([{
+          .insert([Object.assign({
             cliente_id: clienteId,
             nome: nome,
             digits: digits,
             bandeira: cc.bandeira || null,
             limite: Number(cc.limite || 0),
             venc: Number(cc.venc || 0)
-          }])
+          }, getUserScopePayload())])
           .select('id')
           .single();
 
@@ -81,6 +87,10 @@ window.migrarCartaoSemDuplicar = async function () {
     // 2) Migrar lançamentos/estornos do cartão sem duplicar
     for (const it of (cliente.cartao || [])) {
       const cartaoIdNovo = it.cartaoId ? mapaCartoes[it.cartaoId] || null : null;
+      if (!cartaoIdNovo) {
+        console.warn('Lancamento de cartao ignorado sem cartao vinculado:', nomeCliente, it);
+        continue;
+      }
 
       const payloadBusca = {
         cliente_id: clienteId,
@@ -88,31 +98,27 @@ window.migrarCartaoSemDuplicar = async function () {
         data: it.data || null,
         descricao: it.desc || null,
         categoria: it.cat || null,
-        tipo: it.tipo || null,
+        tipo: it.tipo === 'estorno' ? 'estorno' : 'lancamento',
         valor: Number(it.valor || 0)
       };
 
-      let query = supabaseClient
+      let query = applyUserScope(supabaseClient
         .from('lancamentos_cartao')
         .select('id')
          .eq('cliente_id', payloadBusca.cliente_id)
          .eq('descricao', payloadBusca.descricao)
          .eq('tipo', payloadBusca.tipo)
-        .eq('valor', payloadBusca.valor);
+        .eq('valor', payloadBusca.valor));
 
 // tratamento do cartão
-        if (payloadBusca.cartao_id) {
-          query = query.eq('cartao_id', payloadBusca.cartao_id);
-} else {
-  query = query.is('cartao_id', null);
-}
+      query = query.eq('cartao_id', payloadBusca.cartao_id);
 
 // 🔥 tratamento da DATA (correção do erro)
-if (payloadBusca.data) {
-  query = query.eq('data', payloadBusca.data);
-} else {
-  query = query.is('data', null);
-}
+      if (payloadBusca.data) {
+        query = query.eq('data', payloadBusca.data);
+      } else {
+        query = query.is('data', null);
+      }
 
       const { data: itemExistente, error: erroBuscaItem } = await query.maybeSingle();
 
@@ -124,7 +130,7 @@ if (payloadBusca.data) {
       if (!itemExistente) {
         const { error: erroInsertItem } = await supabaseClient
           .from('lancamentos_cartao')
-          .insert([payloadBusca]);
+          .insert([Object.assign(payloadBusca, getUserScopePayload())]);
 
         if (erroInsertItem) {
           console.error('Erro ao inserir lançamento de cartão:', nomeCliente, it, erroInsertItem);

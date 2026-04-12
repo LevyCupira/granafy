@@ -60,10 +60,14 @@ function renderSettingsModal(activeTabKey) {
     '<div class="modal-tabs" id="settingsTabs">'
     + '<button class="modal-tab" data-stab="cats_cc"     onclick="switchSettingsTab(\'cats_cc\')">🏦 Categorias Conta Corrente</button>'
     + '<button class="modal-tab" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')">💳 Categorias Cartão</button>'
+    + (isAdminUser() ? '<button class="modal-tab" data-stab="usuarios" onclick="switchSettingsTab(\'usuarios\')">Usuários</button>' : '')
+    + '<button class="modal-tab" data-stab="auditoria"   onclick="switchSettingsTab(\'auditoria\')">Auditoria</button>'
     + '<button class="modal-tab" data-stab="tema"        onclick="switchSettingsTab(\'tema\')">🎨 Tema</button>'
     + '</div>'
     + '<div id="modal-panel-cats_cc"     class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
+    + '<div id="modal-panel-usuarios"    class="modal-panel"></div>'
+    + '<div id="modal-panel-auditoria"   class="modal-panel"></div>'
     + '<div id="modal-panel-tema"        class="modal-panel"></div>';
   switchSettingsTab(activeTabKey || 'cats_cc');
 }
@@ -75,7 +79,84 @@ function switchSettingsTab(tab) {
   panel.classList.add('active');
   if (tab === 'cats_cc')     renderCatsPanel('cc');
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
+  if (tab === 'usuarios')    renderUsuariosPanel();
+  if (tab === 'auditoria')   renderAuditoriaPanel();
   if (tab === 'tema')        renderTemaPanel();
+}
+
+function renderAuditoriaPanel() {
+  document.getElementById('modal-panel-auditoria').innerHTML =
+    '<p style="color:var(--muted);font-size:.83rem;margin-bottom:13px">Verifica lançamentos de cartão sem alterar nenhum dado no banco.</p>'
+    + '<button class="btn-add" style="margin-top:0" onclick="renderAuditoriaCartoes()">Auditar cartões agora</button>'
+    + '<div id="auditoria-cartoes-output"></div>';
+}
+
+async function renderUsuariosPanel() {
+  const panel = document.getElementById('modal-panel-usuarios');
+  if (!panel) return;
+
+  if (!isAdminUser()) {
+    panel.innerHTML = '<p style="color:var(--muted);font-size:.83rem">Apenas administradores podem visualizar usuários.</p>';
+    return;
+  }
+
+  panel.innerHTML = '<p style="color:var(--muted);font-size:.83rem">Carregando usuários...</p>';
+
+  const { data: perfis, error } = await supabaseClient
+    .from('perfis')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    panel.innerHTML = '<p style="color:var(--danger);font-size:.83rem">Não foi possível carregar usuários. Rode a migração de perfis no Supabase.</p>';
+    console.error(error);
+    return;
+  }
+
+  panel.innerHTML =
+    '<p style="color:var(--muted);font-size:.83rem;margin-bottom:13px">Gerencie tipo de acesso, limite de clientes, plano e status.</p>'
+    + '<div class="user-table-wrap"><table><thead><tr><th>Usuário</th><th>Tipo</th><th>Limite</th><th>Plano</th><th>Status</th><th></th></tr></thead><tbody>'
+    + (perfis || []).map(p => {
+      var id = esc(p.id);
+      return '<tr>'
+        + '<td><strong>' + esc(p.nome || p.email || '-') + '</strong><br><span style="color:var(--muted);font-size:.72rem">' + esc(p.email || '-') + (p.telefone ? ' · ' + esc(p.telefone) : '') + '</span></td>'
+        + '<td><select id="usr-tipo-' + id + '"><option value="cliente"' + (p.tipo_acesso === 'cliente' ? ' selected' : '') + '>Cliente</option><option value="admin"' + (p.tipo_acesso === 'admin' ? ' selected' : '') + '>Admin</option></select></td>'
+        + '<td><input id="usr-limite-' + id + '" type="number" min="0" value="' + Number(p.limite_clientes || 0) + '"/></td>'
+        + '<td><input id="usr-plano-' + id + '" value="' + esc(p.plano || 'gratuito') + '"/></td>'
+        + '<td><select id="usr-status-' + id + '"><option value="ativo"' + (p.status === 'ativo' ? ' selected' : '') + '>Ativo</option><option value="teste"' + (p.status === 'teste' ? ' selected' : '') + '>Teste</option><option value="bloqueado"' + (p.status === 'bloqueado' ? ' selected' : '') + '>Bloqueado</option></select></td>'
+        + '<td><button class="btn-sm" onclick="salvarPerfilUsuario(\'' + id + '\')">Salvar</button></td>'
+        + '</tr>';
+    }).join('')
+    + '</tbody></table></div>';
+}
+
+async function salvarPerfilUsuario(id) {
+  if (!isAdminUser()) return alert('Apenas administradores podem alterar usuários.');
+
+  const tipo = document.getElementById('usr-tipo-' + id).value;
+  const limite = parseInt(document.getElementById('usr-limite-' + id).value, 10);
+  const plano = document.getElementById('usr-plano-' + id).value.trim() || 'gratuito';
+  const status = document.getElementById('usr-status-' + id).value;
+
+  const { error } = await supabaseClient
+    .from('perfis')
+    .update({
+      tipo_acesso: tipo,
+      limite_clientes: Number.isFinite(limite) ? limite : 1,
+      plano,
+      status
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error(error);
+    alert('Não foi possível salvar o usuário.');
+    return;
+  }
+
+  alert('Usuário atualizado.');
+  await loadAuthProfile();
+  renderUsuariosPanel();
 }
 
 function renderCatsPanel(tipo) {
