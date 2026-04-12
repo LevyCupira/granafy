@@ -47,6 +47,32 @@ function initMoneyInputs(scope) {
 }
 
 // ── Motor de colunas móveis (drag & drop nas tabelas) ──
+function applySidebarMenuState(minimized) {
+  var sidebar = document.getElementById('appSidebar');
+  var btn = document.getElementById('sidebarToggle');
+  if (!sidebar || !btn) return;
+
+  sidebar.classList.toggle('minimized', !!minimized);
+  btn.textContent = minimized ? 'Abrir' : 'Recolher';
+  btn.title = minimized ? 'Abrir menu' : 'Minimizar menu';
+  btn.setAttribute('aria-expanded', minimized ? 'false' : 'true');
+}
+
+function toggleSidebarMenu() {
+  var sidebar = document.getElementById('appSidebar');
+  if (!sidebar) return;
+
+  var minimized = !sidebar.classList.contains('minimized');
+  try { localStorage.setItem('granafy_sidebar_minimized', minimized ? '1' : '0'); } catch (e) {}
+  applySidebarMenuState(minimized);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var minimized = false;
+  try { minimized = localStorage.getItem('granafy_sidebar_minimized') === '1'; } catch (e) {}
+  applySidebarMenuState(minimized);
+});
+
 var colOrders = (function() {
   try { return JSON.parse(localStorage.getItem('fb_col_orders')) || {}; } catch { return {}; }
 })();

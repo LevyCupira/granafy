@@ -130,18 +130,119 @@ function saveData() {
   // Não usamos mais localStorage
 }
 
+function tabOrderStorageKey() {
+  var uid = typeof currentUserId === 'function' ? currentUserId() : 'anon';
+  return 'granafy_tab_order_' + (uid || 'anon');
+}
+
+function getOrderedTabs() {
+  var saved = [];
+  try { saved = JSON.parse(localStorage.getItem(tabOrderStorageKey())) || []; } catch (e) { saved = []; }
+
+  var map = Object.fromEntries(TAB_DEFS.map(tab => [tab.key, tab]));
+  var ordered = saved.filter(key => map[key]).map(key => map[key]);
+  TAB_DEFS.forEach(tab => {
+    if (!saved.includes(tab.key)) ordered.push(tab);
+  });
+  return ordered;
+}
+
+function saveTabOrder(keys) {
+  try { localStorage.setItem(tabOrderStorageKey(), JSON.stringify(keys)); } catch (e) {}
+}
+
+function moveTabBefore(srcKey, dstKey) {
+  if (!srcKey || !dstKey || srcKey === dstKey) return;
+
+  var keys = getOrderedTabs().map(tab => tab.key);
+  var from = keys.indexOf(srcKey);
+  var to = keys.indexOf(dstKey);
+  if (from < 0 || to < 0) return;
+
+  keys.splice(from, 1);
+  keys.splice(to, 0, srcKey);
+  saveTabOrder(keys);
+  renderTabs();
+}
+
 function renderTabs() {
   const container = document.getElementById('tabsContainer');
   if (!container) return;
 
-  container.innerHTML = TAB_DEFS.map(tab =>
-    '<button class="tab-btn' + (tab.key === activeTab ? ' active' : '') + '" onclick="switchTab(\'' + tab.key + '\')">' +
+  container.innerHTML = getOrderedTabs().map(tab =>
+    '<button class="tab-btn' + (tab.key === activeTab ? ' active' : '') + '" draggable="true" data-tab="' + tab.key + '" onclick="switchTab(\'' + tab.key + '\')">' +
     tab.label +
     '</button>'
   ).join('');
 
+  initTabDrag(container);
+
   document.querySelectorAll('.tab-panel').forEach(panel => {
     panel.classList.toggle('active', panel.id === 'tab-' + activeTab);
+  });
+}
+
+function initTabDrag(container) {
+  var dragKey = null;
+  var pointer = null;
+  var suppressClick = false;
+
+  container.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      if (!suppressClick) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
+
+    btn.addEventListener('dragstart', e => {
+      dragKey = btn.dataset.tab;
+      btn.classList.add('tab-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    btn.addEventListener('dragend', () => {
+      btn.classList.remove('tab-dragging');
+      container.querySelectorAll('.tab-btn').forEach(item => item.classList.remove('tab-drag-over'));
+      dragKey = null;
+    });
+
+    btn.addEventListener('dragover', e => {
+      e.preventDefault();
+      container.querySelectorAll('.tab-btn').forEach(item => item.classList.remove('tab-drag-over'));
+      if (btn.dataset.tab !== dragKey) btn.classList.add('tab-drag-over');
+    });
+
+    btn.addEventListener('dragleave', () => btn.classList.remove('tab-drag-over'));
+
+    btn.addEventListener('drop', e => {
+      e.preventDefault();
+      btn.classList.remove('tab-drag-over');
+      moveTabBefore(dragKey, btn.dataset.tab);
+    });
+
+    btn.addEventListener('pointerdown', e => {
+      pointer = { key: btn.dataset.tab, x: e.clientX, y: e.clientY, moved: false };
+    });
+
+    btn.addEventListener('pointermove', e => {
+      if (!pointer || pointer.key !== btn.dataset.tab) return;
+      if (Math.abs(e.clientX - pointer.x) > 24 || Math.abs(e.clientY - pointer.y) > 18) pointer.moved = true;
+    });
+
+    btn.addEventListener('pointerup', e => {
+      if (!pointer || pointer.key !== btn.dataset.tab) return;
+      var current = pointer;
+      pointer = null;
+      if (!current.moved) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 0);
+      var target = document.elementFromPoint(e.clientX, e.clientY);
+      var targetBtn = target && target.closest ? target.closest('.tab-btn') : null;
+      if (targetBtn) moveTabBefore(current.key, targetBtn.dataset.tab);
+    });
   });
 }
 

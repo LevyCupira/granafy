@@ -3,8 +3,15 @@
 var _exTipo = 'credito';
 var _exFiltroTipo = 'todos';
 var _exFiltroCat = '';
-var _exFiltroMes = '';
+var _exFiltroMes = getPreviousMonthKey();
 var _exFiltroBusca = '';
+
+function getPreviousMonthKey() {
+  var d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
 
 function setTipoExtrato(t) {
   _exTipo = t;
@@ -69,7 +76,10 @@ function renderExtrato() {
   var saldo = totalCredito - totalDebito;
   var catOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var filtroCatOpts = catsLanc.map(cat => '<option value="' + esc(cat) + '"' + (_exFiltroCat === cat ? ' selected' : '') + '>' + esc(cat) + '</option>').join('');
-  var filtroMesOpts = meses.map(m => {
+  var mesesFiltro = meses.slice();
+  if (_exFiltroMes && !mesesFiltro.includes(_exFiltroMes)) mesesFiltro.unshift(_exFiltroMes);
+
+  var filtroMesOpts = mesesFiltro.map(m => {
     var parts = m.split('-');
     return '<option value="' + m + '"' + (_exFiltroMes === m ? ' selected' : '') + '>' + parts[1] + '/' + parts[0] + '</option>';
   }).join('');

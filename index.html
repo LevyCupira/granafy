@@ -6,16 +6,19 @@
 <title>Granafy</title>
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="css/style.css?v=20260412-9"/>
+<link rel="stylesheet" href="css/style.css?v=20260412-10"/>
 <link rel="icon" href="data:,">
 </head>
 
 <body>
 <div class="app">
-  <aside class="sidebar">
+  <aside class="sidebar" id="appSidebar">
     <div class="sidebar-logo">
-      <span class="logo-text">Granafy</span>
-      <span>Gestão Financeira</span>
+      <div>
+        <span class="logo-text">Granafy</span>
+        <span>Gestão Financeira</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebarMenu()" aria-expanded="true" title="Minimizar menu">Recolher</button>
     </div>
 
     <nav class="sidebar-nav">
@@ -122,18 +125,18 @@
 <script src="js/auth.js?v=20260412-13"></script>
 <script src="js/migracao.js?v=20260412-5"></script>
 
-<script src="js/utils.js?v=20260412-3"></script>
-<script src="js/clientes.js?v=20260412-9"></script>
+<script src="js/utils.js?v=20260412-4"></script>
+<script src="js/clientes.js?v=20260412-10"></script>
 <script src="js/categorias.js?v=20260412-3"></script>
 <script src="js/cartao.js?v=20260412-8"></script>
-<script src="js/dividas.js?v=20260412-8"></script>
-<script src="js/extrato.js?v=20260412-8"></script>
+<script src="js/dividas.js?v=20260412-9"></script>
+<script src="js/extrato.js?v=20260412-9"></script>
 <script src="js/resumo.js?v=20260412-3"></script>
 <script src="js/dre.js?v=20260412-3"></script>
 <script src="js/graficos.js?v=20260412-4"></script>
 <script src="js/pdf.js?v=20260412-4"></script>
 <script src="js/settings.js?v=20260412-5"></script>
-<script src="js/data.js?v=20260412-11"></script>
+<script src="js/data.js?v=20260412-12"></script>
 <script src="js/migracao-cartao-segura.js?v=20260412-6"></script>
 <script src="js/auditoria.js?v=20260412-3"></script>
 </body>

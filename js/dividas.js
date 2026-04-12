@@ -15,6 +15,53 @@ var _dvHistOpen = new Set();
 var _dvFiltroStatus = 'todos';
 var _dvFiltroTipo = '';
 var _dvFiltroBusca = '';
+var _dvPanels = {
+  calc: false,
+  novo: false,
+  filtros: true
+};
+
+function toggleDividasPanel(key) {
+  _dvPanels[key] = !_dvPanels[key];
+  renderDividas();
+}
+
+function setupDividasCollapsiblePanels(area) {
+  if (!area) return;
+
+  var cards = area.querySelectorAll('.form-card');
+  setupDividasPanelDom(area.querySelector('.calc-bc'), 'calc', 'Simulador de financiamento');
+  setupDividasPanelDom(cards[0], 'novo', '+ Nova d\u00edvida');
+  setupDividasPanelDom(cards[1], 'filtros', 'Filtros');
+}
+
+function setupDividasPanelDom(card, key, title) {
+  if (!card) return;
+
+  var open = !!_dvPanels[key];
+  var children = Array.from(card.childNodes);
+  var body = document.createElement('div');
+  body.className = 'collapse-body';
+
+  children.forEach(function(node) {
+    if (node.nodeType === 1 && node.tagName && node.tagName.toLowerCase() === 'h3') return;
+    body.appendChild(node);
+  });
+
+  card.innerHTML = '';
+  card.classList.add('collapsible-card');
+  card.classList.toggle('open', open);
+
+  var button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'collapse-head';
+  button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  button.onclick = function() { toggleDividasPanel(key); };
+  button.innerHTML = '<span>' + esc(title) + '</span><span class="collapse-hint">' + (open ? 'Minimizar' : 'Abrir') + '</span>';
+  card.appendChild(button);
+
+  if (open) card.appendChild(body);
+}
 
 function calcPrice(pv, iMensal, n) {
   if (!pv || !n) return null;
@@ -226,6 +273,7 @@ function renderDividas() {
     + lista;
 
   initMoneyInputs(area);
+  setupDividasCollapsiblePanels(area);
 }
 
 function calcularDivida() {

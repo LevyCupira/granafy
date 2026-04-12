@@ -194,7 +194,7 @@ function selectClient(id) {
   _dvFiltroBusca = '';
   _exFiltroTipo = 'todos';
   _exFiltroCat = '';
-  _exFiltroMes = '';
+  _exFiltroMes = typeof getPreviousMonthKey === 'function' ? getPreviousMonthKey() : '';
   _exFiltroBusca = '';
 
   renderClientList();
