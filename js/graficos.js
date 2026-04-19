@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════
 
 var _chartInstances = {};
+var _graficosPeriodos = null;
 
 function destroyChart(id) {
   if (_chartInstances[id]) { _chartInstances[id].destroy(); delete _chartInstances[id]; }
@@ -14,17 +15,19 @@ function renderGraficos() {
   var mesesSet = [...new Set([
     ...todas.map(l => (l.data || '').slice(0,7)).filter(Boolean),
     ...(c.cartao || []).map(l => (l.data || '').slice(0,7)).filter(Boolean)
-  ])].sort();
-  var ultimos6 = mesesSet.slice(-6);
-  var selEl    = document.getElementById('graficos-mes-sel');
-  var mesFiltro = selEl ? selEl.value : '';
-  var mesOpts  = mesesSet.map(m => { var [y,mo] = m.split('-'); return '<option value="' + m + '"' + (m === mesFiltro ? 'selected' : '') + '>' + mo + '/' + y + '</option>'; }).join('');
+  ])].sort().reverse();
+  var periodos = lerPeriodosSelecionados('graficos-periodos-sel', mesesSet, _graficosPeriodos);
+  _graficosPeriodos = periodos;
+  var periodoSet = new Set(periodos);
+  var periodosGrafico = periodos.slice().sort();
+  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
+  var mesFiltro = periodos.length === 1 ? periodos[0] : '';
 
   document.getElementById('graficos-content').innerHTML =
     '<div class="charts-filter-row">'
-    + '<span style="font-size:.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px">Período (categorias/pizza):</span>'
-    + '<select id="graficos-mes-sel" style="background:var(--card);border:1px solid var(--border);color:var(--text);font-family:\'DM Sans\',sans-serif;font-size:.83rem;padding:6px 10px;border-radius:7px;outline:none" onchange="renderGraficos()">'
-    + '<option value=""' + (!mesFiltro ? ' selected' : '') + '>Todos os meses</option>' + mesOpts + '</select>'
+    + '<span class="period-label">Selecionar periodo:</span>'
+    + buildPeriodoMultiSelect('graficos-periodos-sel', mesesSet, periodos, 'renderGraficos()')
+    + '<span class="period-help">' + esc(periodoTexto) + ' &bull; escolha um ou mais meses.</span>'
     + '<button class="btn-pdf" onclick="exportPDF()">📄 Exportar PDF</button>'
     + '</div>'
     + '<div class="charts-grid-top">'
@@ -43,9 +46,9 @@ function renderGraficos() {
 
   // Chart 1: Receitas vs Despesas
   destroyChart('recdesp');
-  var labels1   = ultimos6.map(m => { var [y,mo] = m.split('-'); return mo + '/' + y.slice(2); });
-  var receitas1 = ultimos6.map(m => todas.filter(l => l.tipo === 'credito' && (l.data||'').startsWith(m)).reduce((s,l) => s+l.valor, 0));
-  var despesas1 = ultimos6.map(m => todas.filter(l => l.tipo === 'debito'  && (l.data||'').startsWith(m)).reduce((s,l) => s+l.valor, 0));
+  var labels1   = periodosGrafico.map(m => { var parts = m.split('-'); return parts[1] + '/' + parts[0].slice(2); });
+  var receitas1 = periodosGrafico.map(m => todas.filter(l => l.tipo === 'credito' && (l.data||'').startsWith(m)).reduce((s,l) => s+l.valor, 0));
+  var despesas1 = periodosGrafico.map(m => todas.filter(l => l.tipo === 'debito'  && (l.data||'').startsWith(m)).reduce((s,l) => s+l.valor, 0));
   _chartInstances['recdesp'] = new Chart(document.getElementById('chart-recdesp'), {
     type: 'bar',
     data: { labels: labels1, datasets: [
@@ -57,7 +60,7 @@ function renderGraficos() {
 
   // Chart 2: Pizza categorias
   destroyChart('pizza');
-  var filtradas = (mesFiltro ? todas.filter(l => (l.data||'').startsWith(mesFiltro)) : todas).filter(l => l.tipo === 'debito');
+  var filtradas = todas.filter(l => periodoSet.has((l.data || '').slice(0, 7))).filter(l => l.tipo === 'debito');
   var catMap = {}; filtradas.forEach(l => { var k = l.cat||'Outros'; catMap[k] = (catMap[k]||0)+l.valor; });
   var pizzaEntries = Object.entries(catMap).sort((a,b) => b[1]-a[1]).slice(0,10);
   if (pizzaEntries.length === 0) {
@@ -76,8 +79,7 @@ function renderGraficos() {
   if (cartoes.length === 0 || !c.cartao || c.cartao.length === 0) {
     document.getElementById('chart-fatura').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0"><div class="icon">💳</div>Nenhum lançamento de cartão.</div>';
   } else {
-    var mesesCartao = [...new Set((c.cartao || []).map(it => (it.data || '').slice(0,7)).filter(Boolean))].sort();
-    var mesesFatura = mesFiltro ? [mesFiltro] : mesesCartao.slice(-6);
+    var mesesFatura = periodosGrafico;
     var labels3 = mesesFatura.map(m => { var [y,mo] = m.split('-'); return mo + '/' + y.slice(2); });
     var cartoesComSemVinculo = cartoes.slice();
     if ((c.cartao || []).some(it => !it.cartaoId)) {

@@ -11,9 +11,10 @@ function exportPDF() {
   var W = 210, M = 14, y = M;
   var hoje   = new Date().toLocaleDateString('pt-BR');
   var fmtVal = v => 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  var filtroEl = document.getElementById('graficos-mes-sel');
-  var mesFiltro = filtroEl ? filtroEl.value : '';
-  var periodoLabel = mesFiltro ? mesFiltro.split('-').reverse().join('/') : 'Todos os meses';
+  var periodosFiltro = Array.isArray(window._graficosPeriodos) ? window._graficosPeriodos.filter(Boolean) : [];
+  var periodoSet = new Set(periodosFiltro);
+  var mesFiltro = periodosFiltro.length === 1 ? periodosFiltro[0] : '';
+  var periodoLabel = periodosFiltro.length ? periodosFiltro.map(formatPeriodoLabel).join(', ') : 'Periodo selecionado';
 
   // Cabeçalho
   doc.setFillColor(30,35,54); doc.rect(0,0,W,28,'F');
@@ -28,9 +29,9 @@ function exportPDF() {
   y = 36;
 
   var todasBase = getTransacoes(activeClient);
-  var todas = mesFiltro ? todasBase.filter(l => (l.data || '').startsWith(mesFiltro)) : todasBase;
-  var cartaoFiltrado = mesFiltro ? (c.cartao || []).filter(it => (it.data || '').startsWith(mesFiltro)) : (c.cartao || []);
-  var extratoFiltrado = mesFiltro ? (c.extrato || []).filter(l => (l.data || '').startsWith(mesFiltro)) : (c.extrato || []);
+  var todas = periodosFiltro.length ? todasBase.filter(l => periodoSet.has((l.data || '').slice(0, 7))) : todasBase;
+  var cartaoFiltrado = periodosFiltro.length ? (c.cartao || []).filter(it => periodoSet.has((it.data || '').slice(0, 7))) : (c.cartao || []);
+  var extratoFiltrado = periodosFiltro.length ? (c.extrato || []).filter(l => periodoSet.has((l.data || '').slice(0, 7))) : (c.extrato || []);
   var tR = todas.filter(l=>l.tipo==='credito').reduce((s,l)=>s+l.valor,0);
   var tD = todas.filter(l=>l.tipo==='debito').reduce((s,l)=>s+l.valor,0);
   var saldo = tR-tD;
@@ -72,7 +73,7 @@ function exportPDF() {
   y=doc.lastAutoTable.finalY+10;
 
   // Receitas e Despesas por mês
-  var meses = mesFiltro ? [mesFiltro] : [...new Set(todas.map(l=>(l.data||'').slice(0,7)).filter(Boolean))].sort().reverse().slice(0,6);
+  var meses = periodosFiltro.length ? periodosFiltro.slice().sort().reverse() : [...new Set(todas.map(l=>(l.data||'').slice(0,7)).filter(Boolean))].sort().reverse().slice(0,6);
   if (meses.length>0){
     if(y>230){doc.addPage();y=M;}
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,35,54);

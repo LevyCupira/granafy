@@ -1,7 +1,8 @@
 const SUPABASE_URL = 'https://pjnnkaafrxruooplccnz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_hiH2CKVSf-he9QP_M3ByrQ_wXXbKZbf';
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+var supabaseClient = window.supabaseClient || (window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
+window.supabaseClient = supabaseClient;
 
 async function testarConexao() {
   const { data, error } = await applyUserScope(

@@ -104,6 +104,12 @@ function setAuthLoading(isLoading) {
   });
 }
 
+function supabaseAuthReady() {
+  if (window.supabaseClient && window.supabaseClient.auth) return true;
+  setAuthMessage('Nao foi possivel carregar o Supabase. Recarregue a pagina com Ctrl + F5.', 'error');
+  return false;
+}
+
 function renderAuthScreen() {
   renderAuthUser();
   var root = document.getElementById('auth-root');
@@ -551,6 +557,8 @@ async function loginUsuario() {
     setAuthMessage('Informe e-mail e senha.', 'error');
     return;
   }
+
+  if (!supabaseAuthReady()) return;
 
   try {
     setAuthLoading(true);

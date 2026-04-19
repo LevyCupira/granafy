@@ -5,10 +5,17 @@
 
 // Consolida Conta Corrente + Cartão (lancamento→despesa)
 // Usado por: resumo, dre, graficos, pdf
+var _resumoPeriodos = null;
+
 function getTransacoes(clienteId) {
   var c = data.clients[clienteId];
   var result = [];
-  (c.extrato || []).forEach(l => result.push({ data: l.data, desc: l.desc, cat: l.cat, valor: Number(l.valor), tipo: l.tipo, fonte: 'Conta Corrente' }));
+  var extratoBase = (c.extrato || []).filter(l => !isCategoriaCartaoCreditoResumo(l.cat));
+  var extrato = typeof chaveDuplicidadeExtrato === 'function'
+    ? filtrarExtratoResumoDuplicados(extratoBase)
+    : extratoBase;
+
+  extrato.forEach(l => result.push({ data: l.data, desc: l.desc, cat: l.cat, valor: Number(l.valor), tipo: l.tipo, fonte: 'Conta Corrente' }));
   (c.cartao  || []).filter(l => l.tipo !== 'estorno').forEach(l => {
     var cc    = (c.cartoes || []).find(x => x.id === l.cartaoId);
     var fonte = cc ? 'Cartão ' + cc.nome : 'Cartão de Crédito';
@@ -17,12 +24,89 @@ function getTransacoes(clienteId) {
   return result;
 }
 
+function isCategoriaCartaoCreditoResumo(cat) {
+  var normalizada = String(cat || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+  return normalizada === 'cartao de credito';
+}
+
+function filtrarExtratoResumoDuplicados(lancamentos) {
+  var vistos = new Map();
+  var filtrados = [];
+
+  (lancamentos || []).forEach(l => {
+    var chave = chaveDuplicidadeExtrato(l);
+    var resolvido = typeof duplicadoResolvidoExtrato === 'function' && duplicadoResolvidoExtrato(chave);
+
+    if (resolvido || !vistos.has(chave)) {
+      filtrados.push(l);
+      vistos.set(chave, true);
+    }
+  });
+
+  return filtrados;
+}
+
+function formatPeriodoLabel(m) {
+  var parts = String(m || '').split('-');
+  return parts.length === 2 ? parts[1] + '/' + parts[0] : m;
+}
+
+function lerPeriodosSelecionados(id, meses, atual) {
+  var sel = document.getElementById(id);
+  if (sel) {
+    var valores = Array.from(sel.selectedOptions).map(opt => opt.value).filter(Boolean);
+    return valores.length ? valores : (atual && atual.length ? atual : (meses[0] ? [meses[0]] : []));
+  }
+  return atual && atual.length ? atual : (meses[0] ? [meses[0]] : []);
+}
+
+function buildPeriodoMultiSelect(id, meses, selecionados, onChange) {
+  var selectedMap = new Set(selecionados || []);
+  var label = (selecionados || []).length ? selecionados.map(formatPeriodoLabel).join(', ') : 'Selecionar periodo';
+  var checks = meses.map(m =>
+    '<label class="period-option"><input type="checkbox" value="' + m + '"' + (selectedMap.has(m) ? ' checked' : '') + '/><span>' + formatPeriodoLabel(m) + '</span></label>'
+  ).join('');
+
+  return '<div class="period-picker" data-period-picker="' + id + '">'
+    + '<button type="button" class="period-picker-btn" onclick="togglePeriodoPicker(\'' + id + '\')">' + esc(label) + '</button>'
+    + '<div class="period-picker-menu">' + checks
+    + '<div class="period-picker-actions"><button type="button" class="btn-sm" onclick="aplicarPeriodoPicker(\'' + id + '\',\'' + onChange.replace('()', '') + '\')">Aplicar</button></div>'
+    + '</div></div>';
+}
+
+function togglePeriodoPicker(id) {
+  document.querySelectorAll('.period-picker').forEach(el => {
+    if (el.getAttribute('data-period-picker') !== id) el.classList.remove('open');
+  });
+  var picker = document.querySelector('[data-period-picker="' + id + '"]');
+  if (picker) picker.classList.toggle('open');
+}
+
+function aplicarPeriodoPicker(id, renderFn) {
+  var picker = document.querySelector('[data-period-picker="' + id + '"]');
+  if (!picker) return;
+
+  var valores = Array.from(picker.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+  if (id === 'resumo-periodos-sel') _resumoPeriodos = valores;
+  if (id === 'graficos-periodos-sel') _graficosPeriodos = valores;
+
+  picker.classList.remove('open');
+  if (typeof window[renderFn] === 'function') window[renderFn]();
+}
+
 function renderResumo() {
   var todas = getTransacoes(activeClient);
   var meses = [...new Set(todas.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
-  var selEl    = document.getElementById('resumo-mes-sel');
-  var mesAtual = selEl ? selEl.value : (meses[0] || '');
-  var filtered = mesAtual ? todas.filter(l => (l.data || '').startsWith(mesAtual)) : todas;
+  var periodos = lerPeriodosSelecionados('resumo-periodos-sel', meses, _resumoPeriodos);
+  _resumoPeriodos = periodos;
+  var periodoSet = new Set(periodos);
+  var filtered = periodos.length ? todas.filter(l => periodoSet.has((l.data || '').slice(0, 7))) : [];
 
   var receitas = filtered.filter(l => l.tipo === 'credito');
   var despesas = filtered.filter(l => l.tipo === 'debito');
@@ -37,7 +121,7 @@ function renderResumo() {
   }
 
   var grR = groupBy(receitas), grD = groupBy(despesas);
-  var mesOpts = meses.map(m => { var [y, mo] = m.split('-'); return '<option value="' + m + '"' + (m === mesAtual ? ' selected' : '') + '>' + mo + '/' + y + '</option>'; }).join('');
+  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
 
   var barR = grR.map(([cat, val]) =>
     '<div class="cat-row"><span class="cat-name">' + esc(cat) + '</span>'
@@ -67,11 +151,10 @@ function renderResumo() {
       + '</tbody></table>';
 
   document.getElementById('resumo-content').innerHTML =
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">'
-    + '<span style="font-size:.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px">Período:</span>'
-    + '<select id="resumo-mes-sel" style="background:var(--card);border:1px solid var(--border);color:var(--text);font-family:\'DM Sans\',sans-serif;font-size:.83rem;padding:6px 10px;border-radius:7px;outline:none" onchange="renderResumo()">'
-    + '<option value=""' + (mesAtual === '' ? ' selected' : '') + '>Todos os meses</option>' + mesOpts + '</select>'
-    + '<span style="font-size:.73rem;color:var(--muted)">• Consolida Conta Corrente + Cartão</span></div>'
+    '<div class="period-filter-row">'
+    + '<span class="period-label">Selecionar periodo:</span>'
+    + buildPeriodoMultiSelect('resumo-periodos-sel', meses, periodos, 'renderResumo()')
+    + '<span class="period-help">' + esc(periodoTexto) + ' &bull; escolha um ou mais meses.</span></div>'
     + '<div class="summary-grid">'
     + '<div class="summary-card"><div class="s-label">Total receitas</div><div class="s-val green">' + fmt(tR) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Total despesas</div><div class="s-val red">' + fmt(tD) + '</div></div>'

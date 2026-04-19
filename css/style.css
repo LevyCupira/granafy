@@ -121,11 +121,31 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .form-group input,.form-group select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.84rem;padding:7px 10px;border-radius:7px;outline:none;transition:border-color var(--tr),background var(--tr)}
 .form-group input:focus,.form-group select:focus{border-color:var(--accent)}
 .form-group select option{background:var(--surface)}
+.period-filter-row,.charts-filter-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.period-label{font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.period-help{font-size:.73rem;color:var(--muted)}
+.period-picker{position:relative;min-width:220px}
+.period-picker-btn{width:100%;min-height:42px;background:var(--card);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:600;text-align:left;padding:8px 34px 8px 12px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.period-picker-btn:after{content:'▾';position:absolute;right:12px;top:11px;color:var(--muted);font-size:.8rem}
+.period-picker.open .period-picker-btn{border-color:var(--accent)}
+.period-picker-menu{display:none;position:absolute;z-index:20;top:calc(100% + 6px);left:0;width:260px;max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 16px 36px rgba(0,0,0,.28);padding:8px}
+.period-picker.open .period-picker-menu{display:block}
+.period-option{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;color:var(--text);font-size:.84rem;cursor:pointer}
+.period-option:hover{background:rgba(91,140,255,.1)}
+.period-option input{accent-color:var(--accent)}
+.period-picker-actions{display:flex;justify-content:flex-end;border-top:1px solid var(--border);padding-top:8px;margin-top:6px}
+.period-multi-select{min-width:210px;max-width:280px;height:74px;background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.83rem;padding:6px 10px;border-radius:7px;outline:none}
+.period-multi-select:focus{border-color:var(--accent)}
+.period-multi-select option{padding:4px 6px;background:var(--surface)}
 .btn-add{margin-top:12px;background:var(--accent);color:#fff;border:none;border-radius:7px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:.83rem;cursor:pointer;transition:opacity var(--tr)}
 .btn-add:hover{opacity:.85}
 .btn-sm{background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.76rem;padding:5px 11px;border-radius:6px;cursor:pointer;transition:border-color var(--tr),color var(--tr),background var(--tr)}
 .btn-sm:hover{border-color:var(--accent);color:var(--accent)}
 .btn-sm.red:hover{border-color:var(--danger);color:var(--danger)}
+.btn-icon{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:6px;font-size:.82rem;line-height:1;cursor:pointer;transition:background var(--tr),border-color var(--tr),color var(--tr)}
+.btn-icon:hover{background:rgba(91,140,255,.1);border-color:var(--accent);color:var(--accent)}
+.btn-icon.danger:hover{background:rgba(255,107,107,.1);border-color:var(--danger);color:var(--danger)}
+.row-actions{display:flex;align-items:center;gap:4px;justify-content:flex-start}
 .section-title{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:9px;font-weight:600}
 
 /* ── Tabela ── */

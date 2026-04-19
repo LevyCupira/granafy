@@ -76,6 +76,40 @@ document.addEventListener('DOMContentLoaded', function() {
   applySidebarMenuState(minimized);
 });
 
+var deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', function(event) {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  var btn = document.getElementById('installAppBtn');
+  if (btn) btn.style.display = '';
+});
+
+window.addEventListener('appinstalled', function() {
+  deferredInstallPrompt = null;
+  var btn = document.getElementById('installAppBtn');
+  if (btn) btn.textContent = 'App instalado';
+});
+
+async function installGranafyApp() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    return;
+  }
+
+  alert('Para instalar como atalho, use o menu do navegador e escolha "Instalar app" ou "Adicionar a tela inicial".');
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').catch(function(error) {
+      console.warn('Service worker nao registrado:', error);
+    });
+  });
+}
+
 var colOrders = (function() {
   try { return JSON.parse(localStorage.getItem('fb_col_orders')) || {}; } catch { return {}; }
 })();

@@ -2,7 +2,7 @@
 // DIVIDAS.JS — VERSÃO FINAL LIMPA (SUPABASE)
 // ════════════════════════════════════════════════════
 
-var DV_TIPOS = ['Empréstimo','Financiamento','Cartão de crédito','Cheque especial','Consignado','Outros'];
+var DV_TIPOS = ['Empréstimo','Financiamento','Acordo','Cartão de crédito','Cheque especial','Consignado','Outros'];
 
 var DV_STATUS_LABEL = {
   quitada: '✅ Quitada',
@@ -16,8 +16,7 @@ var _dvFiltroStatus = 'todos';
 var _dvFiltroTipo = '';
 var _dvFiltroBusca = '';
 var _dvPanels = {
-  calc: false,
-  novo: false,
+  reneg: false,
   filtros: true
 };
 
@@ -30,8 +29,8 @@ function setupDividasCollapsiblePanels(area) {
   if (!area) return;
 
   var cards = area.querySelectorAll('.form-card');
-  setupDividasPanelDom(area.querySelector('.calc-bc'), 'calc', 'Simulador de financiamento');
-  setupDividasPanelDom(cards[0], 'novo', '+ Nova d\u00edvida');
+  setupDividasPanelDom(area.querySelector('.calc-bc'), 'reneg', 'Renegociacao / nova divida');
+  if (cards[0]) cards[0].style.display = 'none';
   setupDividasPanelDom(cards[1], 'filtros', 'Filtros');
 }
 
@@ -110,6 +109,58 @@ function calcPrice(pv, iMensal, n) {
   };
 }
 
+function calcTaxaMensalPorParcela(pv, pmt, n) {
+  if (!pv || !pmt || !n) return null;
+  if (Math.abs((pv / n) - pmt) < 0.01) return 0;
+
+  var baixo = 0;
+  var alto = 1;
+
+  for (var i = 0; i < 100; i++) {
+    var meio = (baixo + alto) / 2;
+    var parcela = pv * (meio * Math.pow(1 + meio, n)) / (Math.pow(1 + meio, n) - 1);
+    if (parcela > pmt) alto = meio;
+    else baixo = meio;
+  }
+
+  return ((baixo + alto) / 2) * 100;
+}
+
+function simularRenegociacaoDivida() {
+  var pv = parseMoney(document.getElementById('dv-total'));
+  var parcelas = parseInt(document.getElementById('dv-parcelas').value) || 0;
+  var valorParcela = parseMoney(document.getElementById('dv-vparcela'));
+  var taxa = parseFloat(document.getElementById('dv-taxa').value) || 0;
+
+  if (!pv || !parcelas) {
+    alert('Informe valor da divida e quantidade de parcelas.');
+    return null;
+  }
+
+  if (valorParcela) {
+    taxa = calcTaxaMensalPorParcela(pv, valorParcela, parcelas);
+    var totalPago = valorParcela * parcelas;
+    var tabelaBase = calcPrice(pv, taxa, parcelas);
+    _lastCalc = {
+      pmt: valorParcela,
+      totalPago: totalPago,
+      totalJuros: totalPago - pv,
+      cet: totalPago > 0 && pv > 0 ? ((totalPago / pv) - 1) * 100 : 0,
+      taxaMensal: taxa,
+      tabela: tabelaBase ? tabelaBase.tabela : []
+    };
+  } else {
+    _lastCalc = calcPrice(pv, taxa, parcelas);
+    if (_lastCalc) {
+      _lastCalc.taxaMensal = taxa;
+      _lastCalc.cet = _lastCalc.totalPago > 0 && pv > 0 ? ((_lastCalc.totalPago / pv) - 1) * 100 : 0;
+    }
+  }
+
+  renderDividas();
+  return _lastCalc;
+}
+
 function getDvStatus(d) {
   var pago = Number(d.pago) || 0;
   var total = Number(d.total) || 0;
@@ -183,7 +234,8 @@ function renderDividas() {
     + '<div class="calc-result-item"><div class="cr-label">Parcela</div><div class="cr-val blue">' + fmt(_lastCalc.pmt) + '</div></div>'
     + '<div class="calc-result-item"><div class="cr-label">Total pago</div><div class="cr-val yellow">' + fmt(_lastCalc.totalPago) + '</div></div>'
     + '<div class="calc-result-item"><div class="cr-label">Juros</div><div class="cr-val red">' + fmt(_lastCalc.totalJuros) + '</div></div>'
-    + '<div class="calc-result-item"><div class="cr-label">CET anual</div><div class="cr-val green">' + _lastCalc.cet.toFixed(2) + '%</div></div>'
+    + '<div class="calc-result-item"><div class="cr-label">Taxa mensal</div><div class="cr-val green">' + Number(_lastCalc.taxaMensal || 0).toFixed(2) + '%</div></div>'
+    + '<div class="calc-result-item"><div class="cr-label">CET total</div><div class="cr-val green">' + _lastCalc.cet.toFixed(2) + '%</div></div>'
     + '</div>'
     + '<div class="calc-amort-table"><table><thead><tr><th>#</th><th>Parcela</th><th>Juros</th><th>Amort.</th><th>Saldo</th></tr></thead><tbody>'
     + _lastCalc.tabela.slice(0, 120).map(row =>
@@ -236,14 +288,21 @@ function renderDividas() {
     + '<div class="summary-card"><div class="s-label">Atrasadas</div><div class="s-val yellow">' + atrasadas + '</div></div>'
     + '</div>'
     + '<div class="calc-bc">'
-    + '<h3>Simulador de financiamento</h3>'
-    + '<div class="calc-sub">Calcule a parcela pela tabela PRICE antes de cadastrar uma dívida.</div>'
+    + '<h3>Renegociacao / nova divida</h3>'
+    + '<div class="calc-sub">Simule a taxa ou a parcela e cadastre a divida na mesma tela.</div>'
     + '<div class="form-row">'
-    + '<div class="form-group"><label>Valor financiado</label><input type="text" id="calc-pv" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
-    + '<div class="form-group"><label>Taxa mensal (%)</label><input type="number" id="calc-taxa" min="0" step="0.01" placeholder="Ex: 1.5"/></div>'
-    + '<div class="form-group"><label>Parcelas</label><input type="number" id="calc-parcelas" min="1" step="1" placeholder="Ex: 24"/></div>'
+    + '<div class="form-group"><label>Orgao / credor</label><input type="text" id="dv-org" placeholder="Banco, financeira..."/></div>'
+    + '<div class="form-group"><label>Tipo</label><select id="dv-tipo">' + tipoOpts + '</select></div>'
+    + '<div class="form-group"><label>Inicio</label><input type="date" id="dv-inicio"/></div>'
     + '</div>'
-    + '<button class="btn-add" onclick="calcularDivida()">Calcular</button>'
+    + '<div class="form-row" style="margin-top:10px">'
+    + '<div class="form-group"><label>Valor da divida</label><input type="text" id="dv-total" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
+    + '<div class="form-group"><label>Parcelas</label><input type="number" id="dv-parcelas" min="1" step="1" placeholder="Ex: 24"/></div>'
+    + '<div class="form-group"><label>Valor da parcela</label><input type="text" id="dv-vparcela" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
+    + '<div class="form-group"><label>Taxa mensal (%)</label><input type="number" id="dv-taxa" min="0" step="0.01" placeholder="Ex: 1.5"/></div>'
+    + '<div class="form-group"><label>Ja pago</label><input type="text" id="dv-pago" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="simularRenegociacaoDivida()">Simular</button><button class="btn-add" style="width:auto;margin-top:0" onclick="addDivida()">Cadastrar divida</button></div>'
     + calcHtml
     + '</div>'
     + '<div class="form-card"><h3>+ Nova dívida</h3>'
@@ -277,17 +336,35 @@ function renderDividas() {
 }
 
 function calcularDivida() {
-  var pv = parseMoney(document.getElementById('calc-pv'));
-  var taxa = parseFloat(document.getElementById('calc-taxa').value) || 0;
-  var parcelas = parseInt(document.getElementById('calc-parcelas').value) || 0;
+  simularRenegociacaoDivida();
+}
 
-  if (!pv || !parcelas) {
-    alert('Informe valor financiado e quantidade de parcelas.');
-    return;
-  }
+async function insertDividaComFallback(payload) {
+  var completo = await supabaseClient
+    .from('dividas')
+    .insert([Object.assign(payload, getUserScopePayload())]);
 
-  _lastCalc = calcPrice(pv, taxa, parcelas);
-  renderDividas();
+  if (!completo.error) return completo;
+
+  var msg = String(completo.error.message || '').toLowerCase();
+  var erroColuna = completo.error.code === '42703' || completo.error.code === 'PGRST204' || msg.includes('column') || msg.includes('schema cache');
+  if (!erroColuna) return completo;
+
+  console.warn('Tentando salvar divida com campos basicos apos erro no payload completo:', completo.error);
+
+  var basico = {
+    cliente_id: payload.cliente_id,
+    credor: payload.credor,
+    tipo_divida: payload.tipo_divida,
+    valor_total: payload.valor_total,
+    valor_pago: payload.valor_pago,
+    parcelas_total: payload.parcelas_total,
+    parcelas_restantes: payload.parcelas_restantes
+  };
+
+  return supabaseClient
+    .from('dividas')
+    .insert([Object.assign(basico, getUserScopePayload())]);
 }
 
 async function addDivida() {
@@ -306,6 +383,15 @@ async function addDivida() {
     return alert('Preencha pelo menos Órgão e Valor.');
   }
 
+  if (parcelas && (!valorParcela || !taxa)) {
+    var calc = simularRenegociacaoDivida();
+    if (calc) {
+      valorParcela = Number(calc.pmt || valorParcela || 0);
+      taxa = Number(calc.taxaMensal || taxa || 0);
+      total = Number(calc.totalPago || total || 0);
+    }
+  }
+
   const payload = {
     cliente_id: activeClient,
     credor: org,
@@ -319,13 +405,11 @@ async function addDivida() {
     valor_pago: pago
   };
 
-  const { error } = await supabaseClient
-    .from('dividas')
-    .insert([Object.assign(payload, getUserScopePayload())]);
+  const { error } = await insertDividaComFallback(payload);
 
   if (error) {
     console.error(error);
-    alert('Erro ao salvar dívida');
+    alert('Erro ao salvar divida: ' + (error.message || 'erro desconhecido'));
     return;
   }
 

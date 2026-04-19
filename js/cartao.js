@@ -9,7 +9,7 @@ var COLS_CARTAO = [
   { key:'desc',   label:'Descrição', render: it => esc(it.desc) },
   { key:'cat',    label:'Categoria', render: it => '<span class="badge badge-cat">' + esc(it.cat || '—') + '</span>' },
   { key:'valor',  label:'Valor',     render: it => it.tipo === 'estorno' ? '<span class="val val-pos">+ ' + fmt(it.valor) + '</span>' : '<span class="val val-neg">- ' + fmt(it.valor) + '</span>' },
-  { key:'_del',   label:'',          render: (it, i) => '<button class="btn-delete" onclick="deleteCartaoItem(' + i + ')">🗑</button>' },
+  { key:'_del',   label:'',          render: (it, i) => '<button class="btn-delete" onclick="deleteCartaoItem(' + i + ')">&#128465;</button>' },
 ];
 
 function getCartaoById(id) {
@@ -247,7 +247,7 @@ function _renderCartaoFiltroETabela() {
     + buildTable('cartao', cols, itens, function(item) {
         var realIdx = c.cartao.indexOf(item);
         return cols.map(col => col.key === '_del'
-          ? '<td><button class="btn-delete" onclick="deleteCartaoItem(' + realIdx + ')">🗑</button></td>'
+          ? '<td><div class="row-actions"><button class="btn-icon" onclick="editCartaoItem(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteCartaoItem(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
           : '<td>' + col.render(item, realIdx) + '</td>'
         ).join('');
       }, r => r.tipo === 'estorno' ? 'row-estorno' : '');
@@ -318,6 +318,17 @@ async function addCartaoItem() {
   if (!cartaoId) return alert('Selecione um cartão para o lançamento.');
   if (!desc || !valor) return alert('Preencha descrição e valor.');
 
+  var duplicado = (data.clients[activeClient].cartao || []).find(it =>
+    it.cartaoId === cartaoId
+    && (it.data || '') === (d_ || '')
+    && Number(it.valor || 0) === Number(valor || 0)
+    && (it.tipo || 'lancamento') === _ccTipo
+  );
+
+  if (duplicado && !confirm('Ja existe um lancamento no mesmo cartao, data, valor e tipo. Deseja lancar novamente?')) {
+    return;
+  }
+
   const { error } = await supabaseClient
     .from('lancamentos_cartao')
     .insert([Object.assign({
@@ -332,7 +343,7 @@ async function addCartaoItem() {
 
   if (error) {
     console.error('Erro ao cadastrar lançamento do cartão:', error);
-    alert('Não foi possível cadastrar o item do cartão.');
+    alert('Nao foi possivel cadastrar o item do cartao: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -377,6 +388,51 @@ function exportCsvTemplate() {
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Fatura');
   XLSX.writeFile(wb, 'modelo_fatura_granafy.xlsx');
+}
+
+async function editCartaoItem(i) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var c = data.clients[activeClient];
+  var item = c.cartao[i];
+  if (!item || !item.id) return;
+
+  var novaData = prompt('Data do lancamento (AAAA-MM-DD):', item.data || '');
+  if (novaData === null) return;
+  var novoDesc = prompt('Descricao:', item.desc || '');
+  if (novoDesc === null) return;
+  novoDesc = novoDesc.trim();
+  var novaCat = prompt('Categoria:', item.cat || '');
+  if (novaCat === null) return;
+  var novoTipo = prompt('Tipo (lancamento ou estorno):', item.tipo || 'lancamento');
+  if (novoTipo === null) return;
+  novoTipo = novoTipo === 'estorno' ? 'estorno' : 'lancamento';
+  var novoValorTxt = prompt('Valor:', String(Number(item.valor || 0)).replace('.', ','));
+  if (novoValorTxt === null) return;
+  var novoValor = parseFloat(String(novoValorTxt).replace(/\./g, '').replace(',', '.')) || 0;
+
+  if (!novoDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
+
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('lancamentos_cartao')
+      .update({
+        data: novaData || null,
+        descricao: novoDesc,
+        categoria: novaCat || null,
+        tipo: novoTipo,
+        valor: Number(novoValor || 0)
+      })
+      .eq('id', item.id)
+  );
+
+  if (error) {
+    console.error('Erro ao editar item do cartao:', error);
+    alert('Nao foi possivel editar o item: ' + (error.message || 'erro desconhecido'));
+    return;
+  }
+
+  await loadData();
+  renderCartao();
 }
 
 function abrirImportacaoCartao() {
@@ -441,6 +497,17 @@ async function importXlsx(event) {
       } else if (typeof rawDate === 'number') {
         var d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
         dataFmt = d.toISOString().slice(0, 10);
+      }
+
+      var duplicado = (data.clients[activeClient].cartao || []).find(it =>
+        it.cartaoId === importCartaoId
+        && (it.data || '') === (dataFmt || '')
+        && Number(it.valor || 0) === Number(valor || 0)
+        && (it.tipo || 'lancamento') === tipo
+      );
+
+      if (duplicado && !confirm('Ja existe um lancamento no mesmo cartao, data, valor e tipo: "' + desc + '". Deseja importar novamente?')) {
+        continue;
       }
 
       const { error } = await supabaseClient
