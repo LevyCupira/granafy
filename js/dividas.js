@@ -11,6 +11,7 @@ var DV_STATUS_LABEL = {
 };
 
 var _lastCalc = null;
+var _dvDraft = {};
 var _dvHistOpen = new Set();
 var _dvFiltroStatus = 'todos';
 var _dvFiltroTipo = '';
@@ -60,6 +61,54 @@ function setupDividasPanelDom(card, key, title) {
   card.appendChild(button);
 
   if (open) card.appendChild(body);
+}
+
+function moneyInputText(valor) {
+  return Number(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function setMoneyInputValue(id, valor) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var numero = Number(valor || 0);
+  el.dataset.cents = String(Math.round(numero * 100));
+  el.value = moneyInputText(numero);
+}
+
+function coletarRascunhoDivida() {
+  var get = id => {
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  };
+
+  return {
+    org: get('dv-org'),
+    tipo: get('dv-tipo'),
+    inicio: get('dv-inicio'),
+    total: parseMoney(document.getElementById('dv-total')),
+    parcelas: get('dv-parcelas'),
+    vparcela: parseMoney(document.getElementById('dv-vparcela')),
+    taxa: get('dv-taxa'),
+    pago: parseMoney(document.getElementById('dv-pago'))
+  };
+}
+
+function restaurarRascunhoDivida() {
+  if (!_dvDraft || Object.keys(_dvDraft).length === 0) return;
+
+  var set = (id, valor) => {
+    var el = document.getElementById(id);
+    if (el && valor !== undefined && valor !== null) el.value = valor;
+  };
+
+  set('dv-org', _dvDraft.org || '');
+  set('dv-tipo', _dvDraft.tipo || DV_TIPOS[0]);
+  set('dv-inicio', _dvDraft.inicio || '');
+  set('dv-parcelas', _dvDraft.parcelas || '');
+  set('dv-taxa', _dvDraft.taxa || '');
+  setMoneyInputValue('dv-total', _dvDraft.total || 0);
+  setMoneyInputValue('dv-vparcela', _dvDraft.vparcela || 0);
+  setMoneyInputValue('dv-pago', _dvDraft.pago || 0);
 }
 
 function calcPrice(pv, iMensal, n) {
@@ -127,6 +176,8 @@ function calcTaxaMensalPorParcela(pv, pmt, n) {
 }
 
 function simularRenegociacaoDivida() {
+  _dvDraft = coletarRascunhoDivida();
+
   var pv = parseMoney(document.getElementById('dv-total'));
   var parcelas = parseInt(document.getElementById('dv-parcelas').value) || 0;
   var valorParcela = parseMoney(document.getElementById('dv-vparcela'));
@@ -149,11 +200,13 @@ function simularRenegociacaoDivida() {
       taxaMensal: taxa,
       tabela: tabelaBase ? tabelaBase.tabela : []
     };
+    _dvDraft.taxa = Number(taxa || 0).toFixed(2);
   } else {
     _lastCalc = calcPrice(pv, taxa, parcelas);
     if (_lastCalc) {
       _lastCalc.taxaMensal = taxa;
       _lastCalc.cet = _lastCalc.totalPago > 0 && pv > 0 ? ((_lastCalc.totalPago / pv) - 1) * 100 : 0;
+      _dvDraft.vparcela = Number(_lastCalc.pmt || 0);
     }
   }
 
@@ -333,6 +386,7 @@ function renderDividas() {
 
   initMoneyInputs(area);
   setupDividasCollapsiblePanels(area);
+  restaurarRascunhoDivida();
 }
 
 function calcularDivida() {
@@ -369,6 +423,7 @@ async function insertDividaComFallback(payload) {
 
 async function addDivida() {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  _dvDraft = coletarRascunhoDivida();
   var org = document.getElementById('dv-org').value.trim();
   var tipo = document.getElementById('dv-tipo').value;
   var dataInicio = document.getElementById('dv-inicio').value;
@@ -414,6 +469,8 @@ async function addDivida() {
   }
 
   await loadData();
+  _dvDraft = {};
+  _lastCalc = null;
   renderDividas();
 }
 
