@@ -40,6 +40,28 @@ async function loadData() {
     return { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes };
   }
 
+  async function carregarContasComEscopo(usarEscopo) {
+    const filtrarUsuario = usarEscopo && !isAdminUser();
+    var query = supabaseClient.from('contas').select('*');
+    if (filtrarUsuario) query = query.eq('user_id', uid);
+    var res = await query.order('banco', { ascending: true });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('contas')) {
+      console.warn('Tabela contas ainda nao existe no Supabase. Rode a migracao 20260419_contas_clientes.sql.');
+      return { data: [], error: null };
+    }
+
+    if (usarEscopo && isMissingUserScopeError(res.error)) {
+      return carregarContasComEscopo(false);
+    }
+
+    return res;
+  }
+
   let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo(userScopeEnabled);
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
@@ -60,6 +82,24 @@ async function loadData() {
   const lancRows = lancRes.data || [];
   const cartoesRows = cartoesRes.data || [];
   const lancCartaoRows = lancCartaoRes.data || [];
+  const contasRes = await carregarContasComEscopo(userScopeEnabled);
+  if (contasRes.error) {
+    console.warn('Nao foi possivel carregar contas cadastradas:', contasRes.error);
+  }
+  const contasRows = contasRes.data || [];
+
+  const contasPorCliente = {};
+  (contasRows || []).forEach(conta => {
+    if (!contasPorCliente[conta.cliente_id]) contasPorCliente[conta.cliente_id] = [];
+    contasPorCliente[conta.cliente_id].push({
+      id: conta.id,
+      tipo: conta.tipo || 'corrente',
+      banco: conta.banco || '',
+      agencia: conta.agencia || '',
+      numero: conta.numero || '',
+      userId: conta.user_id || null
+    });
+  });
 
   const dividasPorCliente = {};
   (dividasRows || []).forEach(d => {
@@ -88,7 +128,8 @@ async function loadData() {
       desc: l.descricao || '',
       cat: l.categoria || '',
       tipo: l.tipo || '',
-      valor: Number(l.valor || 0)
+      valor: Number(l.valor || 0),
+      contaId: l.conta_id || null
     });
   });
 
@@ -119,7 +160,7 @@ async function loadData() {
       name: c.nome || '',
       cartoes: cartoesPorCliente[c.id] || [],
       cartao: lancCartaoPorCliente[c.id] || [],
-      contas: [],
+      contas: contasPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || []
     };

@@ -4,10 +4,233 @@ var _exTipo = 'credito';
 var _exFiltroTipo = 'todos';
 var _exFiltroCat = '';
 var _exFiltroMes = getPreviousMonthKey();
+var _exFiltroConta = '';
 var _exFiltroBusca = '';
 var _exMostrarDuplicados = false;
 var _exManterDuplicado = {};
 var _exDuplicadosResolvidos = carregarDuplicadosResolvidosExtrato();
+
+function contasClienteAtivo() {
+  var c = data.clients[activeClient];
+  return c && Array.isArray(c.contas) ? c.contas : [];
+}
+
+function nomeContaCliente(conta) {
+  if (!conta) return 'Nao informada';
+  var tipo = String(conta.tipo || '').toLowerCase() === 'poupanca' ? 'CP' : 'CC';
+  var banco = conta.banco || 'Banco';
+  var dados = [conta.agencia, conta.numero].filter(Boolean).join('/');
+  return tipo + ' ' + banco + (dados ? ' ' + dados : '');
+}
+
+function nomeContaPorId(cliente, contaId) {
+  if (!cliente || !contaId) return 'Nao informada';
+  var conta = (cliente.contas || []).find(item => item.id === contaId);
+  return nomeContaCliente(conta);
+}
+
+function contasOptionsCliente(contaIdAtual) {
+  var contas = contasClienteAtivo();
+  if (!contas.length) return '<option value="">Sem conta cadastrada</option>';
+
+  return '<option value="">Sem conta</option>' + contas.map(conta =>
+    '<option value="' + esc(conta.id) + '"' + (conta.id === contaIdAtual ? ' selected' : '') + '>' +
+    esc(nomeContaCliente(conta)) +
+    '</option>'
+  ).join('');
+}
+
+function isMissingContaSchemaError(error) {
+  if (!error) return false;
+  var msg = String((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+  return error.code === '42703' || error.code === '42P01' || error.code === 'PGRST204' || error.code === 'PGRST205' || msg.includes('conta_id') || msg.includes('contas') || msg.includes('schema cache');
+}
+
+var BANCOS_COMUNS = [
+  'Banco do Brasil',
+  'Bradesco',
+  'Caixa',
+  'Inter',
+  'Itau',
+  'Nubank',
+  'Santander',
+  'Sicredi',
+  'Sicoob',
+  'Outro'
+];
+
+async function insertLancamentoComFallback(payload) {
+  var completo = await supabaseClient
+    .from('lancamentos')
+    .insert([Object.assign({}, payload, getUserScopePayload())]);
+
+  if (!completo.error || !payload.conta_id || !isMissingContaSchemaError(completo.error)) return completo;
+
+  var basico = Object.assign({}, payload);
+  delete basico.conta_id;
+  console.warn('Tentando salvar lancamento sem conta_id apos erro no schema:', completo.error);
+  return supabaseClient
+    .from('lancamentos')
+    .insert([Object.assign(basico, getUserScopePayload())]);
+}
+
+async function cadastrarContaCliente() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var conta = await abrirFormularioContaCliente(null);
+  if (!conta) return;
+
+  const payload = {
+    cliente_id: activeClient,
+    tipo: conta.tipo,
+    banco: conta.banco,
+    agencia: conta.agencia || null,
+    numero: conta.numero || null
+  };
+
+  const { error } = await supabaseClient
+    .from('contas')
+    .insert([Object.assign(payload, getUserScopePayload())]);
+
+  if (error) {
+    console.error('Erro ao cadastrar conta:', error);
+    if (isMissingContaSchemaError(error)) {
+      alert('A tabela de contas ainda nao existe no Supabase. Rode o arquivo sql/20260419_contas_clientes.sql no SQL Editor.');
+      return;
+    }
+    alert('Nao foi possivel cadastrar a conta: ' + (error.message || 'erro desconhecido'));
+    return;
+  }
+
+  await loadData();
+  renderExtrato();
+}
+
+async function editarContaCliente(contaId) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+
+  var conta = contasClienteAtivo().find(item => item.id === contaId);
+  if (!conta) return alert('Conta nao encontrada.');
+
+  var dados = await abrirFormularioContaCliente(conta);
+  if (!dados) return;
+
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('contas')
+      .update({
+        tipo: dados.tipo,
+        banco: dados.banco,
+        agencia: dados.agencia || null,
+        numero: dados.numero || null
+      })
+      .eq('id', conta.id)
+  );
+
+  if (error) {
+    console.error('Erro ao editar conta:', error);
+    if (isMissingContaSchemaError(error)) {
+      alert('A tabela de contas ainda nao existe no Supabase. Rode o arquivo sql/20260419_contas_clientes.sql no SQL Editor.');
+      return;
+    }
+    alert('Nao foi possivel editar a conta: ' + (error.message || 'erro desconhecido'));
+    return;
+  }
+
+  await loadData();
+  renderExtrato();
+}
+
+function abrirFormularioContaCliente(conta) {
+  return new Promise(resolve => {
+    var overlay = appDialogEnsure();
+    var titleEl = document.getElementById('appDialogTitle');
+    var messageEl = document.getElementById('appDialogMessage');
+    var actionsEl = document.getElementById('appDialogActions');
+    var tipoAtual = (conta && conta.tipo) || 'corrente';
+    var bancoAtual = (conta && conta.banco) || '';
+    var bancoConhecido = BANCOS_COMUNS.includes(bancoAtual) ? bancoAtual : (bancoAtual ? 'Outro' : 'Banco do Brasil');
+
+    overlay.classList.add('account-dialog-overlay');
+    titleEl.textContent = conta ? 'Editar conta' : 'Cadastrar conta';
+    messageEl.innerHTML =
+      '<div class="account-form">' +
+      '<div class="account-type-row" role="group" aria-label="Tipo de conta">' +
+      '<button type="button" class="account-type-btn' + (tipoAtual !== 'poupanca' ? ' active' : '') + '" data-type="corrente">Conta corrente</button>' +
+      '<button type="button" class="account-type-btn' + (tipoAtual === 'poupanca' ? ' active' : '') + '" data-type="poupanca">Poupanca</button>' +
+      '</div>' +
+      '<div class="form-row">' +
+      '<div class="form-group"><label>Banco</label><select id="contaBanco">' +
+      BANCOS_COMUNS.map(banco => '<option value="' + esc(banco) + '"' + (bancoConhecido === banco ? ' selected' : '') + '>' + esc(banco) + '</option>').join('') +
+      '</select></div>' +
+      '<div class="form-group account-other-bank" id="contaOutroWrap"><label>Nome do banco</label><input type="text" id="contaBancoOutro" value="' + esc(bancoConhecido === 'Outro' ? bancoAtual : '') + '" placeholder="Digite o banco"/></div>' +
+      '</div>' +
+      '<div class="form-row">' +
+      '<div class="form-group"><label>Agencia</label><input type="text" id="contaAgencia" value="' + esc((conta && conta.agencia) || '') + '" inputmode="numeric" placeholder="Ex: 1234"/></div>' +
+      '<div class="form-group"><label>Conta</label><input type="text" id="contaNumero" value="' + esc((conta && conta.numero) || '') + '" inputmode="numeric" placeholder="Ex: 000123-4"/></div>' +
+      '</div>' +
+      '<div class="account-form-error" id="contaFormError"></div>' +
+      '</div>';
+    actionsEl.innerHTML =
+      '<button class="app-dialog-btn ghost" type="button" id="contaCancelar">Cancelar</button>' +
+      '<button class="app-dialog-btn primary" type="button" id="contaSalvar">' + (conta ? 'Salvar' : 'Cadastrar') + '</button>';
+
+    var tipoSelecionado = tipoAtual === 'poupanca' ? 'poupanca' : 'corrente';
+    var bancoSelect = document.getElementById('contaBanco');
+    var outroWrap = document.getElementById('contaOutroWrap');
+    var outroInput = document.getElementById('contaBancoOutro');
+    var agenciaInput = document.getElementById('contaAgencia');
+    var numeroInput = document.getElementById('contaNumero');
+    var errorEl = document.getElementById('contaFormError');
+    var cancelar = document.getElementById('contaCancelar');
+    var salvar = document.getElementById('contaSalvar');
+    var typeBtns = Array.from(messageEl.querySelectorAll('.account-type-btn'));
+
+    function syncOutro() {
+      outroWrap.style.display = bancoSelect.value === 'Outro' ? 'flex' : 'none';
+    }
+
+    function close(value) {
+      overlay.classList.remove('open');
+      overlay.classList.remove('account-dialog-overlay');
+      document.removeEventListener('keydown', onKey);
+      resolve(value);
+    }
+
+    function onKey(event) {
+      if (event.key === 'Escape') close(null);
+    }
+
+    typeBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        tipoSelecionado = btn.dataset.type;
+        typeBtns.forEach(item => item.classList.toggle('active', item === btn));
+      });
+    });
+
+    bancoSelect.addEventListener('change', syncOutro);
+    cancelar.addEventListener('click', () => close(null));
+    salvar.addEventListener('click', function() {
+      var banco = bancoSelect.value === 'Outro' ? outroInput.value.trim() : bancoSelect.value;
+      if (!banco) {
+        errorEl.textContent = 'Informe o banco da conta.';
+        if (bancoSelect.value === 'Outro') outroInput.focus();
+        return;
+      }
+
+      close({
+        tipo: tipoSelecionado,
+        banco: banco,
+        agencia: agenciaInput.value.trim(),
+        numero: numeroInput.value.trim()
+      });
+    });
+    document.addEventListener('keydown', onKey);
+
+    syncOutro();
+    overlay.classList.add('open');
+    setTimeout(() => bancoSelect.focus(), 0);
+  });
+}
 
 function getPreviousMonthKey() {
   var d = new Date();
@@ -28,11 +251,13 @@ function aplicarFiltrosExtrato() {
   var tipo = document.getElementById('ex-filtro-tipo');
   var cat = document.getElementById('ex-filtro-cat');
   var mes = document.getElementById('ex-filtro-mes');
+  var conta = document.getElementById('ex-filtro-conta');
   var busca = document.getElementById('ex-filtro-busca');
 
   _exFiltroTipo = tipo ? tipo.value : 'todos';
   _exFiltroCat = cat ? cat.value : '';
   _exFiltroMes = mes ? mes.value : '';
+  _exFiltroConta = conta ? conta.value : '';
   _exFiltroBusca = busca ? busca.value.trim().toLowerCase() : '';
 
   renderExtrato();
@@ -42,6 +267,7 @@ function limparFiltrosExtrato() {
   _exFiltroTipo = 'todos';
   _exFiltroCat = '';
   _exFiltroMes = '';
+  _exFiltroConta = '';
   _exFiltroBusca = '';
   renderExtrato();
 }
@@ -174,7 +400,7 @@ async function removerDuplicadosSelecionadosExtrato() {
   });
 
   if (!idsParaExcluir.length) return alert('Nenhum duplicado selecionado para exclusao.');
-  if (!confirm('Excluir ' + idsParaExcluir.length + ' lancamento(s) duplicado(s), mantendo os marcados como "Manter"?')) return;
+  if (!(await appConfirm('Excluir ' + idsParaExcluir.length + ' lancamento(s) duplicado(s), mantendo os marcados como "Manter"?', { title: 'Excluir duplicados', confirmText: 'Excluir' }))) return;
 
   const { data: removidos, error } = await applyUserScope(
     supabaseClient
@@ -226,7 +452,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
     return;
   }
 
-  if (!confirm('Excluir ' + idsParaExcluir.length + ' lancamento(s) deste grupo e manter o marcado?')) return;
+  if (!(await appConfirm('Excluir ' + idsParaExcluir.length + ' lancamento(s) deste grupo e manter o marcado?', { title: 'Excluir duplicados', confirmText: 'Excluir' }))) return;
 
   const { data: removidos, error } = await applyUserScope(
     supabaseClient
@@ -293,7 +519,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
     return;
   }
 
-  if (!confirm('Foram encontrados ' + duplicados.length + ' lancamento(s) duplicado(s). Deseja remover os repetidos e manter apenas um de cada?')) {
+  if (!(await appConfirm('Foram encontrados ' + duplicados.length + ' lancamento(s) duplicado(s). Deseja remover os repetidos e manter apenas um de cada?', { title: 'Duplicados encontrados', confirmText: 'Remover repetidos' }))) {
     return;
   }
 
@@ -340,6 +566,7 @@ function renderExtrato() {
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
     if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
     if (_exFiltroMes && !(l.data || '').startsWith(_exFiltroMes)) return false;
+    if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
   });
@@ -358,6 +585,20 @@ function renderExtrato() {
   var saldo = totalCredito - totalDebito;
   var catOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var filtroCatOpts = catsLanc.map(cat => '<option value="' + esc(cat) + '"' + (_exFiltroCat === cat ? ' selected' : '') + '>' + esc(cat) + '</option>').join('');
+  var contas = contasClienteAtivo();
+  var contasResumoHtml = contas.length
+    ? contas.map(conta =>
+      '<span class="account-pill">'
+      + '<span>' + esc(nomeContaCliente(conta)) + '</span>'
+      + '<button class="btn-icon" onclick="editarContaCliente(\'' + esc(conta.id) + '\')" title="Editar conta">&#9998;</button>'
+      + '</span>'
+    ).join(' ')
+    : '<span style="color:var(--muted);font-size:.85rem">Nenhuma conta cadastrada para este cliente.</span>';
+  var filtroContaOpts = contas.map(conta =>
+    '<option value="' + esc(conta.id) + '"' + (_exFiltroConta === conta.id ? ' selected' : '') + '>' +
+    esc(nomeContaCliente(conta)) +
+    '</option>'
+  ).join('');
   var mesesFiltro = meses.slice();
   if (_exFiltroMes && !mesesFiltro.includes(_exFiltroMes)) mesesFiltro.unshift(_exFiltroMes);
 
@@ -373,6 +614,12 @@ function renderExtrato() {
     + '<div class="summary-card"><div class="s-label">Débitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">' + filtrados.length + '</div></div>'
     + '</div>'
+    + '<div class="form-card"><h3>Contas do cliente</h3>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + contasResumoHtml + '</div>'
+    + '<button class="btn-sm" onclick="cadastrarContaCliente()">+ Cadastrar conta</button>'
+    + '</div>'
+    + '</div>'
     + '<div class="form-card"><h3>+ Novo lançamento</h3>'
     + '<div class="tipo-toggle" style="margin-bottom:12px">'
     + '<button class="tipo-btn credito" id="ex-tipo-credito" onclick="setTipoExtrato(\'credito\')">Crédito</button>'
@@ -382,6 +629,7 @@ function renderExtrato() {
     + '<div class="form-group" style="max-width:150px"><label>Data</label><input type="date" id="ex-data"/></div>'
     + '<div class="form-group"><label>Descrição</label><input type="text" id="ex-desc" placeholder="Ex: salário, aluguel..."/></div>'
     + '<div class="form-group" style="max-width:180px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-cat">' + catOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:260px"><label>Conta <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="cadastrarContaCliente()">(+ nova)</span></label><select id="ex-conta">' + contasOptionsCliente('') + '</select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
     + '<button class="btn-add" onclick="addExtrato()">Adicionar</button>'
@@ -391,6 +639,7 @@ function renderExtrato() {
     + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="credito"' + (_exFiltroTipo === 'credito' ? ' selected' : '') + '>Crédito</option><option value="debito"' + (_exFiltroTipo === 'debito' ? ' selected' : '') + '>Débito</option></select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Período</label><select id="ex-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descrição ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>'
@@ -454,12 +703,13 @@ function renderExtrato() {
     html += '<div class="empty-state">Nenhum lançamento encontrado com os filtros atuais.</div>';
   } else {
     html += '<table class="data-table">';
-    html += '<thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+    html += '<thead><tr><th>Data</th><th>Conta</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
       html += '<tr class="row-' + l.tipo + '">'
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
+        + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
         + '<td>' + esc(l.desc || '') + '</td>'
         + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
         + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
@@ -485,6 +735,7 @@ async function addExtrato() {
   var dataLanc = document.getElementById('ex-data').value;
   var desc = document.getElementById('ex-desc').value.trim();
   var cat = document.getElementById('ex-cat').value;
+  var contaId = ((document.getElementById('ex-conta') || {}).value) || null;
   var valor = parseMoney(document.getElementById('ex-valor'));
 
   if (!desc || !valor) {
@@ -498,16 +749,15 @@ async function addExtrato() {
     descricao: desc,
     categoria: cat || null,
     tipo: _exTipo,
-    valor: Number(valor)
+    valor: Number(valor),
+    conta_id: contaId || null
   };
 
-  const { error } = await supabaseClient
-    .from('lancamentos')
-    .insert([Object.assign(payload, getUserScopePayload())]);
+  const { error } = await insertLancamentoComFallback(payload);
 
   if (error) {
     console.error(error);
-    alert('Erro ao salvar');
+    alert('Erro ao salvar: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -533,6 +783,11 @@ async function deleteExtrato(i) {
     console.error(error);
     alert('Erro ao excluir');
     return;
+  }
+
+  if (typeof dividaReferenteAoPagamento === 'function' && typeof recalcularDividaPorHistorico === 'function') {
+    var divida = dividaReferenteAoPagamento(c, lanc);
+    if (divida) await recalcularDividaPorHistorico(c, divida, lanc.id);
   }
 
   await loadData();

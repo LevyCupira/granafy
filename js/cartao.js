@@ -288,7 +288,7 @@ async function addCartaoCard() {
 
 async function deleteCartaoCard(id) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (!confirm('Remover cartão?')) return;
+  if (!(await appConfirm('Remover cartao?', { title: 'Excluir cartao', confirmText: 'Excluir' }))) return;
 
   const { error } = await applyUserScope(
     supabaseClient
@@ -325,7 +325,7 @@ async function addCartaoItem() {
     && (it.tipo || 'lancamento') === _ccTipo
   );
 
-  if (duplicado && !confirm('Ja existe um lancamento no mesmo cartao, data, valor e tipo. Deseja lancar novamente?')) {
+  if (duplicado && !(await appConfirm('Ja existe um lancamento no mesmo cartao, data, valor e tipo. Deseja lancar novamente?', { title: 'Lancamento duplicado', confirmText: 'Lancar novamente' }))) {
     return;
   }
 
@@ -353,7 +353,7 @@ async function addCartaoItem() {
 
 async function deleteCartaoItem(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (!confirm('Remover item?')) return;
+  if (!(await appConfirm('Remover item?', { title: 'Excluir lancamento', confirmText: 'Excluir' }))) return;
 
   var c = data.clients[activeClient];
   var item = c.cartao[i];
@@ -506,7 +506,7 @@ async function importXlsx(event) {
         && (it.tipo || 'lancamento') === tipo
       );
 
-      if (duplicado && !confirm('Ja existe um lancamento no mesmo cartao, data, valor e tipo: "' + desc + '". Deseja importar novamente?')) {
+      if (duplicado && !(await appConfirm('Ja existe um lancamento no mesmo cartao, data, valor e tipo: "' + desc + '". Deseja importar novamente?', { title: 'Lancamento duplicado', confirmText: 'Importar novamente' }))) {
         continue;
       }
 

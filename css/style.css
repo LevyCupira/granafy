@@ -102,6 +102,26 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .modal-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .modal-panel{display:none}
 .modal-panel.active{display:block}
+.app-dialog-overlay{display:none;position:fixed;inset:0;z-index:900;align-items:center;justify-content:center;background:rgba(6,8,14,.68);padding:18px}
+.app-dialog-overlay.open{display:flex}
+.app-dialog{width:min(430px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 24px 70px rgba(0,0,0,.42);padding:22px 24px;color:var(--text)}
+.app-dialog-title{font-family:'DM Serif Display',serif;font-size:1.28rem;margin-bottom:10px;color:var(--text)}
+.app-dialog-message{color:var(--muted);font-size:.92rem;line-height:1.45;margin-bottom:20px;word-break:break-word}
+.app-dialog-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.app-dialog-btn{min-width:104px;border-radius:7px;padding:9px 14px;font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:700;cursor:pointer;transition:opacity var(--tr),border-color var(--tr),background var(--tr),color var(--tr)}
+.app-dialog-btn.primary{background:var(--accent);border:1px solid var(--accent);color:#fff}
+.app-dialog-btn.ghost{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.app-dialog-btn:hover{opacity:.88}
+.account-dialog-overlay .app-dialog{width:min(560px,calc(100vw - 32px))}
+.account-dialog-overlay .app-dialog-message{margin-bottom:18px}
+.account-form{display:flex;flex-direction:column;gap:14px}
+.account-type-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.account-type-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:700;cursor:pointer;transition:background var(--tr),border-color var(--tr),color var(--tr)}
+.account-type-btn.active{background:rgba(91,140,255,.16);border-color:var(--accent);color:var(--accent)}
+.account-type-btn:hover{border-color:var(--accent);color:var(--text)}
+.account-form .form-row{gap:12px}
+.account-form .form-group{min-width:160px}
+.account-form-error{min-height:18px;color:var(--danger);font-size:.78rem;font-weight:600}
 
 /* ── Componentes gerais ── */
 .empty-state{text-align:center;padding:46px 20px;color:var(--muted);font-size:.88rem}
@@ -146,6 +166,8 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .btn-icon:hover{background:rgba(91,140,255,.1);border-color:var(--accent);color:var(--accent)}
 .btn-icon.danger:hover{background:rgba(255,107,107,.1);border-color:var(--danger);color:var(--danger)}
 .row-actions{display:flex;align-items:center;gap:4px;justify-content:flex-start}
+.account-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;background:rgba(91,140,255,.12);border:1px solid rgba(91,140,255,.2);border-radius:8px;color:var(--accent);font-size:.8rem}
+.account-pill .btn-icon{width:22px;height:22px;font-size:.72rem}
 .section-title{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:9px;font-weight:600}
 
 /* ── Tabela ── */

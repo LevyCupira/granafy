@@ -64,7 +64,7 @@ async function importData(event) {
 
       var imp = JSON.parse(e.target.result);
       if (!imp.clients) throw new Error('Estrutura invalida.');
-      if (!confirm('Importar este JSON para o Supabase no login atual? Dados iguais serao ignorados para evitar duplicidade.')) return;
+      if (!(await appConfirm('Importar este JSON para o Supabase no login atual? Dados iguais serao ignorados para evitar duplicidade.', { title: 'Importar backup', confirmText: 'Importar' }))) return;
 
       var resumo = await importarBackupJsonParaSupabase(imp);
       await loadData();
@@ -487,8 +487,8 @@ function deleteCategory(tipo, i) {
   renderCatsPanel(tipo);
 }
 
-function resetCategories(tipo) {
-  if (!confirm('Restaurar categorias padrão?')) return;
+async function resetCategories(tipo) {
+  if (!(await appConfirm('Restaurar categorias padrao?', { title: 'Restaurar categorias', confirmText: 'Restaurar' }))) return;
   if (tipo === 'cc') saveCatsCC(DC_CC.map(c => ({...c})));
   else saveCatsCartao([...DC_CART]);
   renderCatsPanel(tipo);

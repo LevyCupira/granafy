@@ -175,6 +175,33 @@ function calcTaxaMensalPorParcela(pv, pmt, n) {
   return ((baixo + alto) / 2) * 100;
 }
 
+function calcularResultadoRenegociacao(pv, parcelas, valorParcela, taxa) {
+  if (!pv || !parcelas) {
+    return null;
+  }
+
+  if (valorParcela) {
+    taxa = calcTaxaMensalPorParcela(pv, valorParcela, parcelas);
+    var totalPago = valorParcela * parcelas;
+    var tabelaBase = calcPrice(pv, taxa, parcelas);
+    return {
+      pmt: valorParcela,
+      totalPago: totalPago,
+      totalJuros: totalPago - pv,
+      cet: totalPago > 0 && pv > 0 ? ((totalPago / pv) - 1) * 100 : 0,
+      taxaMensal: taxa,
+      tabela: tabelaBase ? tabelaBase.tabela : []
+    };
+  }
+
+  var calc = calcPrice(pv, taxa, parcelas);
+  if (calc) {
+    calc.taxaMensal = taxa;
+    calc.cet = calc.totalPago > 0 && pv > 0 ? ((calc.totalPago / pv) - 1) * 100 : 0;
+  }
+  return calc;
+}
+
 function simularRenegociacaoDivida() {
   _dvDraft = coletarRascunhoDivida();
 
@@ -188,27 +215,11 @@ function simularRenegociacaoDivida() {
     return null;
   }
 
-  if (valorParcela) {
-    taxa = calcTaxaMensalPorParcela(pv, valorParcela, parcelas);
-    var totalPago = valorParcela * parcelas;
-    var tabelaBase = calcPrice(pv, taxa, parcelas);
-    _lastCalc = {
-      pmt: valorParcela,
-      totalPago: totalPago,
-      totalJuros: totalPago - pv,
-      cet: totalPago > 0 && pv > 0 ? ((totalPago / pv) - 1) * 100 : 0,
-      taxaMensal: taxa,
-      tabela: tabelaBase ? tabelaBase.tabela : []
-    };
-    _dvDraft.taxa = Number(taxa || 0).toFixed(2);
-  } else {
-    _lastCalc = calcPrice(pv, taxa, parcelas);
-    if (_lastCalc) {
-      _lastCalc.taxaMensal = taxa;
-      _lastCalc.cet = _lastCalc.totalPago > 0 && pv > 0 ? ((_lastCalc.totalPago / pv) - 1) * 100 : 0;
-      _dvDraft.vparcela = Number(_lastCalc.pmt || 0);
-    }
-  }
+  _lastCalc = calcularResultadoRenegociacao(pv, parcelas, valorParcela, taxa);
+  if (!_lastCalc) return null;
+
+  _dvDraft.taxa = Number(_lastCalc.taxaMensal || 0).toFixed(2);
+  _dvDraft.vparcela = Number(_lastCalc.pmt || 0);
 
   renderDividas();
   return _lastCalc;
@@ -252,6 +263,77 @@ function limparFiltrosDividas() {
   renderDividas();
 }
 
+function toggleDividaHistorico(i) {
+  if (_dvHistOpen.has(i)) _dvHistOpen.delete(i);
+  else _dvHistOpen.add(i);
+  renderDividas();
+}
+
+function descricaoPagamentoDivida(d, parcelaRef, banco) {
+  return [
+    'Pagamento divida',
+    d.org || 'Sem credor',
+    'Parcela ' + (parcelaRef || '-'),
+    'Banco ' + (banco || 'Nao informado')
+  ].join(' | ');
+}
+
+function historicoPagamentosDivida(c, d, excluirLancamentoId) {
+  var prefixo = 'Pagamento divida | ' + (d.org || 'Sem credor') + ' |';
+  return (c.extrato || [])
+    .filter(l => String(l.desc || '').startsWith(prefixo) && (!excluirLancamentoId || l.id !== excluirLancamentoId))
+    .map(l => {
+      var partes = String(l.desc || '').split('|').map(p => p.trim());
+      return {
+        id: l.id || null,
+        data: l.data || '',
+        valor: Number(l.valor || 0),
+        parcela: (partes[2] || '').replace(/^Parcela\s*/i, '') || '-',
+        banco: (partes[3] || '').replace(/^Banco\s*/i, '') || 'Nao informado'
+      };
+    })
+    .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+}
+
+function dividaReferenteAoPagamento(c, lancamento) {
+  if (!c || !lancamento || !String(lancamento.desc || '').startsWith('Pagamento divida |')) return null;
+  var partes = String(lancamento.desc || '').split('|').map(p => p.trim());
+  var credor = partes[1] || '';
+  return (c.dividas || []).find(d => String(d.org || 'Sem credor') === credor) || null;
+}
+
+async function recalcularDividaPorHistorico(c, d, excluirLancamentoId) {
+  if (!c || !d || !d.id) return;
+
+  var historico = historicoPagamentosDivida(c, d, excluirLancamentoId);
+  var novoPago = historico.reduce((s, h) => s + Number(h.valor || 0), 0);
+  var valorParcela = Number(d.valorParcela || 0);
+  var parcelasTotal = Number(d.parcelas || 0);
+  var parcelasPagasPorValor = valorParcela > 0 ? Math.floor(novoPago / valorParcela) : 0;
+  var maiorParcelaRef = historico.reduce((max, h) => {
+    var n = parseInt(h.parcela, 10) || 0;
+    return Math.max(max, n);
+  }, 0);
+  var parcelasPagas = Math.max(parcelasPagasPorValor, maiorParcelaRef);
+  var novoRestante = Math.max(0, parcelasTotal - parcelasPagas);
+  if (novoPago >= Number(d.total || 0)) novoRestante = 0;
+
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('dividas')
+      .update({
+        valor_pago: Number(novoPago || 0),
+        parcelas_restantes: novoRestante
+      })
+      .eq('id', d.id)
+  );
+
+  if (error) {
+    console.error('Erro ao sincronizar pagamento da divida:', error);
+    alert('O lancamento foi removido, mas nao foi possivel atualizar o saldo da divida: ' + (error.message || 'erro desconhecido'));
+  }
+}
+
 function renderDividas() {
   var c = data.clients[activeClient];
   var area = document.getElementById('dividas-content');
@@ -281,6 +363,10 @@ function renderDividas() {
 
   var tipoOpts = DV_TIPOS.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
   var filtroTipoOpts = tiposCadastrados.map(t => '<option value="' + esc(t) + '"' + (_dvFiltroTipo === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+  var contasPagamento = Array.isArray(c.contas) ? c.contas : [];
+  var contasPagamentoOpts = contasPagamento.length
+    ? '<option value="">Conta do pagamento</option>' + contasPagamento.map(conta => '<option value="' + esc(conta.id) + '">' + esc(nomeContaCliente(conta)) + '</option>').join('')
+    : '<option value="">Cadastre uma conta no Extrato</option>';
 
   var calcHtml = _lastCalc ? (
     '<div class="calc-result-grid">'
@@ -307,6 +393,19 @@ function renderDividas() {
       var pct = Number(d.total) > 0 ? Math.min(100, Math.round((Number(d.pago || 0) / Number(d.total)) * 100)) : 0;
       var restante = Math.max(0, Number(d.total || 0) - Number(d.pago || 0));
       var progressClass = status === 'quitada' ? ' done' : status === 'atrasada' ? ' late' : '';
+      var historico = historicoPagamentosDivida(c, d);
+      var histOpen = _dvHistOpen.has(i);
+      var hoje = new Date().toISOString().slice(0, 10);
+      var histHtml = historico.length
+        ? historico.map(h =>
+          '<div class="dv-hist-item">'
+          + '<span class="dh-data">' + (h.data ? h.data.split('-').reverse().join('/') : '-') + '</span>'
+          + '<span>Parcela ' + esc(h.parcela || '-') + '</span>'
+          + '<span>' + esc(h.banco || 'Nao informado') + '</span>'
+          + '<span class="dh-val">' + fmt(h.valor || 0) + '</span>'
+          + '</div>'
+        ).join('')
+        : '<div class="dv-hist-item"><span>Nenhum pagamento registrado no extrato.</span></div>';
 
       return '<div class="dv-card ' + status + '">'
         + '<div class="dv-header">'
@@ -320,6 +419,7 @@ function renderDividas() {
         + '<span>Pago: <strong>' + fmt(d.pago || 0) + '</strong></span>'
         + '<span>Restante: <strong>' + fmt(restante) + '</strong></span>'
         + '<span>Parcela: <strong>' + fmt(d.valorParcela || 0) + '</strong></span>'
+        + '<span>Parcelas restantes: <strong>' + Number(d.restantes || 0) + '</strong></span>'
         + '<span>Inicio: <strong>' + (d.dataInicio ? d.dataInicio.split('-').reverse().join('/') : '-') + '</strong></span>'
         + '</div>'
         + '<div class="dv-progress-wrap">'
@@ -327,9 +427,14 @@ function renderDividas() {
         + '<div class="dv-progress-labels"><span>' + pct + '% pago</span><span>' + fmt(restante) + ' em aberto</span></div>'
         + '</div>'
         + '<div class="dv-actions">'
-        + '<input class="dv-pag-input money-input" id="dv-pag-inp-' + i + '" placeholder="0,00" inputmode="numeric"/>'
+        + '<input class="dv-pag-input money-input" id="dv-pag-inp-' + i + '" placeholder="Valor pago" inputmode="numeric"/>'
+        + '<input class="dv-pag-input" id="dv-parcela-inp-' + i + '" type="number" min="1" max="' + Number(d.parcelas || 0) + '" placeholder="Parcela ref."/>'
+        + '<input class="dv-pag-input" id="dv-data-pag-inp-' + i + '" type="date" value="' + hoje + '"/>'
+        + '<select class="dv-pag-input" id="dv-banco-inp-' + i + '">' + contasPagamentoOpts + '</select>'
         + '<button class="btn-pagar" onclick="registrarPagamentoDivida(' + i + ')">Registrar pagamento</button>'
+        + '<button class="btn-hist" onclick="toggleDividaHistorico(' + i + ')">' + (histOpen ? 'Ocultar pagamentos' : 'Ver pagamentos') + ' (' + historico.length + ')</button>'
         + '</div>'
+        + '<div class="dv-hist-wrap' + (histOpen ? ' open' : '') + '">' + histHtml + '</div>'
         + '</div>';
     }).join('');
 
@@ -438,9 +543,9 @@ async function addDivida() {
     return alert('Preencha pelo menos Órgão e Valor.');
   }
 
-  if (parcelas && (!valorParcela || !taxa)) {
-    var calc = simularRenegociacaoDivida();
-    if (calc) {
+  if (parcelas) {
+    var calc = calcularResultadoRenegociacao(total, parcelas, valorParcela, taxa) || _lastCalc;
+    if (calc && Number(calc.totalPago || 0) > 0) {
       valorParcela = Number(calc.pmt || valorParcela || 0);
       taxa = Number(calc.taxaMensal || taxa || 0);
       total = Number(calc.totalPago || total || 0);
@@ -476,7 +581,7 @@ async function addDivida() {
 
 async function deleteDivida(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (!confirm('Excluir dívida?')) return;
+  if (!(await appConfirm('Excluir divida?', { title: 'Excluir divida', confirmText: 'Excluir' }))) return;
 
   var c = data.clients[activeClient];
   var d = c.dividas[i];
@@ -501,8 +606,17 @@ async function deleteDivida(i) {
 async function registrarPagamentoDivida(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var valor = parseMoney(document.getElementById('dv-pag-inp-' + i));
+  var parcelaRef = parseInt((document.getElementById('dv-parcela-inp-' + i) || {}).value, 10) || 0;
+  var dataPagamento = ((document.getElementById('dv-data-pag-inp-' + i) || {}).value) || new Date().toISOString().slice(0, 10);
+  var contaSelect = document.getElementById('dv-banco-inp-' + i);
+  var contaId = (contaSelect && contaSelect.value) ? contaSelect.value : null;
+  var banco = contaSelect && contaSelect.selectedOptions && contaSelect.selectedOptions[0]
+    ? contaSelect.selectedOptions[0].textContent.trim()
+    : '';
+  if (!contaId) banco = '';
 
   if (!valor) return alert('Informe valor');
+  if (!contaId) return alert('Selecione uma conta cadastrada para registrar onde a divida foi paga.');
 
   var c = data.clients[activeClient];
   var d = c.dividas[i];
@@ -511,14 +625,17 @@ async function registrarPagamentoDivida(i) {
   var novoPago = Number(d.pago || 0) + valor;
   var valorParcela = Number(d.valorParcela || 0);
   var parcelasTotal = Number(d.parcelas || 0);
-  var parcelasPagas = valorParcela > 0 ? Math.floor(novoPago / valorParcela) : 0;
+  var parcelasPagasPorValor = valorParcela > 0 ? Math.floor(novoPago / valorParcela) : 0;
+  var parcelasPagas = parcelaRef > 0 ? Math.max(parcelasPagasPorValor, parcelaRef) : parcelasPagasPorValor;
+  var novoRestante = Math.max(0, parcelasTotal - parcelasPagas);
+  if (novoPago >= Number(d.total || 0)) novoRestante = 0;
 
   const { error } = await applyUserScope(
     supabaseClient
       .from('dividas')
       .update({
         valor_pago: novoPago,
-        parcelas_restantes: Math.max(0, parcelasTotal - parcelasPagas)
+        parcelas_restantes: novoRestante
       })
       .eq('id', d.id)
   );
@@ -529,6 +646,28 @@ async function registrarPagamentoDivida(i) {
     return;
   }
 
+  var lancPayload = {
+    cliente_id: activeClient,
+    data_lancamento: dataPagamento,
+    descricao: descricaoPagamentoDivida(d, parcelaRef, banco),
+    categoria: d.tipo || 'Divida',
+    tipo: 'debito',
+    valor: Number(valor || 0),
+    conta_id: contaId || null
+  };
+
+  var lancRes = typeof insertLancamentoComFallback === 'function'
+    ? await insertLancamentoComFallback(lancPayload)
+    : await supabaseClient.from('lancamentos').insert([Object.assign(lancPayload, getUserScopePayload())]);
+
+  const extratoError = lancRes.error;
+
+  if (extratoError) {
+    console.error('Erro ao lancar pagamento da divida no extrato:', extratoError);
+    alert('Pagamento registrado na divida, mas nao foi possivel incluir no extrato: ' + (extratoError.message || 'erro desconhecido'));
+  }
+
   await loadData();
+  _dvHistOpen.add(i);
   renderDividas();
 }

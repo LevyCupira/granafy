@@ -110,6 +110,104 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+var nativeAlert = window.alert ? window.alert.bind(window) : null;
+
+function appDialogEnsure() {
+  var existing = document.getElementById('appDialogOverlay');
+  if (existing) return existing;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'appDialogOverlay';
+  overlay.className = 'app-dialog-overlay';
+  overlay.innerHTML =
+    '<div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">' +
+    '<div class="app-dialog-title" id="appDialogTitle">Granafy</div>' +
+    '<div class="app-dialog-message" id="appDialogMessage"></div>' +
+    '<div class="app-dialog-actions" id="appDialogActions"></div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function appDialogMessageHtml(message) {
+  return esc(message).replace(/\n/g, '<br>');
+}
+
+function appAlert(message, title) {
+  return new Promise(resolve => {
+    if (!document.body) {
+      if (nativeAlert) nativeAlert(message);
+      resolve();
+      return;
+    }
+
+    var overlay = appDialogEnsure();
+    var titleEl = document.getElementById('appDialogTitle');
+    var messageEl = document.getElementById('appDialogMessage');
+    var actionsEl = document.getElementById('appDialogActions');
+
+    titleEl.textContent = title || 'Granafy';
+    messageEl.innerHTML = appDialogMessageHtml(message || '');
+    actionsEl.innerHTML = '<button class="app-dialog-btn primary" type="button">OK</button>';
+
+    var ok = actionsEl.querySelector('button');
+    var close = function() {
+      overlay.classList.remove('open');
+      ok.removeEventListener('click', close);
+      resolve();
+    };
+
+    ok.addEventListener('click', close);
+    overlay.classList.add('open');
+    setTimeout(() => ok.focus(), 0);
+  });
+}
+
+function appConfirm(message, options) {
+  options = options || {};
+  return new Promise(resolve => {
+    if (!document.body) {
+      resolve(window.confirm ? window.confirm(message) : false);
+      return;
+    }
+
+    var overlay = appDialogEnsure();
+    var titleEl = document.getElementById('appDialogTitle');
+    var messageEl = document.getElementById('appDialogMessage');
+    var actionsEl = document.getElementById('appDialogActions');
+
+    titleEl.textContent = options.title || 'Confirmar';
+    messageEl.innerHTML = appDialogMessageHtml(message || '');
+    actionsEl.innerHTML =
+      '<button class="app-dialog-btn ghost" type="button" data-result="0">' + esc(options.cancelText || 'Cancelar') + '</button>' +
+      '<button class="app-dialog-btn primary" type="button" data-result="1">' + esc(options.confirmText || 'Confirmar') + '</button>';
+
+    var buttons = Array.from(actionsEl.querySelectorAll('button'));
+    var done = function(value) {
+      overlay.classList.remove('open');
+      buttons.forEach(btn => btn.removeEventListener('click', onClick));
+      document.removeEventListener('keydown', onKey);
+      resolve(value);
+    };
+    var onClick = function(event) {
+      done(event.currentTarget.dataset.result === '1');
+    };
+    var onKey = function(event) {
+      if (event.key === 'Escape') done(false);
+    };
+
+    buttons.forEach(btn => btn.addEventListener('click', onClick));
+    document.addEventListener('keydown', onKey);
+    overlay.classList.add('open');
+    setTimeout(() => buttons[1].focus(), 0);
+  });
+}
+
+window.alert = function(message) {
+  appAlert(message);
+};
+
 var colOrders = (function() {
   try { return JSON.parse(localStorage.getItem('fb_col_orders')) || {}; } catch { return {}; }
 })();

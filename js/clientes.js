@@ -123,7 +123,7 @@ async function deleteClient(id) {
   const c = data.clients[id];
   if (!c) return;
 
-  if (!confirm('Excluir o cliente "' + c.name + '" e todos os seus dados?\n\nEsta ação não pode ser desfeita.')) {
+  if (!(await appConfirm('Excluir o cliente "' + c.name + '" e todos os seus dados?\n\nEsta acao nao pode ser desfeita.', { title: 'Excluir cliente', confirmText: 'Excluir' }))) {
     return;
   }
 
