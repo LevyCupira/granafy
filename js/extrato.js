@@ -941,6 +941,44 @@ async function importExtratoXlsx(event) {
   event.target.value = '';
 }
 
+function openExtratoEditModal(i) {
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var cats = (data.categories && data.categories.cc) || [];
+  var catOpts = cats.map(cat =>
+    '<option value="' + esc(cat) + '"' + (String(lanc.cat || '') === String(cat) ? ' selected' : '') + '>' + esc(cat) + '</option>'
+  ).join('');
+
+  document.getElementById('modalTitle').textContent = 'Editar lancamento';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="form-row">'
+    + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="date" id="ex-edit-data" value="' + esc(lanc.data || '') + '"/></div>'
+    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex: salario, aluguel..."/></div>'
+    + '</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-edit-cat">' + catOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-edit-conta">' + contasOptionsCliente(lanc.contaId || '') + '</select></div>'
+    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="credito"' + (lanc.tipo === 'credito' ? ' selected' : '') + '>Credito</option><option value="debito"' + (lanc.tipo === 'debito' ? ' selected' : '') + '>Debito</option></select></div>'
+    + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="ex-edit-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
+    + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
+    + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveExtratoEditModal(' + i + ')">Salvar alteracoes</button>'
+    + '</div>';
+
+  document.getElementById('modalOverlay').classList.add('open');
+  initMoneyInputs(document.getElementById('modalBody'));
+
+  var valorInput = document.getElementById('ex-edit-valor');
+  if (valorInput) {
+    var cents = Math.round(Number(lanc.valor || 0) * 100);
+    valorInput.dataset.cents = String(cents);
+    valorInput.value = Number(lanc.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+}
+
 async function deleteExtrato(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var c = data.clients[activeClient];
@@ -972,23 +1010,21 @@ async function deleteExtrato(i) {
 
 async function editExtrato(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  openExtratoEditModal(i);
+}
+
+async function saveExtratoEditModal(i) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var c = data.clients[activeClient];
-  var lanc = c.extrato[i];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
 
-  var novaData = prompt('Data do lancamento (AAAA-MM-DD):', lanc.data || '');
-  if (novaData === null) return;
-  var novaDesc = prompt('Descricao:', lanc.desc || '');
-  if (novaDesc === null) return;
-  novaDesc = novaDesc.trim();
-  var novaCat = prompt('Categoria:', lanc.cat || '');
-  if (novaCat === null) return;
-  var novoTipo = prompt('Tipo (credito ou debito):', lanc.tipo || 'debito');
-  if (novoTipo === null) return;
-  novoTipo = novoTipo === 'credito' ? 'credito' : 'debito';
-  var novoValorTxt = prompt('Valor:', String(Number(lanc.valor || 0)).replace('.', ','));
-  if (novoValorTxt === null) return;
-  var novoValor = parseFloat(String(novoValorTxt).replace(/\./g, '').replace(',', '.')) || 0;
+  var novaData = document.getElementById('ex-edit-data').value;
+  var novaDesc = document.getElementById('ex-edit-desc').value.trim();
+  var novaCat = document.getElementById('ex-edit-cat').value;
+  var novaContaId = document.getElementById('ex-edit-conta').value || null;
+  var novoTipo = document.getElementById('ex-edit-tipo').value === 'credito' ? 'credito' : 'debito';
+  var novoValor = parseMoney(document.getElementById('ex-edit-valor'));
 
   if (!novaDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
 
@@ -1000,7 +1036,8 @@ async function editExtrato(i) {
         descricao: novaDesc,
         categoria: novaCat || null,
         tipo: novoTipo,
-        valor: Number(novoValor || 0)
+        valor: Number(novoValor || 0),
+        conta_id: novaContaId
       })
       .eq('id', lanc.id)
   );
@@ -1012,5 +1049,6 @@ async function editExtrato(i) {
   }
 
   await loadData();
+  closeModal();
   renderExtrato();
 }
