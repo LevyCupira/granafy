@@ -9,6 +9,55 @@ var _exFiltroBusca = '';
 var _exMostrarDuplicados = false;
 var _exManterDuplicado = {};
 var _exDuplicadosResolvidos = carregarDuplicadosResolvidosExtrato();
+var _exPanels = {
+  contas: false,
+  importar: false,
+  novo: false,
+  filtros: false
+};
+
+function toggleExtratoPanel(key) {
+  _exPanels[key] = !_exPanels[key];
+  renderExtrato();
+}
+
+function extratoPanel(key, title, body) {
+  var open = !!_exPanels[key];
+  return '<div class="form-card collapsible-card extrato-collapsible-card' + (open ? ' open' : '') + '">'
+    + '<button type="button" class="collapse-head" onclick="toggleExtratoPanel(\'' + key + '\')" aria-expanded="' + open + '">'
+    + '<span>' + title + '</span>'
+    + '<span class="collapse-chevron" aria-hidden="true">&#9662;</span>'
+    + '</button>'
+    + (open ? '<div class="collapse-body">' + body + '</div>' : '')
+    + '</div>';
+}
+
+function normalizarDataImportada(rawDate) {
+  if (typeof rawDate === 'number' && !isNaN(rawDate)) {
+    var dNum = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+    return dNum.toISOString().slice(0, 10);
+  }
+
+  var texto = String(rawDate || '').trim();
+  if (!texto) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
+
+  var dm = texto.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dm) return dm[3] + '-' + dm[2].padStart(2, '0') + '-' + dm[1].padStart(2, '0');
+  return '';
+}
+
+function lerValorImportadoExtrato(rawVal) {
+  if (typeof rawVal === 'number') return rawVal;
+  return parseFloat(String(rawVal).replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
+}
+
+function inferirTipoImportadoExtrato(rawTipo, valor) {
+  var tipoRaw = String(rawTipo || '').toLowerCase().trim();
+  if (tipoRaw === 'credito' || tipoRaw === 'receita' || tipoRaw === 'entrada') return 'credito';
+  if (tipoRaw === 'debito' || tipoRaw === 'despesa' || tipoRaw === 'saida') return 'debito';
+  return Number(valor || 0) < 0 ? 'debito' : 'credito';
+}
 
 function contasClienteAtivo() {
   var c = data.clients[activeClient];
@@ -38,6 +87,41 @@ function contasOptionsCliente(contaIdAtual) {
     esc(nomeContaCliente(conta)) +
     '</option>'
   ).join('');
+}
+
+function contasOptionsObrigatoriasCliente(contaIdAtual, placeholder) {
+  var contas = contasClienteAtivo();
+  if (!contas.length) return '<option value="">Sem conta cadastrada</option>';
+
+  return '<option value="">' + esc(placeholder || 'Selecione') + '</option>' + contas.map(conta =>
+    '<option value="' + esc(conta.id) + '"' + (conta.id === contaIdAtual ? ' selected' : '') + '>' +
+    esc(nomeContaCliente(conta)) +
+    '</option>'
+  ).join('');
+}
+
+function abrirImportacaoExtrato() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var sel = document.getElementById('ex-import-conta');
+  if (!sel || !sel.value) {
+    alert('Selecione a conta antes de importar o extrato.');
+    return;
+  }
+  document.getElementById('importExtratoXlsxInput').click();
+}
+
+function exportExtratoTemplate() {
+  var rows = [
+    ['data', 'descricao', 'valor', 'categoria', 'tipo'],
+    ['01/05/2026', 'Salario', 4200.00, 'Salario', 'credito'],
+    ['02/05/2026', 'Supermercado', -185.70, 'Alimentacao', 'debito'],
+    ['03/05/2026', 'Pix recebido', 150.00, 'Receita extra', 'credito']
+  ];
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:12},{wch:36},{wch:12},{wch:22},{wch:12}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Extrato');
+  XLSX.writeFile(wb, 'modelo_extrato_granafy.xlsx');
 }
 
 function isMissingContaSchemaError(error) {
@@ -554,7 +638,7 @@ function renderExtrato() {
   if (!area) return;
 
   if (!c) {
-    area.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
+    area.innerHTML = '<div class="empty-state"><div class="icon">↓</div>Selecione um cliente.</div>';
     return;
   }
 
@@ -607,47 +691,59 @@ function renderExtrato() {
     return '<option value="' + m + '"' + (_exFiltroMes === m ? ' selected' : '') + '>' + parts[1] + '/' + parts[0] + '</option>';
   }).join('');
 
-  var html =
-    '<div class="summary-grid">'
-    + '<div class="summary-card"><div class="s-label">Saldo</div><div class="s-val ' + (saldo >= 0 ? 'green' : 'red') + '">' + fmt(saldo) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Créditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Débitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">' + filtrados.length + '</div></div>'
-    + '</div>'
-    + '<div class="form-card"><h3>Contas do cliente</h3>'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+  var contasPanelBody =
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + contasResumoHtml + '</div>'
     + '<button class="btn-sm" onclick="cadastrarContaCliente()">+ Cadastrar conta</button>'
+    + '</div>';
+
+  var importarPanelBody =
+    '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Baixe o modelo, selecione a conta e importe o arquivo.</p>'
+    + '<div class="form-row">'
+    + '<div class="form-group" style="max-width:260px"><label>Conta do extrato</label><select id="ex-import-conta">' + contasOptionsObrigatoriasCliente('', '-- selecione a conta --') + '</select></div>'
     + '</div>'
-    + '</div>'
-    + '<div class="form-card"><h3>+ Novo lançamento</h3>'
-    + '<div class="tipo-toggle" style="margin-bottom:12px">'
-    + '<button class="tipo-btn credito" id="ex-tipo-credito" onclick="setTipoExtrato(\'credito\')">Crédito</button>'
-    + '<button class="tipo-btn debito" id="ex-tipo-debito" onclick="setTipoExtrato(\'debito\')">Débito</button>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="exportExtratoTemplate()">Baixar modelo (.xlsx)</button><button class="btn-sm" onclick="abrirImportacaoExtrato()">Importar planilha</button></div>';
+
+  var novoPanelBody =
+    '<div class="tipo-toggle" style="margin-bottom:12px">'
+    + '<button class="tipo-btn credito" id="ex-tipo-credito" onclick="setTipoExtrato(\'credito\')">Credito</button>'
+    + '<button class="tipo-btn debito" id="ex-tipo-debito" onclick="setTipoExtrato(\'debito\')">Debito</button>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:150px"><label>Data</label><input type="date" id="ex-data"/></div>'
-    + '<div class="form-group"><label>Descrição</label><input type="text" id="ex-desc" placeholder="Ex: salário, aluguel..."/></div>'
+    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-desc" placeholder="Ex: salario, aluguel..."/></div>'
     + '<div class="form-group" style="max-width:180px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="cadastrarContaCliente()">(+ nova)</span></label><select id="ex-conta">' + contasOptionsCliente('') + '</select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
-    + '<button class="btn-add" onclick="addExtrato()">Adicionar</button>'
-    + '</div>'
-    + '<div class="form-card"><h3>Filtros</h3>'
-    + '<div class="form-row">'
-    + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="credito"' + (_exFiltroTipo === 'credito' ? ' selected' : '') + '>Crédito</option><option value="debito"' + (_exFiltroTipo === 'debito' ? ' selected' : '') + '>Débito</option></select></div>'
+    + '<button class="btn-add" onclick="addExtrato()">Adicionar</button>';
+
+  var filtrosPanelBody =
+    '<div class="form-row">'
+    + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="credito"' + (_exFiltroTipo === 'credito' ? ' selected' : '') + '>Credito</option><option value="debito"' + (_exFiltroTipo === 'debito' ? ' selected' : '') + '>Debito</option></select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
-    + '<div class="form-group" style="max-width:150px"><label>Período</label><select id="ex-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:150px"><label>Periodo</label><select id="ex-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
-    + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descrição ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
+    + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>';
+
+  var html =
+    '<div class="summary-grid">'
+    + '<div class="summary-card"><div class="s-label">Saldo</div><div class="s-val ' + (saldo >= 0 ? 'green' : 'red') + '">' + fmt(saldo) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Creditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Debitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + filtrados.length + '</div></div>'
+    + '</div>'
+    + '<div class="extrato-panels-grid">'
+    + extratoPanel('contas', 'Contas do cliente', contasPanelBody)
+    + extratoPanel('importar', 'Importar extrato via planilha', importarPanelBody)
+    + extratoPanel('novo', '+ Novo lancamento', novoPanelBody)
+    + extratoPanel('filtros', 'Filtros', filtrosPanelBody)
     + '</div>'
     + (qtdDuplicadosPendentes
-      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-6px 0 12px;color:var(--warning);font-size:.78rem"><span>' + qtdDuplicadosPendentes + ' duplicado(s) pendente(s) de conferencia. Eles continuam aparecendo no extrato e nos totais.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="toggleDuplicadosExtrato()">' + (_exMostrarDuplicados ? 'Ocultar duplicados' : 'Ver duplicados') + '</button></span></div>'
-      : '<div style="display:flex;justify-content:flex-end;margin:-6px 0 12px;color:var(--muted);font-size:.78rem">Nenhuma duplicidade pendente de conferencia.</div>');
-
+      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-2px 0 12px;color:var(--warning);font-size:.78rem"><span>' + qtdDuplicadosPendentes + ' duplicado(s) pendente(s) de conferencia. Eles continuam aparecendo no extrato e nos totais.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="toggleDuplicadosExtrato()">' + (_exMostrarDuplicados ? 'Ocultar duplicados' : 'Ver duplicados') + '</button></span></div>'
+      : '');
   if (_exMostrarDuplicados && gruposDuplicados.length) {
     html += '<p class="section-title">Duplicidades para conferencia</p>'
       + '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;color:var(--muted);font-size:.78rem">Resolva um grupo por vez.</div>';
@@ -680,7 +776,7 @@ function renderExtrato() {
   if (false && _exMostrarDuplicados && dedupe.duplicados.length) {
     html += '<p class="section-title">Duplicados ocultos</p>'
       + '<table class="data-table" style="margin-bottom:18px">'
-      + '<thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+      + '<thead><tr><th>Data</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...dedupe.duplicados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
@@ -698,12 +794,12 @@ function renderExtrato() {
   }
 
   if (lncs.length === 0) {
-    html += '<div class="empty-state">Nenhum lançamento</div>';
+    html += '<div class="empty-state">Nenhum lancamento</div>';
   } else if (filtrados.length === 0) {
-    html += '<div class="empty-state">Nenhum lançamento encontrado com os filtros atuais.</div>';
+    html += '<div class="empty-state">Nenhum lancamento encontrado com os filtros atuais.</div>';
   } else {
     html += '<table class="data-table">';
-    html += '<thead><tr><th>Data</th><th>Conta</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+    html += '<thead><tr><th>Data</th><th>Conta</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
@@ -729,7 +825,6 @@ function renderExtrato() {
   setTipoExtrato(_exTipo);
   initMoneyInputs(area);
 }
-
 async function addExtrato() {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var dataLanc = document.getElementById('ex-data').value;
@@ -763,6 +858,87 @@ async function addExtrato() {
 
   await loadData();
   renderExtrato();
+}
+
+async function importExtratoXlsx(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (!activeClient) return alert('Selecione um cliente primeiro.');
+
+  var contaId = (document.getElementById('ex-import-conta') && document.getElementById('ex-import-conta').value) || '';
+  if (!contaId) {
+    event.target.value = '';
+    return alert('Selecione a conta do extrato antes de importar.');
+  }
+
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    var header = (rows[0] || []).map(h => String(h).toLowerCase().trim());
+    var iDate = header.findIndex(h => h.includes('data') || h.includes('date'));
+    var iDesc = header.findIndex(h => h.includes('desc'));
+    var iVal = header.findIndex(h => h.includes('valor') || h.includes('value') || h.includes('amount'));
+    var iCat = header.findIndex(h => h.includes('cat'));
+    var iTipo = header.findIndex(h => h.includes('tipo') || h.includes('type'));
+
+    if (iDate < 0 || iDesc < 0 || iVal < 0) {
+      return alert('Planilha invalida. Colunas obrigatorias: data, descricao, valor.');
+    }
+
+    var c = data.clients[activeClient];
+    var count = 0;
+    var erros = 0;
+
+    for (const row of rows.slice(1)) {
+      var dataFmt = normalizarDataImportada(row[iDate]);
+      var desc = String(row[iDesc] || '').trim();
+      var valorBruto = lerValorImportadoExtrato(row[iVal]);
+      var tipo = inferirTipoImportadoExtrato(iTipo >= 0 ? row[iTipo] : '', valorBruto);
+      var valor = Math.abs(Number(valorBruto || 0));
+      var cat = iCat >= 0 ? String(row[iCat] || 'Outros').trim() : 'Outros';
+
+      if (!desc || !valor) continue;
+
+      var duplicado = (c.extrato || []).find(l =>
+        (l.data || '') === (dataFmt || '')
+        && String(l.desc || '') === desc
+        && Number(l.valor || 0) === Number(valor || 0)
+        && (l.tipo || '') === tipo
+        && (l.contaId || '') === contaId
+      );
+
+      if (duplicado && !(await appConfirm('Ja existe um lancamento nessa conta com a mesma data, descricao, valor e tipo: "' + desc + '". Deseja importar novamente?', { title: 'Lancamento duplicado', confirmText: 'Importar novamente' }))) {
+        continue;
+      }
+
+      const { error } = await insertLancamentoComFallback({
+        cliente_id: activeClient,
+        data_lancamento: dataFmt || null,
+        descricao: desc,
+        categoria: cat || 'Outros',
+        tipo: tipo,
+        valor: Number(valor || 0),
+        conta_id: contaId
+      });
+
+      if (error) {
+        console.error('Erro ao importar item do extrato:', row, error);
+        erros++;
+      } else {
+        count++;
+      }
+    }
+
+    await loadData();
+    renderExtrato();
+    alert(count + ' lancamento(s) do extrato importado(s) com sucesso!' + (erros ? ' ' + erros + ' falharam.' : ''));
+  };
+
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
 }
 
 async function deleteExtrato(i) {

@@ -133,8 +133,12 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .collapse-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;background:transparent;border:0;color:var(--accent);padding:15px 18px;font-family:'DM Sans',sans-serif;font-size:.88rem;font-weight:700;text-align:left;cursor:pointer}
 .collapse-head:hover{background:rgba(90,132,255,.08)}
 .collapse-hint{color:var(--muted);font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+.collapse-chevron{color:var(--muted);font-size:1rem;line-height:1;transition:transform var(--tr),color var(--tr)}
+.collapsible-card.open .collapse-chevron{transform:rotate(180deg);color:var(--accent)}
 .collapse-body{padding:0 20px 18px}
 .collapsible-card.open .collapse-head{border-bottom:1px solid var(--border);margin-bottom:16px}
+.extrato-panels-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.extrato-collapsible-card{margin-bottom:0}
 .form-row{display:flex;gap:10px;flex-wrap:wrap}
 .form-group{flex:1;min-width:128px;display:flex;flex-direction:column;gap:5px}
 .form-group label{font-size:.72rem;color:var(--muted);font-weight:500}
@@ -406,6 +410,7 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .form-card.collapsible-card,.calc-bc.collapsible-card{padding:0}
   .collapse-head{padding:14px;min-height:48px}
   .collapse-body{padding:0 14px 14px}
+  .extrato-panels-grid{grid-template-columns:1fr;gap:12px}
   .form-row{display:grid;grid-template-columns:1fr;gap:10px}
   .form-group{min-width:0}
   .form-group input,.form-group select,.btn-add,.btn-sm,.btn-pdf,.btn-pagar,.bill-pay-btn{min-height:42px;font-size:.88rem}
