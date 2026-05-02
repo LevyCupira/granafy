@@ -946,9 +946,11 @@ function openExtratoEditModal(i) {
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
 
-  var cats = (data.categories && data.categories.cc) || [];
+  var cats = nomesCC();
+  var catAtual = String(lanc.cat || '').trim();
+  if (catAtual && !cats.includes(catAtual)) cats = [catAtual].concat(cats);
   var catOpts = cats.map(cat =>
-    '<option value="' + esc(cat) + '"' + (String(lanc.cat || '') === String(cat) ? ' selected' : '') + '>' + esc(cat) + '</option>'
+    '<option value="' + esc(cat) + '"' + (catAtual === String(cat) ? ' selected' : '') + '>' + esc(cat) + '</option>'
   ).join('');
 
   document.getElementById('modalTitle').textContent = 'Editar lancamento';
