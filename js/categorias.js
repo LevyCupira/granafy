@@ -39,64 +39,122 @@ function normalizarNomeCategoria(nome) {
     .replace(/\s+/g, ' ');
 }
 
+function compararCategoriaNome(a, b) {
+  return String(a || '').localeCompare(String(b || ''), 'pt-BR', { sensitivity: 'base' });
+}
+
 function isCategoriaMovContas(nome) {
   return normalizarNomeCategoria(nome) === normalizarNomeCategoria(CATEGORIA_MOV_CONTAS.nome);
 }
 
-function sincronizarCatsCC(lista) {
-  var cats = Array.isArray(lista) ? lista.map(function(cat) {
-    if (typeof cat === 'string') return { nome: cat, tipo: 'variavel' };
-    return {
-      nome: cat && cat.nome ? cat.nome : '',
-      tipo: cat && cat.tipo ? cat.tipo : 'variavel',
-      fixa: !!(cat && cat.fixa)
-    };
-  }).filter(function(cat) {
-    return String(cat.nome || '').trim();
-  }) : [];
+function isCategoriaFixaCC(cat) {
+  var nome = typeof cat === 'string' ? cat : (cat && cat.nome);
+  return isCategoriaMovContas(nome);
+}
 
-  var mov = cats.find(isCategoriaMovContas);
-  if (mov) {
-    mov.nome = CATEGORIA_MOV_CONTAS.nome;
-    mov.tipo = CATEGORIA_MOV_CONTAS.tipo;
-    mov.fixa = true;
+function ordenarCategoriasCC(lista) {
+  return (lista || []).slice().sort(function(a, b) {
+    return compararCategoriaNome(a && a.nome, b && b.nome);
+  });
+}
+
+function ordenarCategoriasCartao(lista) {
+  return (lista || []).slice().sort(compararCategoriaNome);
+}
+
+function sincronizarCatsCC(lista) {
+  var padroes = new Map(
+    DC_CC.map(function(cat) {
+      return [normalizarNomeCategoria(cat.nome), { nome: cat.nome, tipo: cat.tipo, fixa: !!cat.fixa }];
+    })
+  );
+
+  var mapa = new Map();
+  var origem = Array.isArray(lista) && lista.length
+    ? lista
+    : DC_CC.map(function(cat) { return Object.assign({}, cat); });
+
+  origem.forEach(function(cat) {
+    var nome = typeof cat === 'string' ? cat : (cat && cat.nome);
+    nome = String(nome || '').trim();
+    if (!nome) return;
+
+    var chave = normalizarNomeCategoria(nome);
+    if (mapa.has(chave)) return;
+
+    var padrao = padroes.get(chave);
+    var tipo = typeof cat === 'string'
+      ? (padrao ? padrao.tipo : 'variavel')
+      : (cat && cat.tipo ? cat.tipo : (padrao ? padrao.tipo : 'variavel'));
+
+    mapa.set(chave, {
+      nome: padrao && padrao.fixa ? padrao.nome : nome,
+      tipo: padrao && padrao.fixa ? padrao.tipo : tipo,
+      fixa: !!(padrao && padrao.fixa)
+    });
+  });
+
+  if (!mapa.has(normalizarNomeCategoria(CATEGORIA_MOV_CONTAS.nome))) {
+    mapa.set(normalizarNomeCategoria(CATEGORIA_MOV_CONTAS.nome), Object.assign({}, CATEGORIA_MOV_CONTAS));
   } else {
-    cats.push(Object.assign({}, CATEGORIA_MOV_CONTAS));
+    mapa.set(normalizarNomeCategoria(CATEGORIA_MOV_CONTAS.nome), Object.assign({}, CATEGORIA_MOV_CONTAS));
   }
 
-  return cats;
+  return ordenarCategoriasCC(Array.from(mapa.values()));
 }
 
 function loadCatsCC() {
   try {
-    return sincronizarCatsCC(JSON.parse(localStorage.getItem('fb_cats_cc')) || DC_CC.map(function(c) { return Object.assign({}, c); }));
+    return sincronizarCatsCC(JSON.parse(localStorage.getItem('fb_cats_cc')));
   } catch (e) {
     return sincronizarCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); }));
   }
 }
 
-function saveCatsCC(a) {
-  localStorage.setItem('fb_cats_cc', JSON.stringify(sincronizarCatsCC(a)));
+function saveCatsCC(lista) {
+  localStorage.setItem('fb_cats_cc', JSON.stringify(sincronizarCatsCC(lista)));
+}
+
+function sincronizarCatsCartao(lista) {
+  var mapa = new Map();
+  var origem = Array.isArray(lista) && lista.length ? lista : DC_CART.slice();
+
+  origem.forEach(function(cat) {
+    var nome = String(cat || '').trim();
+    if (!nome) return;
+    var chave = normalizarNomeCategoria(nome);
+    if (mapa.has(chave)) return;
+    mapa.set(chave, nome);
+  });
+
+  return ordenarCategoriasCartao(Array.from(mapa.values()));
 }
 
 function loadCatsCartao() {
-  try { return JSON.parse(localStorage.getItem('fb_cats_cartao')) || [].concat(DC_CART); }
-  catch (e) { return [].concat(DC_CART); }
+  try {
+    return sincronizarCatsCartao(JSON.parse(localStorage.getItem('fb_cats_cartao')));
+  } catch (e) {
+    return sincronizarCatsCartao(DC_CART.slice());
+  }
 }
 
-function saveCatsCartao(a) {
-  localStorage.setItem('fb_cats_cartao', JSON.stringify(a));
+function saveCatsCartao(lista) {
+  localStorage.setItem('fb_cats_cartao', JSON.stringify(sincronizarCatsCartao(lista)));
 }
 
 function nomesCC() {
-  return loadCatsCC().map(function(c) { return c.nome || c; });
+  return loadCatsCC().map(function(c) { return c.nome; });
+}
+
+function nomesCartao() {
+  return loadCatsCartao().slice();
 }
 
 function tipoCat(nomeCategoria) {
+  if (isCategoriaMovContas(nomeCategoria)) return 'transferencia';
   var cats = loadCatsCC();
   var found = cats.find(function(c) {
-    return normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(nomeCategoria);
+    return normalizarNomeCategoria(c.nome) === normalizarNomeCategoria(nomeCategoria);
   });
-  if (!found) return 'variavel';
-  return found.tipo || 'variavel';
+  return found ? (found.tipo || 'variavel') : 'variavel';
 }

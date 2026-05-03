@@ -514,3 +514,195 @@ function toggleTheme(isDark) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('fb_theme', theme);
 }
+
+// ----------------------------------------------------
+// Overrides limpos para categorias
+// ----------------------------------------------------
+
+function renderCatsPanel(tipo) {
+  var cats = tipo === 'cc' ? loadCatsCC() : loadCatsCartao();
+  var pid = 'modal-panel-cats_' + (tipo === 'cc' ? 'cc' : 'cartao');
+  var TIPOS_DRE = { receita: 'Receita', fixa: 'Fixa', variavel: 'Variavel', transferencia: 'Transferencia' };
+
+  var tagHtml = '';
+  if (tipo === 'cc') {
+    tagHtml = cats.map(function(c, i) {
+      var nome = c.nome || c;
+      var tipoCatVal = c.tipo || 'variavel';
+      var fixa = !!c.fixa;
+      return '<div class="tag-item" style="gap:8px">'
+        + '<span>' + esc(nome) + '</span>'
+        + '<select onchange="setCatTipo(\'cc\',' + i + ',this.value)"' + (fixa ? ' disabled' : '') + ' style="background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:\'DM Sans\',sans-serif;font-size:.72rem;padding:2px 5px;border-radius:5px;outline:none">'
+        + Object.keys(TIPOS_DRE).map(function(k) {
+            return '<option value="' + k + '"' + (tipoCatVal === k ? ' selected' : '') + '>' + TIPOS_DRE[k] + '</option>';
+          }).join('')
+        + '</select>'
+        + (fixa ? '' : '<button class="btn-icon" type="button" onclick="openEditCategoryModal(\'cc\',' + i + ')" title="Editar categoria">&#9998;</button>')
+        + (fixa ? '' : '<button class="tag-del" onclick="deleteCategory(\'cc\',' + i + ')">✕</button>')
+        + '</div>';
+    }).join('');
+  } else {
+    tagHtml = cats.map(function(c, i) {
+      return '<div class="tag-item" style="gap:8px">'
+        + '<span>' + esc(c) + '</span>'
+        + '<button class="btn-icon" type="button" onclick="openEditCategoryModal(\'cartao\',' + i + ')" title="Editar categoria">&#9998;</button>'
+        + '<button class="tag-del" onclick="deleteCategory(\'cartao\',' + i + ')">✕</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  var desc = tipo === 'cc'
+    ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
+    : 'Categorias dos lancamentos do <strong style="color:var(--text)">Cartao de Credito</strong>. Entram como despesa variavel no DRE.';
+
+  document.getElementById(pid).innerHTML =
+    '<p style="color:var(--muted);font-size:.83rem;margin-bottom:13px">' + desc + '</p>'
+    + '<div class="tag-list" id="tagList-' + tipo + '">' + tagHtml + '</div>'
+    + '<div class="tag-input-row">'
+    + '<input type="text" id="newCatInput-' + tipo + '" placeholder="Nova categoria..." onkeydown="if(event.key===\'Enter\')addCategory(\'' + tipo + '\')"/>'
+    + '<button onclick="addCategory(\'' + tipo + '\')">Adicionar</button>'
+    + '</div>'
+    + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'
+    + '<button class="btn-sm red" onclick="resetCategories(\'' + tipo + '\')">&#8634; Restaurar padrao</button>'
+    + '</div>';
+}
+
+function setCatTipo(tipo, i, novoTipo) {
+  var cats = loadCatsCC();
+  if (cats[i] && cats[i].fixa) return;
+  if (!cats[i] || typeof cats[i] === 'string') cats[i] = { nome: cats[i] || '', tipo: novoTipo };
+  else cats[i].tipo = novoTipo;
+  saveCatsCC(cats);
+  renderCatsPanel('cc');
+}
+
+function addCategory(tipo) {
+  var inp = document.getElementById('newCatInput-' + tipo);
+  var val = (inp && inp.value || '').trim();
+  if (!val) return;
+
+  if (tipo === 'cc') {
+    var cats = loadCatsCC();
+    if (cats.find(function(c) { return normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
+    cats.push({ nome: val, tipo: 'variavel' });
+    saveCatsCC(cats);
+  } else {
+    var carts = loadCatsCartao();
+    if (carts.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
+    carts.push(val);
+    saveCatsCartao(carts);
+  }
+
+  if (inp) inp.value = '';
+  renderCatsPanel(tipo);
+}
+
+function deleteCategory(tipo, i) {
+  if (tipo === 'cc') {
+    var cats = loadCatsCC();
+    if (cats[i] && cats[i].fixa) return;
+    cats.splice(i, 1);
+    saveCatsCC(cats);
+  } else {
+    var carts = loadCatsCartao();
+    carts.splice(i, 1);
+    saveCatsCartao(carts);
+  }
+  renderCatsPanel(tipo);
+}
+
+function openEditCategoryModal(tipo, i) {
+  var cats = tipo === 'cc' ? loadCatsCC() : loadCatsCartao();
+  var cat = cats[i];
+  if (!cat) return;
+  if (tipo === 'cc' && cat.fixa) return;
+
+  var nome = tipo === 'cc' ? (cat.nome || '') : String(cat || '');
+  var tipoAtual = tipo === 'cc' ? (cat.tipo || 'variavel') : '';
+
+  document.getElementById('modalTitle').textContent = 'Editar categoria';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="form-row">'
+    + '<div class="form-group"><label>Nome</label><input type="text" id="cat-edit-nome" value="' + esc(nome) + '" placeholder="Nome da categoria"/></div>'
+    + (tipo === 'cc'
+      ? '<div class="form-group" style="max-width:180px"><label>Tipo</label><select id="cat-edit-tipo"><option value="receita"' + (tipoAtual === 'receita' ? ' selected' : '') + '>Receita</option><option value="fixa"' + (tipoAtual === 'fixa' ? ' selected' : '') + '>Fixa</option><option value="variavel"' + (tipoAtual === 'variavel' ? ' selected' : '') + '>Variavel</option></select></div>'
+      : '')
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
+    + '<button class="btn-sm red" type="button" onclick="renderSettingsModal(\'' + (tipo === 'cc' ? 'cats_cc' : 'cats_cartao') + '\')">Cancelar</button>'
+    + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveCategoryEdit(\'' + tipo + '\',' + i + ')">Salvar alteracoes</button>'
+    + '</div>';
+}
+
+async function renomearCategoriaEmLancamentos(tipo, nomeAntigo, nomeNovo) {
+  if (!nomeAntigo || !nomeNovo) return;
+  if (normalizarNomeCategoria(nomeAntigo) === normalizarNomeCategoria(nomeNovo)) return;
+
+  Object.keys(data.clients || {}).forEach(function(clienteId) {
+    var cliente = data.clients[clienteId];
+    if (!cliente) return;
+    var lista = tipo === 'cc' ? (cliente.extrato || []) : (cliente.cartao || []);
+    lista.forEach(function(item) {
+      if (normalizarNomeCategoria(item.cat) === normalizarNomeCategoria(nomeAntigo)) item.cat = nomeNovo;
+    });
+  });
+  if (typeof saveData === 'function') saveData();
+
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    var tabela = tipo === 'cc' ? 'lancamentos' : 'lancamentos_cartao';
+    var query = supabaseClient.from(tabela).update({ categoria: nomeNovo }).eq('categoria', nomeAntigo);
+    query = typeof applyUserScope === 'function' ? applyUserScope(query) : query;
+    var resposta = await query;
+    if (resposta && resposta.error) throw new Error(resposta.error.message || 'Erro ao atualizar categoria.');
+  }
+}
+
+async function saveCategoryEdit(tipo, i) {
+  var nome = (document.getElementById('cat-edit-nome').value || '').trim();
+  if (!nome) return alert('Informe o nome da categoria.');
+
+  if (tipo === 'cc') {
+    var cats = loadCatsCC();
+    var atual = cats[i];
+    if (!atual || atual.fixa) return;
+    if (cats.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
+
+    var nomeAntigo = atual.nome || '';
+    atual.nome = nome;
+    atual.tipo = document.getElementById('cat-edit-tipo').value || 'variavel';
+    cats[i] = atual;
+    saveCatsCC(cats);
+
+    try {
+      await renomearCategoriaEmLancamentos('cc', nomeAntigo, nome);
+      if (typeof loadData === 'function') await loadData();
+      renderSettingsModal('cats_cc');
+    } catch (err) {
+      alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err.message);
+    }
+    return;
+  }
+
+  var carts = loadCatsCartao();
+  if (!carts[i]) return;
+  if (carts.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
+
+  var nomeAntigoCartao = String(carts[i] || '');
+  carts[i] = nome;
+  saveCatsCartao(carts);
+
+  try {
+    await renomearCategoriaEmLancamentos('cartao', nomeAntigoCartao, nome);
+    if (typeof loadData === 'function') await loadData();
+    renderSettingsModal('cats_cartao');
+  } catch (err2) {
+    alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err2.message);
+  }
+}
+
+async function resetCategories(tipo) {
+  if (!(await appConfirm('Restaurar categorias padrao?', { title: 'Restaurar categorias', confirmText: 'Restaurar' }))) return;
+  if (tipo === 'cc') saveCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); }));
+  else saveCatsCartao(DC_CART.slice());
+  renderCatsPanel(tipo);
+}

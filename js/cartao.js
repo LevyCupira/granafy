@@ -228,7 +228,7 @@ function _renderCartaoFiltroETabela() {
 
   var cols = getColOrder('cartao', COLS_CARTAO);
   var meses = [...new Set(c.cartao.map(it => (it.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
-  var cats = [...new Set(c.cartao.map(it => it.cat || '').filter(Boolean))].sort();
+  var cats = [...new Set(c.cartao.map(it => it.cat || '').filter(Boolean))].sort(compararCategoriaNome);
   var itensBase = _ccFiltro.size === 0 ? c.cartao : c.cartao.filter(it => _ccFiltro.has(it.cartaoId));
   var itens = itensBase.filter(it => {
     var texto = ((it.desc || '') + ' ' + (it.cat || '')).toLowerCase();

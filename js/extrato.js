@@ -687,7 +687,7 @@ function renderExtrato() {
 
   var lncs = c.extrato || [];
   var meses = [...new Set(lncs.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
-  var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort();
+  var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort(compararCategoriaNome);
   var filtradosBrutos = lncs.filter(l => {
     var texto = ((l.desc || '') + ' ' + (l.cat || '')).toLowerCase();
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
@@ -992,6 +992,7 @@ function openExtratoEditModal(i) {
   var cats = nomesCC();
   var catAtual = String(lanc.cat || '').trim();
   if (catAtual && !cats.includes(catAtual)) cats = [catAtual].concat(cats);
+  cats = [...new Set(cats)].sort(compararCategoriaNome);
   var catOpts = cats.map(cat =>
     '<option value="' + esc(cat) + '"' + (catAtual === String(cat) ? ' selected' : '') + '>' + esc(cat) + '</option>'
   ).join('');
