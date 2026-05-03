@@ -1,10 +1,10 @@
-// ════════════════════════════════════════════════════
-// PDF.JS — Exportar relatório PDF
-// ════════════════════════════════════════════════════
+﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PDF.JS â€” Exportar relatÃ³rio PDF
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 function exportPDF() {
   var jsPDF = window.jspdf && window.jspdf.jsPDF;
-  if (!jsPDF) return alert('Biblioteca PDF não carregada.');
+  if (!jsPDF) return alert('Biblioteca PDF nÃ£o carregada.');
   if (!activeClient) return alert('Selecione um cliente.');
   var c   = data.clients[activeClient];
   var doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
@@ -15,14 +15,17 @@ function exportPDF() {
   var periodoSet = new Set(periodosFiltro);
   var mesFiltro = periodosFiltro.length === 1 ? periodosFiltro[0] : '';
   var periodoLabel = periodosFiltro.length ? periodosFiltro.map(formatPeriodoLabel).join(', ') : 'Periodo selecionado';
+  var isAbatimento = function(l) {
+    return typeof isAbatimentoDespesaResumo === 'function' && isAbatimentoDespesaResumo(l);
+  };
 
-  // Cabeçalho
+  // CabeÃ§alho
   doc.setFillColor(30,35,54); doc.rect(0,0,W,28,'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(255,255,255);
   doc.text('Granafy', M, 12);
   doc.setFontSize(10); doc.setFont('helvetica','normal');
-  doc.text('Relatório Financeiro — ' + c.name, M+30, 12);
-  doc.text('Período: ' + periodoLabel, M+30, 18);
+  doc.text('RelatÃ³rio Financeiro â€” ' + c.name, M+30, 12);
+  doc.text('PerÃ­odo: ' + periodoLabel, M+30, 18);
   doc.text('Gerado em ' + hoje, W-M, 19, {align:'right'});
   doc.setFontSize(8); doc.setTextColor(150,175,220);
   doc.text('Desenvolvido por Levy Lima - Teste Beta Granafy', M, 23);
@@ -30,10 +33,11 @@ function exportPDF() {
 
   var todasBase = getTransacoes(activeClient);
   var todas = periodosFiltro.length ? todasBase.filter(l => periodoSet.has((l.data || '').slice(0, 7))) : todasBase;
+  var consolidado = typeof consolidarTransacoesAnaliticas === 'function' ? consolidarTransacoesAnaliticas(todas) : null;
   var cartaoFiltrado = periodosFiltro.length ? (c.cartao || []).filter(it => periodoSet.has((it.data || '').slice(0, 7))) : (c.cartao || []);
   var extratoFiltrado = periodosFiltro.length ? (c.extrato || []).filter(l => periodoSet.has((l.data || '').slice(0, 7))) : (c.extrato || []);
-  var tR = todas.filter(l=>l.tipo==='credito').reduce((s,l)=>s+l.valor,0);
-  var tD = todas.filter(l=>l.tipo==='debito').reduce((s,l)=>s+l.valor,0);
+  var tR = consolidado ? consolidado.totalReceitas : todas.filter(l=>l.tipo==='credito').reduce((s,l)=>s+l.valor,0);
+  var tD = consolidado ? consolidado.totalDespesas : todas.filter(l=>l.tipo==='debito').reduce((s,l)=>s+l.valor,0);
   var saldo = tR-tD;
   var faturaTotal = cartaoFiltrado.reduce((s,it)=>s+(it.tipo==='estorno'?-Number(it.valor || 0):Number(it.valor || 0)),0);
 
@@ -41,7 +45,7 @@ function exportPDF() {
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,35,54);
   doc.text('RESUMO GERAL - ' + periodoLabel, M, y); y+=6;
   doc.setDrawColor(91,140,255); doc.setLineWidth(.4); doc.line(M,y,W-M,y); y+=5;
-  var cards = [['Total Receitas',fmtVal(tR),'#1fad90'],['Total Despesas',fmtVal(tD),'#e03b3b'],['Resultado',fmtVal(saldo),saldo>=0?'#1fad90':'#e03b3b'],['Fatura Cartão',fmtVal(faturaTotal),'#d4900a']];
+  var cards = [['Total Receitas',fmtVal(tR),'#1fad90'],['Total Despesas',fmtVal(tD),'#e03b3b'],['Resultado',fmtVal(saldo),saldo>=0?'#1fad90':'#e03b3b'],['Fatura CartÃ£o',fmtVal(faturaTotal),'#d4900a']];
   var cw = (W-M*2-9)/4;
   cards.forEach(([lbl,val,cor],i) => {
     var cx = M+i*(cw+3);
@@ -53,46 +57,47 @@ function exportPDF() {
   y+=26;
 
   // DRE resumido
-  var fixas    = todas.filter(l=>l.tipo==='debito'&&tipoCat(l.cat)==='fixa');
-  var variaveis = todas.filter(l=>l.tipo==='debito'&&tipoCat(l.cat)!=='fixa');
+  var despesasAnaliticas = consolidado ? consolidado.despesas : [];
+  var fixas = despesasAnaliticas.filter(l=>l.classe==='fixa');
+  var variaveis = despesasAnaliticas.filter(l=>l.classe!=='fixa');
   var tFix = fixas.reduce((s,l)=>s+l.valor,0);
   var tVar = variaveis.reduce((s,l)=>s+l.valor,0);
-  var txPoup = tR>0?((tR-tD)/tR*100).toFixed(1)+'%':'—';
+  var txPoup = tR>0?((tR-tD)/tR*100).toFixed(1)+'%':'â€”';
   if (y>230){doc.addPage();y=M;}
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,35,54);
-  doc.text('DRE — DEMONSTRAÇÃO DO RESULTADO',M,y); y+=4;
+  doc.text('DRE â€” DEMONSTRAÃ‡ÃƒO DO RESULTADO',M,y); y+=4;
   doc.setDrawColor(91,140,255); doc.line(M,y,W-M,y); y+=3;
-  doc.autoTable({startY:y,head:[['Descrição','Valor']],body:[
+  doc.autoTable({startY:y,head:[['DescriÃ§Ã£o','Valor']],body:[
     ['(+) Receita Total',fmtVal(tR)],
-    ['(−) Despesas Fixas',fmtVal(tFix)],
-    ['(−) Despesas Variáveis',fmtVal(tVar)],
-    ['(=) Resultado Líquido',fmtVal(tR-tD)],
-    ['Taxa de Poupança',txPoup],
+    ['(âˆ’) Despesas Fixas',fmtVal(tFix)],
+    ['(âˆ’) Despesas VariÃ¡veis',fmtVal(tVar)],
+    ['(=) Resultado LÃ­quido',fmtVal(tR-tD)],
+    ['Taxa de PoupanÃ§a',txPoup],
   ],styles:{fontSize:9,cellPadding:3},headStyles:{fillColor:[91,140,255],textColor:255,fontStyle:'bold'},
   alternateRowStyles:{fillColor:[245,246,250]},columnStyles:{1:{halign:'right'}},margin:{left:M,right:M}});
   y=doc.lastAutoTable.finalY+10;
 
-  // Receitas e Despesas por mês
+  // Receitas e Despesas por mÃªs
   var meses = periodosFiltro.length ? periodosFiltro.slice().sort().reverse() : [...new Set(todas.map(l=>(l.data||'').slice(0,7)).filter(Boolean))].sort().reverse().slice(0,6);
   if (meses.length>0){
     if(y>230){doc.addPage();y=M;}
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,35,54);
-    doc.text('RECEITAS & DESPESAS POR MÊS',M,y);y+=4;
+    doc.text('RECEITAS & DESPESAS POR MÃŠS',M,y);y+=4;
     doc.setDrawColor(91,140,255);doc.line(M,y,W-M,y);y+=3;
-    var rows=meses.reverse().map(m=>{var[yr,mo]=m.split('-');var r=todas.filter(l=>l.tipo==='credito'&&(l.data||'').startsWith(m)).reduce((s,l)=>s+l.valor,0);var d=todas.filter(l=>l.tipo==='debito'&&(l.data||'').startsWith(m)).reduce((s,l)=>s+l.valor,0);return[mo+'/'+yr,fmtVal(r),fmtVal(d),fmtVal(r-d)];});
-    doc.autoTable({startY:y,head:[['Mês','Receitas','Despesas','Resultado']],body:rows,styles:{fontSize:9,cellPadding:3},headStyles:{fillColor:[91,140,255],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[245,246,250]},columnStyles:{0:{cellWidth:30},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}},margin:{left:M,right:M}});
+    var rows=meses.reverse().map(m=>{var[yr,mo]=m.split('-');var cons=consolidarTransacoesAnaliticas(todas.filter(l=>(l.data||'').startsWith(m)));var r=cons.totalReceitas;var d=cons.totalDespesas;return[mo+'/'+yr,fmtVal(r),fmtVal(d),fmtVal(r-d)];});
+    doc.autoTable({startY:y,head:[['MÃªs','Receitas','Despesas','Resultado']],body:rows,styles:{fontSize:9,cellPadding:3},headStyles:{fillColor:[91,140,255],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[245,246,250]},columnStyles:{0:{cellWidth:30},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}},margin:{left:M,right:M}});
     y=doc.lastAutoTable.finalY+10;
   }
 
-  // Cartão de crédito
+  // CartÃ£o de crÃ©dito
   var cartao=cartaoFiltrado;
   if(cartao.length>0){
     if(y>230){doc.addPage();y=M;}
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,35,54);
-    doc.text('LANÇAMENTOS DO CARTÃO (últimos 50)',M,y);y+=4;
+    doc.text('LANÃ‡AMENTOS DO CARTÃƒO (Ãºltimos 50)',M,y);y+=4;
     doc.setDrawColor(255,198,107);doc.line(M,y,W-M,y);y+=3;
-    var ccRows=[...cartao].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,50).map(it=>{var cc=(c.cartoes||[]).find(x=>x.id===it.cartaoId);return[it.data?it.data.split('-').reverse().join('/'):'—',cc?cc.nome:'—',it.desc,it.cat||'—',it.tipo==='estorno'?'Estorno':'Lançamento',fmtVal(it.valor)];});
-    doc.autoTable({startY:y,head:[['Data','Cartão','Descrição','Categoria','Tipo','Valor']],body:ccRows,styles:{fontSize:8,cellPadding:2.5},headStyles:{fillColor:[255,198,107],textColor:[30,35,54],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,246,250]},columnStyles:{5:{halign:'right'}},margin:{left:M,right:M}});
+    var ccRows=[...cartao].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,50).map(it=>{var cc=(c.cartoes||[]).find(x=>x.id===it.cartaoId);return[it.data?it.data.split('-').reverse().join('/'):'â€”',cc?cc.nome:'â€”',it.desc,it.cat||'â€”',it.tipo==='estorno'?'Estorno':'LanÃ§amento',fmtVal(it.valor)];});
+    doc.autoTable({startY:y,head:[['Data','CartÃ£o','DescriÃ§Ã£o','Categoria','Tipo','Valor']],body:ccRows,styles:{fontSize:8,cellPadding:2.5},headStyles:{fillColor:[255,198,107],textColor:[30,35,54],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,246,250]},columnStyles:{5:{halign:'right'}},margin:{left:M,right:M}});
     y=doc.lastAutoTable.finalY+10;
   }
 
@@ -101,19 +106,19 @@ function exportPDF() {
   if(extrato.length>0){
     if(y>230){doc.addPage();y=M;}
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(30,35,54);
-    doc.text('CONTA CORRENTE (últimos 50)',M,y);y+=4;
+    doc.text('CONTA CORRENTE (Ãºltimos 50)',M,y);y+=4;
     doc.setDrawColor(62,207,176);doc.line(M,y,W-M,y);y+=3;
-    var exRows=[...extrato].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,50).map(l=>[l.data?l.data.split('-').reverse().join('/'):'—',l.desc,l.cat||'—',l.tipo==='credito'?'Receita':'Despesa',fmtVal(l.valor)]);
-    doc.autoTable({startY:y,head:[['Data','Descrição','Categoria','Tipo','Valor']],body:exRows,styles:{fontSize:8,cellPadding:2.5},headStyles:{fillColor:[62,207,176],textColor:[30,35,54],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,246,250]},columnStyles:{4:{halign:'right'}},margin:{left:M,right:M}});
+    var exRows=[...extrato].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,50).map(l=>[l.data?l.data.split('-').reverse().join('/'):'â€”',l.desc,l.cat||'â€”',l.tipo==='credito'?'Receita':'Despesa',fmtVal(l.valor)]);
+    doc.autoTable({startY:y,head:[['Data','DescriÃ§Ã£o','Categoria','Tipo','Valor']],body:exRows,styles:{fontSize:8,cellPadding:2.5},headStyles:{fillColor:[62,207,176],textColor:[30,35,54],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,246,250]},columnStyles:{4:{halign:'right'}},margin:{left:M,right:M}});
   }
 
-  // Rodapé
+  // RodapÃ©
   var pages=doc.internal.getNumberOfPages();
   for(var p=1;p<=pages;p++){
     doc.setPage(p);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(150,155,170);
-    doc.text('Granafy — '+c.name+' — '+hoje,M,295);
+    doc.text('Granafy â€” '+c.name+' â€” '+hoje,M,295);
     doc.setFont('helvetica','italic');doc.text('Desenvolvido por Levy Lima - Teste Beta Granafy',W/2,295,{align:'center'});
-    doc.setFont('helvetica','normal');doc.text('Página '+p+'/'+pages,W-M,295,{align:'right'});
+    doc.setFont('helvetica','normal');doc.text('PÃ¡gina '+p+'/'+pages,W-M,295,{align:'right'});
   }
   doc.save('granafy_relatorio_'+c.name.toLowerCase().replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.pdf');
 }

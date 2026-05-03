@@ -377,17 +377,60 @@ function chaveResolucaoDuplicadoExtrato(chave) {
   return String(activeClient || '') + '::' + chave;
 }
 
-function duplicadoResolvidoExtrato(chave) {
-  return !!_exDuplicadosResolvidos[chaveResolucaoDuplicadoExtrato(chave)];
+function assinaturaLinhaDuplicadaExtrato(l) {
+  return [
+    l && l.id ? 'id:' + l.id : '',
+    l && (l.data || l.data_lancamento || '') || '',
+    String(l && (l.desc || l.descricao || '') || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' '),
+    String(l && l.cat || '').trim().toLowerCase(),
+    String(l && l.tipo || '').trim().toLowerCase(),
+    String(l && l.contaId || '').trim().toLowerCase(),
+    Math.round(Number(l && l.valor || 0) * 100)
+  ].join('|');
 }
 
-function resolverDuplicadoExtrato(chave) {
-  _exDuplicadosResolvidos[chaveResolucaoDuplicadoExtrato(chave)] = true;
+function assinaturaGrupoDuplicadoExtrato(linhas) {
+  return (linhas || [])
+    .map(assinaturaLinhaDuplicadaExtrato)
+    .sort()
+    .join('||');
+}
+
+function duplicadoResolvidoExtrato(chave, linhas) {
+  var resolucao = _exDuplicadosResolvidos[chaveResolucaoDuplicadoExtrato(chave)];
+  if (!resolucao) return false;
+  if (resolucao === true) return true;
+
+  var assinaturaAtual = assinaturaGrupoDuplicadoExtrato(linhas);
+  if (!assinaturaAtual) return !!resolucao;
+  return resolucao.assinatura === assinaturaAtual;
+}
+
+function grupoDuplicadoPendenteExtrato(grupo) {
+  return !duplicadoResolvidoExtrato(grupo.chave, grupo.linhas);
+}
+
+function resolverDuplicadoExtrato(chave, linhas, acao) {
+  _exDuplicadosResolvidos[chaveResolucaoDuplicadoExtrato(chave)] = {
+    acao: acao || 'manter',
+    assinatura: assinaturaGrupoDuplicadoExtrato(linhas),
+    resolvidoEm: new Date().toISOString()
+  };
   salvarDuplicadosResolvidosExtrato();
 }
 
 function manterTodosDuplicadoExtrato(chave) {
-  resolverDuplicadoExtrato(decodeURIComponent(chave));
+  var chaveDecodificada = decodeURIComponent(chave);
+  var c = data.clients[activeClient];
+  var grupo = c && Array.isArray(c.extrato)
+    ? agruparDuplicadosExtrato(c.extrato).find(g => g.chave === chaveDecodificada)
+    : null;
+  resolverDuplicadoExtrato(chaveDecodificada, grupo && grupo.linhas, 'manter');
   renderExtrato();
 }
 
@@ -467,7 +510,7 @@ async function removerDuplicadosSelecionadosExtrato() {
   var c = data.clients[activeClient];
   if (!c || !Array.isArray(c.extrato)) return;
 
-  var grupos = agruparDuplicadosExtrato(c.extrato).filter(grupo => !duplicadoResolvidoExtrato(grupo.chave));
+  var grupos = agruparDuplicadosExtrato(c.extrato).filter(grupoDuplicadoPendenteExtrato);
   var idsParaExcluir = [];
   var chavesResolvidas = [];
 
@@ -480,7 +523,7 @@ async function removerDuplicadosSelecionadosExtrato() {
         temExclusao = true;
       }
     });
-    if (temExclusao) chavesResolvidas.push(grupo.chave);
+    if (temExclusao) chavesResolvidas.push(grupo);
   });
 
   if (!idsParaExcluir.length) return alert('Nenhum duplicado selecionado para exclusao.');
@@ -505,7 +548,7 @@ async function removerDuplicadosSelecionadosExtrato() {
     return;
   }
 
-  chavesResolvidas.forEach(resolverDuplicadoExtrato);
+  chavesResolvidas.forEach(grupo => resolverDuplicadoExtrato(grupo.chave, grupo.linhas, 'excluir'));
   await loadData();
   renderExtrato();
   alert(removidos.length + ' lancamento(s) duplicado(s) removido(s).');
@@ -520,7 +563,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
 
   var grupo = agruparDuplicadosExtrato(c.extrato).find(g => g.chave === chave);
   if (!grupo) {
-    resolverDuplicadoExtrato(chave);
+    resolverDuplicadoExtrato(chave, [], 'manter');
     renderExtrato();
     return;
   }
@@ -531,7 +574,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
     .map(l => l.id);
 
   if (!idsParaExcluir.length) {
-    resolverDuplicadoExtrato(chave);
+    resolverDuplicadoExtrato(chave, grupo.linhas, 'manter');
     renderExtrato();
     return;
   }
@@ -557,7 +600,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
     return;
   }
 
-  resolverDuplicadoExtrato(chave);
+  resolverDuplicadoExtrato(chave, grupo.linhas, 'excluir');
   await loadData();
   renderExtrato();
   alert(removidos.length + ' lancamento(s) removido(s).');
@@ -654,7 +697,7 @@ function renderExtrato() {
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
   });
-  var gruposDuplicados = agruparDuplicadosExtrato(filtradosBrutos).filter(grupo => !duplicadoResolvidoExtrato(grupo.chave));
+  var gruposDuplicados = agruparDuplicadosExtrato(filtradosBrutos).filter(grupoDuplicadoPendenteExtrato);
   var qtdDuplicadosPendentes = gruposDuplicados.reduce((total, grupo) => total + Math.max(grupo.linhas.length - 1, 0), 0);
   var filtrados = filtradosBrutos;
 

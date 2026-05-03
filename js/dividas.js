@@ -18,7 +18,7 @@ var _dvFiltroTipo = '';
 var _dvFiltroBusca = '';
 var _dvPanels = {
   reneg: false,
-  filtros: true
+  filtros: false
 };
 
 function toggleDividasPanel(key) {
@@ -29,10 +29,27 @@ function toggleDividasPanel(key) {
 function setupDividasCollapsiblePanels(area) {
   if (!area) return;
 
+  var calcCard = area.querySelector('.calc-bc');
   var cards = area.querySelectorAll('.form-card');
-  setupDividasPanelDom(area.querySelector('.calc-bc'), 'reneg', 'Renegociacao / nova divida');
-  if (cards[0]) cards[0].style.display = 'none';
-  setupDividasPanelDom(cards[1], 'filtros', 'Filtros');
+  var legacyCard = cards[0] || null;
+  var filtrosCard = cards[1] || null;
+  var anchor = area.querySelector('.section-title');
+
+  if (legacyCard) legacyCard.style.display = 'none';
+
+  if (calcCard && filtrosCard) {
+    var grid = area.querySelector('.dividas-panels-grid');
+    if (!grid) {
+      grid = document.createElement('div');
+      grid.className = 'dividas-panels-grid';
+    }
+    grid.appendChild(calcCard);
+    grid.appendChild(filtrosCard);
+    if (anchor) area.insertBefore(grid, anchor);
+  }
+
+  setupDividasPanelDom(calcCard, 'reneg', 'Renegociacao / nova divida');
+  setupDividasPanelDom(filtrosCard, 'filtros', 'Filtros');
 }
 
 function setupDividasPanelDom(card, key, title) {
@@ -57,7 +74,7 @@ function setupDividasPanelDom(card, key, title) {
   button.className = 'collapse-head';
   button.setAttribute('aria-expanded', open ? 'true' : 'false');
   button.onclick = function() { toggleDividasPanel(key); };
-  button.innerHTML = '<span>' + esc(title) + '</span><span class="collapse-hint">' + (open ? 'Minimizar' : 'Abrir') + '</span>';
+  button.innerHTML = '<span>' + esc(title) + '</span><span class="collapse-chevron" aria-hidden="true">&#9662;</span>';
   card.appendChild(button);
 
   if (open) card.appendChild(body);

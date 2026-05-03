@@ -1,26 +1,41 @@
-// ════════════════════════════════════════════════════
-// RESUMO.JS — Aba Receita & Despesas
-// Inclui getTransacoes() usado por DRE e Gráficos
-// ════════════════════════════════════════════════════
-
-// Consolida Conta Corrente + Cartão (lancamento→despesa)
-// Usado por: resumo, dre, graficos, pdf
 var _resumoPeriodos = null;
 
 function getTransacoes(clienteId) {
   var c = data.clients[clienteId];
+  if (!c) return [];
+
   var result = [];
-  var extratoBase = (c.extrato || []).filter(l => !isCategoriaCartaoCreditoResumo(l.cat));
+  var extratoBase = (c.extrato || []).filter(function(l) { return !isCategoriaCartaoCreditoResumo(l.cat); });
   var extrato = typeof chaveDuplicidadeExtrato === 'function'
     ? filtrarExtratoResumoDuplicados(extratoBase)
     : extratoBase;
 
-  extrato.forEach(l => result.push({ data: l.data, desc: l.desc, cat: l.cat, valor: Number(l.valor), tipo: l.tipo, fonte: 'Conta Corrente' }));
-  (c.cartao  || []).filter(l => l.tipo !== 'estorno').forEach(l => {
-    var cc    = (c.cartoes || []).find(x => x.id === l.cartaoId);
-    var fonte = cc ? 'Cartão ' + cc.nome : 'Cartão de Crédito';
-    result.push({ data: l.data, desc: l.desc, cat: l.cat, valor: Number(l.valor), tipo: 'debito', fonte });
+  extrato.forEach(function(l) {
+    result.push({
+      data: l.data,
+      desc: l.desc,
+      cat: l.cat,
+      valor: Number(l.valor),
+      tipo: l.tipo,
+      fonte: 'Conta Corrente',
+      ehMovConta: typeof isCategoriaMovContas === 'function' && isCategoriaMovContas(l.cat)
+    });
   });
+
+  (c.cartao || []).filter(function(l) { return l.tipo !== 'estorno'; }).forEach(function(l) {
+    var cc = (c.cartoes || []).find(function(x) { return x.id === l.cartaoId; });
+    var fonte = cc ? 'Cartao ' + cc.nome : 'Cartao de Credito';
+    result.push({
+      data: l.data,
+      desc: l.desc,
+      cat: l.cat,
+      valor: Number(l.valor),
+      tipo: 'debito',
+      fonte: fonte,
+      ehMovConta: false
+    });
+  });
+
   return result;
 }
 
@@ -39,9 +54,9 @@ function filtrarExtratoResumoDuplicados(lancamentos) {
   var vistos = new Map();
   var filtrados = [];
 
-  (lancamentos || []).forEach(l => {
+  (lancamentos || []).forEach(function(l) {
     var chave = chaveDuplicidadeExtrato(l);
-    var resolvido = typeof duplicadoResolvidoExtrato === 'function' && duplicadoResolvidoExtrato(chave);
+    var resolvido = typeof duplicadoResolvidoExtrato === 'function' && duplicadoResolvidoExtrato(chave, [l]);
 
     if (resolvido || !vistos.has(chave)) {
       filtrados.push(l);
@@ -52,6 +67,50 @@ function filtrarExtratoResumoDuplicados(lancamentos) {
   return filtrados;
 }
 
+function consolidarTransacoesAnaliticas(transacoes) {
+  var movContas = (transacoes || []).filter(function(l) { return l.ehMovConta; });
+  var analiticas = (transacoes || []).filter(function(l) { return !l.ehMovConta; });
+  var receitasMap = new Map();
+  var despesasMap = new Map();
+
+  analiticas.forEach(function(l) {
+    var cat = l.cat || 'Outros';
+    var classe = typeof tipoCat === 'function' ? tipoCat(cat) : 'variavel';
+
+    if (classe === 'receita') {
+      receitasMap.set(cat, (receitasMap.get(cat) || 0) + (l.tipo === 'credito' ? Number(l.valor || 0) : -Number(l.valor || 0)));
+      return;
+    }
+
+    despesasMap.set(cat, (despesasMap.get(cat) || 0) + (l.tipo === 'debito' ? Number(l.valor || 0) : -Number(l.valor || 0)));
+  });
+
+  var receitas = Array.from(receitasMap.entries())
+    .map(function(entry) { return { cat: entry[0], valor: entry[1] }; })
+    .filter(function(entry) { return entry.valor > 0; })
+    .sort(function(a, b) { return b.valor - a.valor; });
+
+  var despesas = Array.from(despesasMap.entries())
+    .map(function(entry) { return { cat: entry[0], valor: entry[1], classe: typeof tipoCat === 'function' ? tipoCat(entry[0]) : 'variavel' }; })
+    .filter(function(entry) { return entry.valor > 0; })
+    .sort(function(a, b) { return b.valor - a.valor; });
+
+  return {
+    movContas: movContas,
+    analiticas: analiticas,
+    receitas: receitas,
+    despesas: despesas,
+    totalReceitas: receitas.reduce(function(s, entry) { return s + entry.valor; }, 0),
+    totalDespesas: despesas.reduce(function(s, entry) { return s + entry.valor; }, 0)
+  };
+}
+
+function isAbatimentoDespesaResumo(l) {
+  if (!l || l.ehMovConta) return false;
+  if (l.tipo !== 'credito') return false;
+  return typeof tipoCat === 'function' && tipoCat(l.cat) !== 'receita';
+}
+
 function formatPeriodoLabel(m) {
   var parts = String(m || '').split('-');
   return parts.length === 2 ? parts[1] + '/' + parts[0] : m;
@@ -60,7 +119,7 @@ function formatPeriodoLabel(m) {
 function lerPeriodosSelecionados(id, meses, atual) {
   var sel = document.getElementById(id);
   if (sel) {
-    var valores = Array.from(sel.selectedOptions).map(opt => opt.value).filter(Boolean);
+    var valores = Array.from(sel.selectedOptions).map(function(opt) { return opt.value; }).filter(Boolean);
     return valores.length ? valores : (atual && atual.length ? atual : (meses[0] ? [meses[0]] : []));
   }
   return atual && atual.length ? atual : (meses[0] ? [meses[0]] : []);
@@ -69,9 +128,9 @@ function lerPeriodosSelecionados(id, meses, atual) {
 function buildPeriodoMultiSelect(id, meses, selecionados, onChange) {
   var selectedMap = new Set(selecionados || []);
   var label = (selecionados || []).length ? selecionados.map(formatPeriodoLabel).join(', ') : 'Selecionar periodo';
-  var checks = meses.map(m =>
-    '<label class="period-option"><input type="checkbox" value="' + m + '"' + (selectedMap.has(m) ? ' checked' : '') + '/><span>' + formatPeriodoLabel(m) + '</span></label>'
-  ).join('');
+  var checks = meses.map(function(m) {
+    return '<label class="period-option"><input type="checkbox" value="' + m + '"' + (selectedMap.has(m) ? ' checked' : '') + '/><span>' + formatPeriodoLabel(m) + '</span></label>';
+  }).join('');
 
   return '<div class="period-picker" data-period-picker="' + id + '">'
     + '<button type="button" class="period-picker-btn" onclick="togglePeriodoPicker(\'' + id + '\')">' + esc(label) + '</button>'
@@ -81,7 +140,7 @@ function buildPeriodoMultiSelect(id, meses, selecionados, onChange) {
 }
 
 function togglePeriodoPicker(id) {
-  document.querySelectorAll('.period-picker').forEach(el => {
+  document.querySelectorAll('.period-picker').forEach(function(el) {
     if (el.getAttribute('data-period-picker') !== id) el.classList.remove('open');
   });
   var picker = document.querySelector('[data-period-picker="' + id + '"]');
@@ -92,7 +151,7 @@ function aplicarPeriodoPicker(id, renderFn) {
   var picker = document.querySelector('[data-period-picker="' + id + '"]');
   if (!picker) return;
 
-  var valores = Array.from(picker.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+  var valores = Array.from(picker.querySelectorAll('input[type="checkbox"]:checked')).map(function(input) { return input.value; });
   if (id === 'resumo-periodos-sel') _resumoPeriodos = valores;
   if (id === 'graficos-periodos-sel') _graficosPeriodos = valores;
 
@@ -102,53 +161,71 @@ function aplicarPeriodoPicker(id, renderFn) {
 
 function renderResumo() {
   var todas = getTransacoes(activeClient);
-  var meses = [...new Set(todas.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
+  var meses = Array.from(new Set(todas.map(function(l) { return (l.data || '').slice(0, 7); }).filter(Boolean))).sort().reverse();
   var periodos = lerPeriodosSelecionados('resumo-periodos-sel', meses, _resumoPeriodos);
   _resumoPeriodos = periodos;
-  var periodoSet = new Set(periodos);
-  var filtered = periodos.length ? todas.filter(l => periodoSet.has((l.data || '').slice(0, 7))) : [];
 
-  var receitas = filtered.filter(l => l.tipo === 'credito');
-  var despesas = filtered.filter(l => l.tipo === 'debito');
-  var tR = receitas.reduce((s, l) => s + l.valor, 0);
-  var tD = despesas.reduce((s, l) => s + l.valor, 0);
+  var periodoSet = new Set(periodos);
+  var filtered = periodos.length ? todas.filter(function(l) { return periodoSet.has((l.data || '').slice(0, 7)); }) : [];
+  var consolidado = consolidarTransacoesAnaliticas(filtered);
+  var movContas = consolidado.movContas;
+  var receitas = consolidado.receitas;
+  var despesas = consolidado.despesas;
+  var tR = consolidado.totalReceitas;
+  var tD = consolidado.totalDespesas;
   var resultado = tR - tD;
 
-  function groupBy(arr) {
-    var m = {};
-    arr.forEach(l => { m[l.cat || 'Outros'] = (m[l.cat || 'Outros'] || 0) + l.valor; });
-    return Object.entries(m).sort((a, b) => b[1] - a[1]);
-  }
+  var movEntradas = movContas.filter(function(l) { return l.tipo === 'credito'; }).reduce(function(s, l) { return s + l.valor; }, 0);
+  var movSaidas = movContas.filter(function(l) { return l.tipo === 'debito'; }).reduce(function(s, l) { return s + l.valor; }, 0);
 
-  var grR = groupBy(receitas), grD = groupBy(despesas);
   var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
 
-  var barR = grR.map(([cat, val]) =>
-    '<div class="cat-row"><span class="cat-name">' + esc(cat) + '</span>'
-    + '<div class="cat-bar-wrap"><div class="cat-bar-fill income" style="width:' + (tR > 0 ? Math.round((val / tR) * 100) : 0) + '%"></div></div>'
-    + '<span class="cat-val val-pos">' + fmt(val) + '</span></div>'
-  ).join('') || '<p style="color:var(--muted);font-size:.82rem;padding:6px 0">Nenhuma receita.</p>';
+  var barR = receitas.map(function(entry) {
+    var cat = entry.cat, val = entry.valor;
+    return '<div class="cat-row"><span class="cat-name">' + esc(cat) + '</span>'
+      + '<div class="cat-bar-wrap"><div class="cat-bar-fill income" style="width:' + (tR > 0 ? Math.round((val / tR) * 100) : 0) + '%"></div></div>'
+      + '<span class="cat-val val-pos">' + fmt(val) + '</span></div>';
+  }).join('') || '<p style="color:var(--muted);font-size:.82rem;padding:6px 0">Nenhuma receita.</p>';
 
-  var barD = grD.map(([cat, val]) =>
-    '<div class="cat-row"><span class="cat-name">' + esc(cat) + '</span>'
-    + '<div class="cat-bar-wrap"><div class="cat-bar-fill expense" style="width:' + (tD > 0 ? Math.round((val / tD) * 100) : 0) + '%"></div></div>'
-    + '<span class="cat-val val-neg">' + fmt(val) + '</span></div>'
-  ).join('') || '<p style="color:var(--muted);font-size:.82rem;padding:6px 0">Nenhuma despesa.</p>';
+  var barD = despesas.map(function(entry) {
+    var cat = entry.cat, val = entry.valor;
+    return '<div class="cat-row"><span class="cat-name">' + esc(cat) + '</span>'
+      + '<div class="cat-bar-wrap"><div class="cat-bar-fill expense" style="width:' + (tD > 0 ? Math.round((val / tD) * 100) : 0) + '%"></div></div>'
+      + '<span class="cat-val val-neg">' + fmt(val) + '</span></div>';
+  }).join('') || '<p style="color:var(--muted);font-size:.82rem;padding:6px 0">Nenhuma despesa.</p>';
 
   var tabela = filtered.length === 0
-    ? '<div class="empty-state" style="padding:26px"><div class="icon">📊</div>Nenhum lançamento no período.</div>'
-    : '<table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>'
-      + [...filtered].sort((a, b) => (b.data || '').localeCompare(a.data || '')).map(l =>
-          '<tr class="row-' + l.tipo + '">'
-          + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '—') + '</td>'
-          + '<td><span style="font-size:.75rem;color:var(--muted)">' + esc(l.fonte || '') + '</span></td>'
-          + '<td>' + esc(l.desc) + '</td>'
-          + '<td><span class="badge badge-cat">' + esc(l.cat || '—') + '</span></td>'
-          + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
-          + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+' : '-') + ' ' + fmt(l.valor) + '</span></td>'
-          + '</tr>'
-        ).join('')
+    ? '<div class="empty-state" style="padding:26px"><div class="icon">&#128202;</div>Nenhum lancamento no periodo.</div>'
+    : '<table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>'
+      + filtered.slice().sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); }).map(function(l) {
+          var abatimento = isAbatimentoDespesaResumo(l);
+          var tipoLabel = abatimento ? 'Abatimento' : (l.tipo === 'credito' ? 'Receita' : 'Despesa');
+          var tipoColor = abatimento ? 'var(--warning)' : (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)');
+          var valorClass = abatimento ? 'val-pos' : (l.tipo === 'credito' ? 'val-pos' : 'val-neg');
+          var valorPrefixo = abatimento ? '&#8722; despesa ' : (l.tipo === 'credito' ? '+' : '-');
+          var descExtra = abatimento
+            ? '<div style="font-size:.72rem;color:var(--warning);margin-top:2px">Credito tratado como abatimento da despesa da categoria.</div>'
+            : '';
+          return '<tr class="row-' + l.tipo + '">'
+            + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
+            + '<td><span style="font-size:.75rem;color:var(--muted)">' + esc(l.fonte || '') + '</span></td>'
+            + '<td>' + esc(l.desc) + descExtra + '</td>'
+            + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
+            + '<td><span style="font-size:.79rem;color:' + tipoColor + '">' + tipoLabel + '</span></td>'
+            + '<td><span class="val ' + valorClass + '">' + valorPrefixo + ' ' + fmt(l.valor) + '</span></td>'
+            + '</tr>';
+        }).join('')
       + '</tbody></table>';
+
+  var observacoes = movContas.length
+    ? '<div class="form-card" style="margin-top:18px"><h3>Observacoes do periodo</h3>'
+      + '<p style="color:var(--muted);font-size:.82rem;line-height:1.5">A categoria <strong style="color:var(--text)">Mov. Contas</strong> representa transferencia interna entre contas. Por isso ela nao entra como receita nem como despesa nos totais.</p>'
+      + '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:.84rem">'
+      + '<span>Entradas internas: <strong style="color:var(--success)">' + fmt(movEntradas) + '</strong></span>'
+      + '<span>Saidas internas: <strong style="color:var(--danger)">' + fmt(movSaidas) + '</strong></span>'
+      + '<span>Movimentacoes: <strong style="color:var(--text)">' + movContas.length + '</strong></span>'
+      + '</div></div>'
+    : '';
 
   document.getElementById('resumo-content').innerHTML =
     '<div class="period-filter-row">'
@@ -159,11 +236,12 @@ function renderResumo() {
     + '<div class="summary-card"><div class="s-label">Total receitas</div><div class="s-val green">' + fmt(tR) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Total despesas</div><div class="s-val red">' + fmt(tD) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Resultado</div><div class="s-val ' + (resultado >= 0 ? 'green' : 'red') + '">' + fmt(resultado) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Transações</div><div class="s-val blue">' + filtered.length + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Transacoes</div><div class="s-val blue">' + filtered.length + '</div></div>'
     + '</div>'
+    + observacoes
     + '<div class="cat-breakdown">'
-    + '<div class="cat-block"><h4>📈 Receitas por categoria</h4>' + barR + '</div>'
-    + '<div class="cat-block"><h4>📉 Despesas por categoria</h4>' + barD + '</div>'
+    + '<div class="cat-block"><h4>&#128200; Receitas por categoria</h4>' + barR + '</div>'
+    + '<div class="cat-block"><h4>&#128201; Despesas por categoria</h4>' + barD + '</div>'
     + '</div>'
-    + '<p class="section-title" style="margin-top:22px">Lançamentos do período</p>' + tabela;
+    + '<p class="section-title" style="margin-top:22px">Lancamentos do periodo</p>' + tabela;
 }

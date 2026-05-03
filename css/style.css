@@ -139,6 +139,9 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .collapsible-card.open .collapse-head{border-bottom:1px solid var(--border);margin-bottom:16px}
 .extrato-panels-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px}
 .extrato-collapsible-card{margin-bottom:0}
+.cartao-panels-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.cartao-collapsible-card{margin-bottom:0}
+.dividas-panels-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px}
 .form-row{display:flex;gap:10px;flex-wrap:wrap}
 .form-group{flex:1;min-width:128px;display:flex;flex-direction:column;gap:5px}
 .form-group label{font-size:.72rem;color:var(--muted);font-weight:500}
@@ -411,6 +414,8 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .collapse-head{padding:14px;min-height:48px}
   .collapse-body{padding:0 14px 14px}
   .extrato-panels-grid{grid-template-columns:1fr;gap:12px}
+  .cartao-panels-grid{grid-template-columns:1fr;gap:12px}
+  .dividas-panels-grid{grid-template-columns:1fr;gap:12px}
   .form-row{display:grid;grid-template-columns:1fr;gap:10px}
   .form-group{min-width:0}
   .form-group input,.form-group select,.btn-add,.btn-sm,.btn-pdf,.btn-pagar,.bill-pay-btn{min-height:42px;font-size:.88rem}

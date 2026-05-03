@@ -1,66 +1,102 @@
-// ════════════════════════════════════════════════════
-// CATEGORIAS.JS — Listas de categorias com tipo (Fixa/Variável)
-// Usado por: extrato, resumo, dre, settings
-// ════════════════════════════════════════════════════
+// Categorias da conta corrente e do cartao.
+// A categoria "Mov. Contas" e fixa e representa transferencia interna.
 
-// Categorias da Conta Corrente com tipo para o DRE
+var CATEGORIA_MOV_CONTAS = { nome: 'Mov. Contas', tipo: 'transferencia', fixa: true };
+
 var DC_CC = [
-  // Receitas
-  { nome: 'Salário',                tipo: 'receita' },
-  { nome: 'Freelance',              tipo: 'receita' },
-  { nome: 'Transferência recebida', tipo: 'receita' },
-  { nome: 'Investimento',           tipo: 'receita' },
-  { nome: 'Dividendos',             tipo: 'receita' },
-  // Despesas Fixas
-  { nome: 'Aluguel',                tipo: 'fixa' },
-  { nome: 'Água',                   tipo: 'fixa' },
-  { nome: 'Energia',                tipo: 'fixa' },
-  { nome: 'Telefone/Internet',      tipo: 'fixa' },
-  { nome: 'Empréstimo / Financiamento', tipo: 'fixa' },
-  // Despesas Variáveis
-  { nome: 'Alimentação',            tipo: 'variavel' },
-  { nome: 'Transporte',             tipo: 'variavel' },
-  { nome: 'Saúde',                  tipo: 'variavel' },
-  { nome: 'Educação',               tipo: 'variavel' },
-  { nome: 'Lazer',                  tipo: 'variavel' },
-  { nome: 'Vestuário',              tipo: 'variavel' },
-  { nome: 'Outros',                 tipo: 'variavel' },
+  { nome: 'Salario', tipo: 'receita' },
+  { nome: 'Freelance', tipo: 'receita' },
+  { nome: 'Transferencia recebida', tipo: 'receita' },
+  { nome: 'Investimento', tipo: 'receita' },
+  { nome: 'Dividendos', tipo: 'receita' },
+  { nome: 'Aluguel', tipo: 'fixa' },
+  { nome: 'Agua', tipo: 'fixa' },
+  { nome: 'Energia', tipo: 'fixa' },
+  { nome: 'Telefone/Internet', tipo: 'fixa' },
+  { nome: 'Emprestimo / Financiamento', tipo: 'fixa' },
+  { nome: 'Alimentacao', tipo: 'variavel' },
+  { nome: 'Transporte', tipo: 'variavel' },
+  { nome: 'Saude', tipo: 'variavel' },
+  { nome: 'Educacao', tipo: 'variavel' },
+  { nome: 'Lazer', tipo: 'variavel' },
+  { nome: 'Vestuario', tipo: 'variavel' },
+  { nome: 'Outros', tipo: 'variavel' },
+  CATEGORIA_MOV_CONTAS
 ];
 
-// Categorias do Cartão (sem tipo DRE — entram como "variável" no DRE)
 var DC_CART = [
-  'Alimentação','Farmácia','Mercado','Transporte','Lazer',
-  'Vestuário','Saúde','Educação','Streaming','Assinatura',
-  'Viagem','Restaurante','Combustível','Outros'
+  'Alimentacao', 'Farmacia', 'Mercado', 'Transporte', 'Lazer',
+  'Vestuario', 'Saude', 'Educacao', 'Streaming', 'Assinatura',
+  'Viagem', 'Restaurante', 'Combustivel', 'Outros'
 ];
+
+function normalizarNomeCategoria(nome) {
+  return String(nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function isCategoriaMovContas(nome) {
+  return normalizarNomeCategoria(nome) === normalizarNomeCategoria(CATEGORIA_MOV_CONTAS.nome);
+}
+
+function sincronizarCatsCC(lista) {
+  var cats = Array.isArray(lista) ? lista.map(function(cat) {
+    if (typeof cat === 'string') return { nome: cat, tipo: 'variavel' };
+    return {
+      nome: cat && cat.nome ? cat.nome : '',
+      tipo: cat && cat.tipo ? cat.tipo : 'variavel',
+      fixa: !!(cat && cat.fixa)
+    };
+  }).filter(function(cat) {
+    return String(cat.nome || '').trim();
+  }) : [];
+
+  var mov = cats.find(isCategoriaMovContas);
+  if (mov) {
+    mov.nome = CATEGORIA_MOV_CONTAS.nome;
+    mov.tipo = CATEGORIA_MOV_CONTAS.tipo;
+    mov.fixa = true;
+  } else {
+    cats.push(Object.assign({}, CATEGORIA_MOV_CONTAS));
+  }
+
+  return cats;
+}
 
 function loadCatsCC() {
-  try { return JSON.parse(localStorage.getItem('fb_cats_cc')) || DC_CC.map(c => ({ ...c })); }
-  catch { return DC_CC.map(c => ({ ...c })); }
+  try {
+    return sincronizarCatsCC(JSON.parse(localStorage.getItem('fb_cats_cc')) || DC_CC.map(function(c) { return Object.assign({}, c); }));
+  } catch (e) {
+    return sincronizarCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); }));
+  }
 }
 
 function saveCatsCC(a) {
-  localStorage.setItem('fb_cats_cc', JSON.stringify(a));
+  localStorage.setItem('fb_cats_cc', JSON.stringify(sincronizarCatsCC(a)));
 }
 
 function loadCatsCartao() {
-  try { return JSON.parse(localStorage.getItem('fb_cats_cartao')) || [...DC_CART]; }
-  catch { return [...DC_CART]; }
+  try { return JSON.parse(localStorage.getItem('fb_cats_cartao')) || [].concat(DC_CART); }
+  catch (e) { return [].concat(DC_CART); }
 }
 
 function saveCatsCartao(a) {
   localStorage.setItem('fb_cats_cartao', JSON.stringify(a));
 }
 
-// Retorna só os nomes (para selects)
 function nomesCC() {
-  return loadCatsCC().map(c => c.nome || c);
+  return loadCatsCC().map(function(c) { return c.nome || c; });
 }
 
-// Retorna o tipo de uma categoria CC ('receita' | 'fixa' | 'variavel')
 function tipoCat(nomeCategoria) {
-  const cats = loadCatsCC();
-  const found = cats.find(c => (c.nome || c) === nomeCategoria);
+  var cats = loadCatsCC();
+  var found = cats.find(function(c) {
+    return normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(nomeCategoria);
+  });
   if (!found) return 'variavel';
   return found.tipo || 'variavel';
 }
