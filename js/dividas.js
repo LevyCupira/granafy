@@ -1,4 +1,4 @@
-// ════════════════════════════════════════════════════
+﻿// ════════════════════════════════════════════════════
 // DIVIDAS.JS — VERSÃO FINAL LIMPA (SUPABASE)
 // ════════════════════════════════════════════════════
 
@@ -30,12 +30,11 @@ function setupDividasCollapsiblePanels(area) {
   if (!area) return;
 
   var calcCard = area.querySelector('.calc-bc');
-  var cards = area.querySelectorAll('.form-card');
-  var legacyCard = cards[0] || null;
-  var filtrosCard = cards[1] || null;
+  var filtrosCard = Array.from(area.querySelectorAll('.form-card')).find(function(card) {
+    var titulo = card.querySelector('h3');
+    return titulo && String(titulo.textContent || '').toLowerCase().indexOf('filtro') >= 0;
+  }) || null;
   var anchor = area.querySelector('.section-title');
-
-  if (legacyCard) legacyCard.style.display = 'none';
 
   if (calcCard && filtrosCard) {
     var grid = area.querySelector('.dividas-panels-grid');
@@ -479,21 +478,6 @@ function renderDividas() {
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="simularRenegociacaoDivida()">Simular</button><button class="btn-add" style="width:auto;margin-top:0" onclick="addDivida()">Cadastrar divida</button></div>'
     + calcHtml
-    + '</div>'
-    + '<div class="form-card"><h3>+ Nova dívida</h3>'
-    + '<div class="form-row">'
-    + '<div class="form-group"><label>Órgão / credor</label><input type="text" id="dv-org" placeholder="Banco, financeira..."/></div>'
-    + '<div class="form-group"><label>Tipo</label><select id="dv-tipo">' + tipoOpts + '</select></div>'
-    + '<div class="form-group"><label>Inicio</label><input type="date" id="dv-inicio"/></div>'
-    + '</div>'
-    + '<div class="form-row" style="margin-top:10px">'
-    + '<div class="form-group"><label>Valor total</label><input type="text" id="dv-total" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
-    + '<div class="form-group"><label>Parcelas</label><input type="number" id="dv-parcelas" min="0" step="1" placeholder="0"/></div>'
-    + '<div class="form-group"><label>Valor da parcela</label><input type="text" id="dv-vparcela" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
-    + '<div class="form-group"><label>Taxa mensal (%)</label><input type="number" id="dv-taxa" min="0" step="0.01" placeholder="0"/></div>'
-    + '<div class="form-group"><label>Já pago</label><input type="text" id="dv-pago" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
-    + '</div>'
-    + '<button class="btn-add" onclick="addDivida()">Cadastrar dívida</button>'
     + '</div>'
     + '<div class="form-card"><h3>Filtros</h3>'
     + '<div class="form-row">'
