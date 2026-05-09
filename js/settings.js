@@ -520,9 +520,16 @@ function toggleTheme(isDark) {
 // ----------------------------------------------------
 
 function renderCatsPanel(tipo) {
+  if (!activeClient || !data.clients || !data.clients[activeClient]) {
+    document.getElementById('modal-panel-cats_' + (tipo === 'cc' ? 'cc' : 'cartao')).innerHTML =
+      '<p style="color:var(--muted);font-size:.83rem">Selecione um cliente para personalizar as categorias dele.</p>';
+    return;
+  }
+
   var cats = tipo === 'cc' ? loadCatsCC() : loadCatsCartao();
   var pid = 'modal-panel-cats_' + (tipo === 'cc' ? 'cc' : 'cartao');
   var TIPOS_DRE = { receita: 'Receita', fixa: 'Fixa', variavel: 'Variavel', transferencia: 'Transferencia' };
+  var clienteNome = (data.clients[activeClient] && data.clients[activeClient].name) || 'cliente atual';
 
   var tagHtml = '';
   if (tipo === 'cc') {
@@ -552,8 +559,8 @@ function renderCatsPanel(tipo) {
   }
 
   var desc = tipo === 'cc'
-    ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
-    : 'Categorias dos lancamentos do <strong style="color:var(--text)">Cartao de Credito</strong>. Entram como despesa variavel no DRE.';
+    ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
+    : 'Categorias dos lancamentos do <strong style="color:var(--text)">Cartao de Credito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variavel no DRE.';
 
   document.getElementById(pid).innerHTML =
     '<p style="color:var(--muted);font-size:.83rem;margin-bottom:13px">' + desc + '</p>'
@@ -637,20 +644,22 @@ function openEditCategoryModal(tipo, i) {
 async function renomearCategoriaEmLancamentos(tipo, nomeAntigo, nomeNovo) {
   if (!nomeAntigo || !nomeNovo) return;
   if (normalizarNomeCategoria(nomeAntigo) === normalizarNomeCategoria(nomeNovo)) return;
+  if (!activeClient || !data.clients || !data.clients[activeClient]) return;
 
-  Object.keys(data.clients || {}).forEach(function(clienteId) {
-    var cliente = data.clients[clienteId];
-    if (!cliente) return;
-    var lista = tipo === 'cc' ? (cliente.extrato || []) : (cliente.cartao || []);
-    lista.forEach(function(item) {
-      if (normalizarNomeCategoria(item.cat) === normalizarNomeCategoria(nomeAntigo)) item.cat = nomeNovo;
-    });
+  var cliente = data.clients[activeClient];
+  var lista = tipo === 'cc' ? (cliente.extrato || []) : (cliente.cartao || []);
+  lista.forEach(function(item) {
+    if (normalizarNomeCategoria(item.cat) === normalizarNomeCategoria(nomeAntigo)) item.cat = nomeNovo;
   });
   if (typeof saveData === 'function') saveData();
 
   if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     var tabela = tipo === 'cc' ? 'lancamentos' : 'lancamentos_cartao';
-    var query = supabaseClient.from(tabela).update({ categoria: nomeNovo }).eq('categoria', nomeAntigo);
+    var query = supabaseClient
+      .from(tabela)
+      .update({ categoria: nomeNovo })
+      .eq('cliente_id', activeClient)
+      .eq('categoria', nomeAntigo);
     query = typeof applyUserScope === 'function' ? applyUserScope(query) : query;
     var resposta = await query;
     if (resposta && resposta.error) throw new Error(resposta.error.message || 'Erro ao atualizar categoria.');
@@ -671,7 +680,7 @@ async function saveCategoryEdit(tipo, i) {
     atual.nome = nome;
     atual.tipo = document.getElementById('cat-edit-tipo').value || 'variavel';
     cats[i] = atual;
-    saveCatsCC(cats);
+    await Promise.resolve(saveCatsCC(cats));
 
     try {
       await renomearCategoriaEmLancamentos('cc', nomeAntigo, nome);
@@ -689,7 +698,7 @@ async function saveCategoryEdit(tipo, i) {
 
   var nomeAntigoCartao = String(carts[i] || '');
   carts[i] = nome;
-  saveCatsCartao(carts);
+  await Promise.resolve(saveCatsCartao(carts));
 
   try {
     await renomearCategoriaEmLancamentos('cartao', nomeAntigoCartao, nome);
@@ -702,7 +711,7 @@ async function saveCategoryEdit(tipo, i) {
 
 async function resetCategories(tipo) {
   if (!(await appConfirm('Restaurar categorias padrao?', { title: 'Restaurar categorias', confirmText: 'Restaurar' }))) return;
-  if (tipo === 'cc') saveCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); }));
-  else saveCatsCartao(DC_CART.slice());
+  if (tipo === 'cc') await Promise.resolve(saveCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); })));
+  else await Promise.resolve(saveCatsCartao(DC_CART.slice()));
   renderCatsPanel(tipo);
 }

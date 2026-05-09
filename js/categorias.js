@@ -62,6 +62,78 @@ function ordenarCategoriasCartao(lista) {
   return (lista || []).slice().sort(compararCategoriaNome);
 }
 
+function getCategoryClientId(clientId) {
+  var alvo = clientId || activeClient || '';
+  return String(alvo || '').trim();
+}
+
+function catsCCStorageKey(clientId) {
+  var id = getCategoryClientId(clientId);
+  return id ? ('fb_cats_cc__' + id) : 'fb_cats_cc';
+}
+
+function catsCartaoStorageKey(clientId) {
+  var id = getCategoryClientId(clientId);
+  return id ? ('fb_cats_cartao__' + id) : 'fb_cats_cartao';
+}
+
+function isCategoriasClienteTableMissing(error) {
+  if (!error) return false;
+  var msg = String((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+  return error.code === '42P01' || error.code === 'PGRST205' || (msg.includes('categorias_cliente') && (msg.includes('relation') || msg.includes('schema cache')));
+}
+
+async function persistirCategoriasClienteNoSupabase(escopo, lista, clientId) {
+  var alvo = getCategoryClientId(clientId);
+  if (!alvo || typeof supabaseClient === 'undefined' || !supabaseClient || typeof currentUserId !== 'function' || !currentUserId()) return;
+
+  var linhas = escopo === 'cc'
+    ? sincronizarCatsCC(lista).map(function(cat) {
+        return Object.assign({
+          cliente_id: alvo,
+          escopo: 'cc',
+          nome: cat.nome,
+          tipo: cat.tipo || 'variavel',
+          fixa: !!cat.fixa
+        }, getUserScopePayload());
+      })
+    : sincronizarCatsCartao(lista).map(function(nome) {
+        return Object.assign({
+          cliente_id: alvo,
+          escopo: 'cartao',
+          nome: nome,
+          tipo: 'variavel',
+          fixa: false
+        }, getUserScopePayload());
+      });
+
+  var deleteQuery = supabaseClient
+    .from('categorias_cliente')
+    .delete()
+    .eq('cliente_id', alvo)
+    .eq('escopo', escopo);
+  deleteQuery = typeof applyUserScope === 'function' ? applyUserScope(deleteQuery) : deleteQuery;
+  var deleteRes = await deleteQuery;
+  if (deleteRes && deleteRes.error) {
+    if (isCategoriasClienteTableMissing(deleteRes.error)) {
+      console.warn('Tabela categorias_cliente ainda nao existe no Supabase. Rode a migracao 20260508_categorias_por_cliente.sql.');
+      return;
+    }
+    throw new Error(deleteRes.error.message || 'Erro ao limpar categorias do cliente.');
+  }
+
+  if (!linhas.length) return;
+
+  var insertRes = await supabaseClient.from('categorias_cliente').insert(linhas);
+  if (insertRes && insertRes.error) {
+    if (isCategoriasClienteTableMissing(insertRes.error)) {
+      console.warn('Tabela categorias_cliente ainda nao existe no Supabase. Rode a migracao 20260508_categorias_por_cliente.sql.');
+      return;
+    }
+    throw new Error(insertRes.error.message || 'Erro ao salvar categorias do cliente.');
+  }
+}
+
 function sincronizarCatsCC(lista) {
   var padroes = new Map(
     DC_CC.map(function(cat) {
@@ -103,16 +175,34 @@ function sincronizarCatsCC(lista) {
   return ordenarCategoriasCC(Array.from(mapa.values()));
 }
 
-function loadCatsCC() {
+function loadCatsCC(clientId) {
+  var alvo = getCategoryClientId(clientId);
+  if (!alvo) return sincronizarCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); }));
+
   try {
-    return sincronizarCatsCC(JSON.parse(localStorage.getItem('fb_cats_cc')));
+    var cliente = data && data.clients ? data.clients[alvo] : null;
+    var emMemoria = cliente && Array.isArray(cliente.catsCC) ? cliente.catsCC : null;
+    if (emMemoria && emMemoria.length) return sincronizarCatsCC(emMemoria);
+
+    var salvo = JSON.parse(localStorage.getItem(catsCCStorageKey(alvo)));
+    var lista = sincronizarCatsCC(salvo);
+    if (cliente) cliente.catsCC = lista.slice();
+    return lista;
   } catch (e) {
     return sincronizarCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); }));
   }
 }
 
-function saveCatsCC(lista) {
-  localStorage.setItem('fb_cats_cc', JSON.stringify(sincronizarCatsCC(lista)));
+function saveCatsCC(lista, clientId) {
+  var alvo = getCategoryClientId(clientId);
+  var normalizada = sincronizarCatsCC(lista);
+  if (alvo && data && data.clients && data.clients[alvo]) data.clients[alvo].catsCC = normalizada.slice();
+  localStorage.setItem(catsCCStorageKey(alvo), JSON.stringify(normalizada));
+  var syncPromise = persistirCategoriasClienteNoSupabase('cc', normalizada, alvo);
+  syncPromise.catch(function(err) {
+    console.error('Nao foi possivel sincronizar categorias CC no Supabase:', err);
+  });
+  return syncPromise;
 }
 
 function sincronizarCatsCartao(lista) {
@@ -130,29 +220,47 @@ function sincronizarCatsCartao(lista) {
   return ordenarCategoriasCartao(Array.from(mapa.values()));
 }
 
-function loadCatsCartao() {
+function loadCatsCartao(clientId) {
+  var alvo = getCategoryClientId(clientId);
+  if (!alvo) return sincronizarCatsCartao(DC_CART.slice());
+
   try {
-    return sincronizarCatsCartao(JSON.parse(localStorage.getItem('fb_cats_cartao')));
+    var cliente = data && data.clients ? data.clients[alvo] : null;
+    var emMemoria = cliente && Array.isArray(cliente.catsCartao) ? cliente.catsCartao : null;
+    if (emMemoria && emMemoria.length) return sincronizarCatsCartao(emMemoria);
+
+    var salvo = JSON.parse(localStorage.getItem(catsCartaoStorageKey(alvo)));
+    var lista = sincronizarCatsCartao(salvo);
+    if (cliente) cliente.catsCartao = lista.slice();
+    return lista;
   } catch (e) {
     return sincronizarCatsCartao(DC_CART.slice());
   }
 }
 
-function saveCatsCartao(lista) {
-  localStorage.setItem('fb_cats_cartao', JSON.stringify(sincronizarCatsCartao(lista)));
+function saveCatsCartao(lista, clientId) {
+  var alvo = getCategoryClientId(clientId);
+  var normalizada = sincronizarCatsCartao(lista);
+  if (alvo && data && data.clients && data.clients[alvo]) data.clients[alvo].catsCartao = normalizada.slice();
+  localStorage.setItem(catsCartaoStorageKey(alvo), JSON.stringify(normalizada));
+  var syncPromise = persistirCategoriasClienteNoSupabase('cartao', normalizada, alvo);
+  syncPromise.catch(function(err) {
+    console.error('Nao foi possivel sincronizar categorias de cartao no Supabase:', err);
+  });
+  return syncPromise;
 }
 
-function nomesCC() {
-  return loadCatsCC().map(function(c) { return c.nome; });
+function nomesCC(clientId) {
+  return loadCatsCC(clientId).map(function(c) { return c.nome; });
 }
 
-function nomesCartao() {
-  return loadCatsCartao().slice();
+function nomesCartao(clientId) {
+  return loadCatsCartao(clientId).slice();
 }
 
-function tipoCat(nomeCategoria) {
+function tipoCat(nomeCategoria, clientId) {
   if (isCategoriaMovContas(nomeCategoria)) return 'transferencia';
-  var cats = loadCatsCC();
+  var cats = loadCatsCC(clientId);
   var found = cats.find(function(c) {
     return normalizarNomeCategoria(c.nome) === normalizarNomeCategoria(nomeCategoria);
   });

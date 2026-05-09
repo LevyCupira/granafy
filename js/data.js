@@ -62,6 +62,26 @@ async function loadData() {
     return res;
   }
 
+  async function carregarCategoriasComEscopo(usarEscopo) {
+    const filtrarUsuario = usarEscopo && !isAdminUser();
+    var query = supabaseClient.from('categorias_cliente').select('*');
+    if (filtrarUsuario) query = query.eq('user_id', uid);
+    var res = await query.order('nome', { ascending: true });
+
+    if (!res.error) return res;
+
+    if (isCategoriasClienteTableMissing(res.error)) {
+      console.warn('Tabela categorias_cliente ainda nao existe no Supabase. Rode a migracao 20260508_categorias_por_cliente.sql.');
+      return { data: [], error: null };
+    }
+
+    if (usarEscopo && isMissingUserScopeError(res.error)) {
+      return carregarCategoriasComEscopo(false);
+    }
+
+    return res;
+  }
+
   let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo(userScopeEnabled);
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
@@ -87,6 +107,11 @@ async function loadData() {
     console.warn('Nao foi possivel carregar contas cadastradas:', contasRes.error);
   }
   const contasRows = contasRes.data || [];
+  const categoriasRes = await carregarCategoriasComEscopo(userScopeEnabled);
+  if (categoriasRes.error) {
+    console.warn('Nao foi possivel carregar categorias personalizadas:', categoriasRes.error);
+  }
+  const categoriasRows = categoriasRes.data || [];
 
   const contasPorCliente = {};
   (contasRows || []).forEach(conta => {
@@ -99,6 +124,26 @@ async function loadData() {
       numero: conta.numero || '',
       userId: conta.user_id || null
     });
+  });
+
+  const catsCCPorCliente = {};
+  const catsCartaoPorCliente = {};
+  (categoriasRows || []).forEach(cat => {
+    if (!cat || !cat.cliente_id || !cat.nome) return;
+    if (cat.escopo === 'cc') {
+      if (!catsCCPorCliente[cat.cliente_id]) catsCCPorCliente[cat.cliente_id] = [];
+      catsCCPorCliente[cat.cliente_id].push({
+        nome: cat.nome,
+        tipo: cat.tipo || 'variavel',
+        fixa: !!cat.fixa
+      });
+      return;
+    }
+
+    if (cat.escopo === 'cartao') {
+      if (!catsCartaoPorCliente[cat.cliente_id]) catsCartaoPorCliente[cat.cliente_id] = [];
+      catsCartaoPorCliente[cat.cliente_id].push(cat.nome);
+    }
   });
 
   const dividasPorCliente = {};
@@ -158,11 +203,21 @@ async function loadData() {
       id: c.id,
       userId: c.user_id || null,
       name: c.nome || '',
+      tipoCliente: c.tipo_cliente || 'pf',
+      documento: c.documento || '',
+      telefone: c.telefone || '',
+      emailFinanceiro: c.email_financeiro || '',
+      responsavel: c.responsavel || '',
+      razaoSocial: c.razao_social || '',
+      nomeFantasia: c.nome_fantasia || '',
+      observacoes: c.observacoes || '',
       cartoes: cartoesPorCliente[c.id] || [],
       cartao: lancCartaoPorCliente[c.id] || [],
       contas: contasPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
-      extrato: extratoPorCliente[c.id] || []
+      extrato: extratoPorCliente[c.id] || [],
+      catsCC: catsCCPorCliente[c.id] ? sincronizarCatsCC(catsCCPorCliente[c.id]) : loadCatsCC(c.id),
+      catsCartao: catsCartaoPorCliente[c.id] ? sincronizarCatsCartao(catsCartaoPorCliente[c.id]) : loadCatsCartao(c.id)
     };
   });
 }
