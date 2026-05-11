@@ -306,6 +306,10 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .cc-chip:hover{border-color:var(--accent);color:var(--text)}
 .cc-chip.active{background:rgba(91,140,255,.18);border-color:var(--accent);color:var(--accent)}
 .cc-chip.todos.active{background:rgba(62,207,176,.15);border-color:var(--accent3);color:var(--accent3)}
+.cc-filter-tools{display:flex;align-items:center;gap:12px;margin-left:auto;flex-wrap:wrap}
+.cc-filter-count{font-size:.72rem;color:var(--muted);white-space:nowrap}
+.cc-filter-toggle{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:.72rem;font-weight:600;white-space:nowrap}
+.cc-toggle-switch{width:42px;height:24px}
 
 /* ── Categorias (barras) ── */
 .cat-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}
@@ -491,6 +495,7 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .cc-filter-row{align-items:flex-start;gap:7px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
   .cc-filter-label{flex:0 0 auto;padding-top:6px}
   .cc-chip{flex:0 0 auto;padding:8px 12px}
+  .cc-filter-tools{margin-left:0;flex:0 0 auto}
   .data-table{display:block;overflow-x:auto;white-space:nowrap;border-radius:8px}
   .data-table th,.data-table td{padding:10px;font-size:.8rem}
   .chart-wrap,.chart-wrap-tall{height:260px}
