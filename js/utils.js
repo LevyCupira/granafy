@@ -53,7 +53,7 @@ function applySidebarMenuState(minimized) {
   if (!sidebar || !btn) return;
 
   sidebar.classList.toggle('minimized', !!minimized);
-  btn.textContent = minimized ? 'Menu' : 'Recolher';
+  btn.textContent = minimized ? '☰' : 'Recolher';
   btn.title = minimized ? 'Abrir menu' : 'Minimizar menu';
   btn.setAttribute('aria-expanded', minimized ? 'false' : 'true');
 }

@@ -82,6 +82,28 @@ async function loadData() {
     return res;
   }
 
+  async function carregarRelacionamentosComEscopo(usarEscopo) {
+    const filtrarUsuario = usarEscopo && !isAdminUser();
+    var query = supabaseClient.from('relacionamentos_cliente').select('*');
+    if (filtrarUsuario) query = query.eq('user_id', uid);
+    var res = await query.order('nome', { ascending: true });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('relacionamentos_cliente')) {
+      console.warn('Tabela relacionamentos_cliente ainda nao existe no Supabase. Rode a migracao 20260510_relacionamentos_extrato.sql.');
+      return { data: [], error: null };
+    }
+
+    if (usarEscopo && isMissingUserScopeError(res.error)) {
+      return carregarRelacionamentosComEscopo(false);
+    }
+
+    return res;
+  }
+
   let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo(userScopeEnabled);
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
@@ -112,6 +134,11 @@ async function loadData() {
     console.warn('Nao foi possivel carregar categorias personalizadas:', categoriasRes.error);
   }
   const categoriasRows = categoriasRes.data || [];
+  const relacionamentosRes = await carregarRelacionamentosComEscopo(userScopeEnabled);
+  if (relacionamentosRes.error) {
+    console.warn('Nao foi possivel carregar relacionamentos personalizados:', relacionamentosRes.error);
+  }
+  const relacionamentosRows = relacionamentosRes.data || [];
 
   const contasPorCliente = {};
   (contasRows || []).forEach(conta => {
@@ -146,6 +173,19 @@ async function loadData() {
     }
   });
 
+  const relacionamentosPorCliente = {};
+  (relacionamentosRows || []).forEach(rel => {
+    if (!rel || !rel.cliente_id || !rel.nome) return;
+    if (!relacionamentosPorCliente[rel.cliente_id]) relacionamentosPorCliente[rel.cliente_id] = [];
+    relacionamentosPorCliente[rel.cliente_id].push({
+      id: rel.id,
+      nome: rel.nome,
+      tipo: rel.tipo || 'interno',
+      observacao: rel.observacao || '',
+      userId: rel.user_id || null
+    });
+  });
+
   const dividasPorCliente = {};
   (dividasRows || []).forEach(d => {
     if (!dividasPorCliente[d.cliente_id]) dividasPorCliente[d.cliente_id] = [];
@@ -171,10 +211,13 @@ async function loadData() {
       id: l.id,
       data: l.data || l.data_lancamento || null,
       desc: l.descricao || '',
+      descOriginal: l.descricao_original || l.descricao || '',
       cat: l.categoria || '',
       tipo: l.tipo || '',
       valor: Number(l.valor || 0),
-      contaId: l.conta_id || null
+      contaId: l.conta_id || null,
+      relacionamentoId: l.relacionamento_id || null,
+      observacao: l.observacao || ''
     });
   });
 
@@ -214,6 +257,7 @@ async function loadData() {
       cartoes: cartoesPorCliente[c.id] || [],
       cartao: lancCartaoPorCliente[c.id] || [],
       contas: contasPorCliente[c.id] || [],
+      relacionamentos: relacionamentosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],
       catsCC: catsCCPorCliente[c.id] ? sincronizarCatsCC(catsCCPorCliente[c.id]) : loadCatsCC(c.id),
@@ -368,6 +412,7 @@ function renderTab(tabKey) {
 (async function init() {
   const savedTheme = localStorage.getItem('fb_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
+  if (typeof syncSidebarThemeToggle === 'function') syncSidebarThemeToggle();
 
   if (typeof requireAuthSession === 'function') {
     await requireAuthSession();
@@ -402,4 +447,5 @@ function renderTab(tabKey) {
       if (e.key === 'Enter') addClient();
     });
   }
+  if (typeof syncSidebarThemeToggle === 'function') syncSidebarThemeToggle();
 })();

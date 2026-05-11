@@ -6,7 +6,7 @@
 <title>Granafy</title>
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="css/style.css?v=20260508-1"/>
+<link rel="stylesheet" href="css/style.css?v=20260510-2"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <meta name="theme-color" content="#181c27"/>
 <link rel="icon" href="data:,">
@@ -20,13 +20,22 @@
         <span class="logo-text">Granafy</span>
         <span>Gestão Financeira</span>
       </div>
-      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebarMenu()" aria-expanded="false" title="Abrir menu">Menu</button>
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebarMenu()" aria-expanded="false" title="Abrir menu">☰</button>
     </div>
 
     <nav class="sidebar-nav">
-      <button class="snav-btn" onclick="openModal('settings')">Configurações</button>
-      <button class="snav-btn" onclick="openModal('backup')">Backup</button>
-      <button class="snav-btn" id="installAppBtn" onclick="installGranafyApp()">Instalar app</button>
+      <button class="snav-btn" onclick="openModal('settings')" title="Configurações">
+        <span class="snav-icon">&#9881;</span>
+        <span class="snav-label">Configurações</span>
+      </button>
+      <button class="snav-btn" onclick="openModal('backup')" title="Backup">
+        <span class="snav-icon">&#10515;</span>
+        <span class="snav-label">Backup</span>
+      </button>
+      <button class="snav-btn" id="installAppBtn" onclick="installGranafyApp()" title="Instalar app">
+        <span class="snav-icon">&#8681;</span>
+        <span class="snav-label">Instalar app</span>
+      </button>
       <div id="auth-user-box" class="auth-user-box"><span>Verificando login...</span></div>
     </nav>
 
@@ -50,6 +59,20 @@
       <div class="new-client-area">
         <p class="sidebar-section-label">Cadastro de cliente</p>
         <button id="openClientFormBtn" onclick="addClient()">+ Cadastrar cliente</button>
+      </div>
+
+      <div class="sidebar-theme-card">
+        <div class="sidebar-theme-copy">
+          <p class="sidebar-section-label">Tema</p>
+          <small id="sidebarThemeText">Tema escuro</small>
+        </div>
+        <label class="sidebar-theme-toggle" title="Alternar tema claro e escuro">
+          <input type="checkbox" id="sidebarThemeToggle" onchange="toggleTheme(this.checked)"/>
+          <span class="sidebar-theme-track">
+            <span class="sidebar-theme-icon sidebar-theme-icon-moon">&#9790;</span>
+            <span class="sidebar-theme-icon sidebar-theme-icon-sun">&#9728;</span>
+          </span>
+        </label>
       </div>
     </div>
   </aside>
@@ -104,7 +127,7 @@
   <div class="modal">
     <div class="modal-header">
       <h3 id="modalTitle"></h3>
-      <button class="modal-close" onclick="closeModal()">×</button>
+      <button class="modal-close" onclick="closeModal()">x</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
@@ -133,13 +156,13 @@
 <script src="js/categorias.js?v=20260508-1"></script>
 <script src="js/cartao.js?v=20260503-1"></script>
 <script src="js/dividas.js?v=20260502-1"></script>
-<script src="js/extrato.js?v=20260503-1"></script>
+<script src="js/extrato.js?v=20260510-1"></script>
 <script src="js/resumo.js?v=20260503-1"></script>
 <script src="js/dre.js?v=20260503-1"></script>
 <script src="js/graficos.js?v=20260503-1"></script>
 <script src="js/pdf.js?v=20260503-4"></script>
-<script src="js/settings.js?v=20260508-1"></script>
-<script src="js/data.js?v=20260508-1"></script>
+<script src="js/settings.js?v=20260510-4"></script>
+<script src="js/data.js?v=20260510-2"></script>
 <script src="js/migracao-cartao-segura.js?v=20260412-6"></script>
 <script src="js/auditoria.js?v=20260412-3"></script>
 </body>
