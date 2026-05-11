@@ -5,12 +5,14 @@ var _exFiltroTipo = 'todos';
 var _exFiltroCat = '';
 var _exFiltroMes = getPreviousMonthKey();
 var _exFiltroConta = '';
+var _exFiltroRelacionamento = '';
 var _exFiltroBusca = '';
 var _exMostrarDuplicados = false;
 var _exManterDuplicado = {};
 var _exDuplicadosResolvidos = carregarDuplicadosResolvidosExtrato();
 var _exPanels = {
   contas: false,
+  relacionamentos: false,
   importar: false,
   novo: false,
   filtros: false
@@ -62,6 +64,48 @@ function inferirTipoImportadoExtrato(rawTipo, valor) {
 function contasClienteAtivo() {
   var c = data.clients[activeClient];
   return c && Array.isArray(c.contas) ? c.contas : [];
+}
+
+function clienteAtivoEhPJ() {
+  var c = data.clients[activeClient];
+  return !!(c && String(c.tipoCliente || '').toLowerCase() === 'pj');
+}
+
+function relacionamentosClienteAtivo() {
+  var c = data.clients[activeClient];
+  return c && Array.isArray(c.relacionamentos) ? c.relacionamentos : [];
+}
+
+function tipoRelacionamentoLabel(tipo) {
+  var chave = String(tipo || '').toLowerCase();
+  if (chave === 'pf') return 'PF';
+  if (chave === 'pj') return 'PJ';
+  if (chave === 'terceiro') return 'Terceiro';
+  return 'Interno';
+}
+
+function nomeRelacionamento(item) {
+  return item && item.nome ? item.nome : 'Nao vinculado';
+}
+
+function nomeRelacionamentoPorId(cliente, relacionamentoId) {
+  if (!cliente || !relacionamentoId) return '-';
+  var rel = (cliente.relacionamentos || []).find(item => item.id === relacionamentoId);
+  return rel ? nomeRelacionamento(rel) : '-';
+}
+
+function relacionamentoOptionsCliente(relacionamentoIdAtual, incluirVazio) {
+  var relacionamentos = relacionamentosClienteAtivo().slice().sort(function(a, b) {
+    return compararCategoriaNome(nomeRelacionamento(a), nomeRelacionamento(b));
+  });
+
+  var inicio = incluirVazio === false ? '' : '<option value="">Nao vinculado</option>';
+  return inicio + relacionamentos.map(function(rel) {
+    return '<option value="' + esc(rel.id) + '"' + (rel.id === relacionamentoIdAtual ? ' selected' : '') + '>'
+      + esc(nomeRelacionamento(rel))
+      + ' (' + esc(tipoRelacionamentoLabel(rel.tipo)) + ')'
+      + '</option>';
+  }).join('');
 }
 
 function nomeContaCliente(conta) {
@@ -130,6 +174,16 @@ function isMissingContaSchemaError(error) {
   return error.code === '42703' || error.code === '42P01' || error.code === 'PGRST204' || error.code === 'PGRST205' || msg.includes('conta_id') || msg.includes('contas') || msg.includes('schema cache');
 }
 
+function isMissingRelacionamentoSchemaError(error) {
+  if (!error) return false;
+  var msg = String((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+  return error.code === '42703' || error.code === '42P01' || error.code === 'PGRST204' || error.code === 'PGRST205'
+    || msg.includes('relacionamento_id')
+    || msg.includes('descricao_original')
+    || msg.includes('relacionamentos_cliente')
+    || msg.includes('schema cache');
+}
+
 var BANCOS_COMUNS = [
   'Banco do Brasil',
   'Bradesco',
@@ -143,19 +197,30 @@ var BANCOS_COMUNS = [
   'Outro'
 ];
 
+var TIPOS_RELACIONAMENTO = [
+  { value: 'pf', label: 'Pessoa fisica' },
+  { value: 'pj', label: 'Pessoa juridica' },
+  { value: 'interno', label: 'Interno' },
+  { value: 'terceiro', label: 'Terceiro' }
+];
+
 async function insertLancamentoComFallback(payload) {
   var completo = await supabaseClient
     .from('lancamentos')
     .insert([Object.assign({}, payload, getUserScopePayload())]);
 
-  if (!completo.error || !payload.conta_id || !isMissingContaSchemaError(completo.error)) return completo;
+  if (!completo.error) return completo;
 
   var basico = Object.assign({}, payload);
-  delete basico.conta_id;
-  console.warn('Tentando salvar lancamento sem conta_id apos erro no schema:', completo.error);
-  return supabaseClient
-    .from('lancamentos')
-    .insert([Object.assign(basico, getUserScopePayload())]);
+
+  if (payload.conta_id && isMissingContaSchemaError(completo.error)) {
+    delete basico.conta_id;
+    console.warn('Tentando salvar lancamento sem conta_id apos erro no schema:', completo.error);
+    return supabaseClient
+      .from('lancamentos')
+      .insert([Object.assign(basico, getUserScopePayload())]);
+  }
+  return completo;
 }
 
 async function cadastrarContaCliente() {
@@ -222,6 +287,151 @@ async function editarContaCliente(contaId) {
 
   await loadData();
   renderExtrato();
+}
+
+async function cadastrarRelacionamentoCliente() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var relacionamento = await abrirFormularioRelacionamentoCliente(null);
+  if (!relacionamento) return;
+
+  const { error } = await supabaseClient
+    .from('relacionamentos_cliente')
+    .insert([Object.assign({
+      cliente_id: activeClient,
+      nome: relacionamento.nome,
+      tipo: relacionamento.tipo,
+      observacao: relacionamento.observacao || null
+    }, getUserScopePayload())]);
+
+  if (error) {
+    console.error('Erro ao cadastrar relacionamento:', error);
+    if (isMissingRelacionamentoSchemaError(error)) {
+      alert('A tabela de relacionamentos ainda nao existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      return;
+    }
+    alert('Nao foi possivel cadastrar o relacionamento: ' + (error.message || 'erro desconhecido'));
+    return;
+  }
+
+  await loadData();
+  renderExtrato();
+}
+
+async function editarRelacionamentoCliente(relacionamentoId) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
+  if (!rel) return alert('Relacionamento nao encontrado.');
+
+  var dados = await abrirFormularioRelacionamentoCliente(rel);
+  if (!dados) return;
+
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('relacionamentos_cliente')
+      .update({
+        nome: dados.nome,
+        tipo: dados.tipo,
+        observacao: dados.observacao || null
+      })
+      .eq('id', rel.id)
+  );
+
+  if (error) {
+    console.error('Erro ao editar relacionamento:', error);
+    if (isMissingRelacionamentoSchemaError(error)) {
+      alert('A tabela de relacionamentos ainda nao existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      return;
+    }
+    alert('Nao foi possivel editar o relacionamento: ' + (error.message || 'erro desconhecido'));
+    return;
+  }
+
+  await loadData();
+  renderExtrato();
+}
+
+async function excluirRelacionamentoCliente(relacionamentoId) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
+  if (!rel) return;
+
+  var texto = 'Excluir o relacionamento "' + nomeRelacionamento(rel) + '"? Os lancamentos vinculados permanecerao no extrato, mas sem este relacionamento.';
+  if (!(await appConfirm(texto, { title: 'Excluir relacionamento', confirmText: 'Excluir' }))) return;
+
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('relacionamentos_cliente')
+      .delete()
+      .eq('id', rel.id)
+  );
+
+  if (error) {
+    console.error('Erro ao excluir relacionamento:', error);
+    alert('Nao foi possivel excluir o relacionamento: ' + (error.message || 'erro desconhecido'));
+    return;
+  }
+
+  await loadData();
+  renderExtrato();
+}
+
+function abrirFormularioRelacionamentoCliente(relacionamento) {
+  return new Promise(function(resolve) {
+    var overlay = appDialogEnsure();
+    var titleEl = document.getElementById('appDialogTitle');
+    var messageEl = document.getElementById('appDialogMessage');
+    var actionsEl = document.getElementById('appDialogActions');
+
+    titleEl.textContent = relacionamento ? 'Editar relacionamento' : 'Cadastrar relacionamento';
+    messageEl.innerHTML =
+      '<div class="account-form">' +
+      '<div class="form-row">' +
+      '<div class="form-group"><label>Apelido</label><input type="text" id="relNome" value="' + esc((relacionamento && relacionamento.nome) || '') + '" placeholder="Ex: Granafy, Levy PF, Casa"/></div>' +
+      '<div class="form-group" style="max-width:200px"><label>Tipo</label><select id="relTipo">' +
+      TIPOS_RELACIONAMENTO.map(function(item) {
+        var selected = ((relacionamento && relacionamento.tipo) || 'interno') === item.value ? ' selected' : '';
+        return '<option value="' + item.value + '"' + selected + '>' + item.label + '</option>';
+      }).join('') +
+      '</select></div>' +
+      '</div>' +
+      '<div class="form-group"><label>Observacao</label><input type="text" id="relObs" value="' + esc((relacionamento && relacionamento.observacao) || '') + '" placeholder="Ex: Pagamento pessoal feito para a empresa"/></div>' +
+      '<div class="account-form-error" id="relFormError"></div>' +
+      '</div>';
+    actionsEl.innerHTML =
+      '<button class="app-dialog-btn ghost" type="button" id="relCancelar">Cancelar</button>' +
+      '<button class="app-dialog-btn primary" type="button" id="relSalvar">' + (relacionamento ? 'Salvar' : 'Cadastrar') + '</button>';
+
+    function close(value) {
+      overlay.classList.remove('open');
+      resolve(value);
+    }
+
+    document.getElementById('relCancelar').onclick = function() { close(null); };
+    document.getElementById('relSalvar').onclick = function() {
+      var nome = document.getElementById('relNome').value.trim();
+      var tipo = document.getElementById('relTipo').value || 'interno';
+      var observacao = document.getElementById('relObs').value.trim();
+      var errorEl = document.getElementById('relFormError');
+
+      if (!nome) {
+        errorEl.textContent = 'Informe o apelido do relacionamento.';
+        document.getElementById('relNome').focus();
+        return;
+      }
+
+      close({
+        nome: nome,
+        tipo: tipo,
+        observacao: observacao
+      });
+    };
+
+    overlay.classList.add('open');
+    setTimeout(function() {
+      var input = document.getElementById('relNome');
+      if (input) input.focus();
+    }, 0);
+  });
 }
 
 function abrirFormularioContaCliente(conta) {
@@ -336,12 +546,14 @@ function aplicarFiltrosExtrato() {
   var cat = document.getElementById('ex-filtro-cat');
   var mes = document.getElementById('ex-filtro-mes');
   var conta = document.getElementById('ex-filtro-conta');
+  var relacionamento = document.getElementById('ex-filtro-relacionamento');
   var busca = document.getElementById('ex-filtro-busca');
 
   _exFiltroTipo = tipo ? tipo.value : 'todos';
   _exFiltroCat = cat ? cat.value : '';
   _exFiltroMes = mes ? mes.value : '';
   _exFiltroConta = conta ? conta.value : '';
+  _exFiltroRelacionamento = clienteAtivoEhPJ() && relacionamento ? relacionamento.value : '';
   _exFiltroBusca = busca ? busca.value.trim().toLowerCase() : '';
 
   renderExtrato();
@@ -352,6 +564,7 @@ function limparFiltrosExtrato() {
   _exFiltroCat = '';
   _exFiltroMes = '';
   _exFiltroConta = '';
+  _exFiltroRelacionamento = '';
   _exFiltroBusca = '';
   renderExtrato();
 }
@@ -685,15 +898,17 @@ function renderExtrato() {
     return;
   }
 
+  var relacionamentoAtivo = clienteAtivoEhPJ();
   var lncs = c.extrato || [];
   var meses = [...new Set(lncs.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort(compararCategoriaNome);
   var filtradosBrutos = lncs.filter(l => {
-    var texto = ((l.desc || '') + ' ' + (l.cat || '')).toLowerCase();
+    var texto = ((l.desc || '') + ' ' + (l.cat || '') + ' ' + (relacionamentoAtivo ? nomeRelacionamentoPorId(c, l.relacionamentoId) : '') + ' ' + (l.observacao || '')).toLowerCase();
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
     if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
     if (_exFiltroMes && !(l.data || '').startsWith(_exFiltroMes)) return false;
     if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
+    if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
   });
@@ -713,6 +928,7 @@ function renderExtrato() {
   var catOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var filtroCatOpts = catsLanc.map(cat => '<option value="' + esc(cat) + '"' + (_exFiltroCat === cat ? ' selected' : '') + '>' + esc(cat) + '</option>').join('');
   var contas = contasClienteAtivo();
+  var relacionamentos = relacionamentoAtivo ? relacionamentosClienteAtivo() : [];
   var contasResumoHtml = contas.length
     ? contas.map(conta =>
       '<span class="account-pill">'
@@ -721,11 +937,29 @@ function renderExtrato() {
       + '</span>'
     ).join(' ')
     : '<span style="color:var(--muted);font-size:.85rem">Nenhuma conta cadastrada para este cliente.</span>';
+  var relacionamentosResumoHtml = relacionamentos.length
+    ? relacionamentos.slice().sort(function(a, b) {
+        return compararCategoriaNome(nomeRelacionamento(a), nomeRelacionamento(b));
+      }).map(function(rel) {
+        return '<span class="account-pill">'
+          + '<span>' + esc(nomeRelacionamento(rel)) + ' <small style="color:var(--muted)">(' + esc(tipoRelacionamentoLabel(rel.tipo)) + ')</small></span>'
+          + '<button class="btn-icon" onclick="editarRelacionamentoCliente(\'' + esc(rel.id) + '\')" title="Editar relacionamento">&#9998;</button>'
+          + '<button class="btn-icon danger" onclick="excluirRelacionamentoCliente(\'' + esc(rel.id) + '\')" title="Excluir relacionamento">&#128465;</button>'
+          + '</span>';
+      }).join(' ')
+    : '<span style="color:var(--muted);font-size:.85rem">Nenhum relacionamento cadastrado para este cliente.</span>';
   var filtroContaOpts = contas.map(conta =>
     '<option value="' + esc(conta.id) + '"' + (_exFiltroConta === conta.id ? ' selected' : '') + '>' +
     esc(nomeContaCliente(conta)) +
     '</option>'
   ).join('');
+  var filtroRelacionamentoOpts = relacionamentos.slice().sort(function(a, b) {
+    return compararCategoriaNome(nomeRelacionamento(a), nomeRelacionamento(b));
+  }).map(function(rel) {
+    return '<option value="' + esc(rel.id) + '"' + (_exFiltroRelacionamento === rel.id ? ' selected' : '') + '>' +
+      esc(nomeRelacionamento(rel)) +
+      '</option>';
+  }).join('');
   var mesesFiltro = meses.slice();
   if (_exFiltroMes && !mesesFiltro.includes(_exFiltroMes)) mesesFiltro.unshift(_exFiltroMes);
 
@@ -740,10 +974,18 @@ function renderExtrato() {
     + '<button class="btn-sm" onclick="cadastrarContaCliente()">+ Cadastrar conta</button>'
     + '</div>';
 
+  var relacionamentosPanelBody =
+    '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Use apelidos controlados para identificar a origem ou o destino real do valor, sem perder a descricao original do banco.</p>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + relacionamentosResumoHtml + '</div>'
+    + '<button class="btn-sm" onclick="cadastrarRelacionamentoCliente()">+ Cadastrar relacionamento</button>'
+    + '</div>';
+
   var importarPanelBody =
     '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Baixe o modelo, selecione a conta e importe o arquivo.</p>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:260px"><label>Conta do extrato</label><select id="ex-import-conta">' + contasOptionsObrigatoriasCliente('', '-- selecione a conta --') + '</select></div>'
+    + (relacionamentoAtivo ? '<div class="form-group" style="max-width:260px"><label>Relacionado a</label><select id="ex-import-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="exportExtratoTemplate()">Baixar modelo (.xlsx)</button><button class="btn-sm" onclick="abrirImportacaoExtrato()">Importar planilha</button></div>';
 
@@ -757,8 +999,10 @@ function renderExtrato() {
     + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-desc" placeholder="Ex: salario, aluguel..."/></div>'
     + '<div class="form-group" style="max-width:180px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="cadastrarContaCliente()">(+ nova)</span></label><select id="ex-conta">' + contasOptionsCliente('') + '</select></div>'
+    + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
+    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-obs" placeholder="Opcional. Ex: Pagamento feito por Levy PF para a Granafy."/></div></div>'
     + '<button class="btn-add" onclick="addExtrato()">Adicionar</button>';
 
   var filtrosPanelBody =
@@ -767,6 +1011,7 @@ function renderExtrato() {
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Periodo</label><select id="ex-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
+    + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>';
@@ -780,6 +1025,7 @@ function renderExtrato() {
     + '</div>'
     + '<div class="extrato-panels-grid">'
     + extratoPanel('contas', 'Contas do cliente', contasPanelBody)
+    + (relacionamentoAtivo ? extratoPanel('relacionamentos', 'Relacionamentos', relacionamentosPanelBody) : '')
     + extratoPanel('importar', 'Importar extrato via planilha', importarPanelBody)
     + extratoPanel('novo', '+ Novo lancamento', novoPanelBody)
     + extratoPanel('filtros', 'Filtros', filtrosPanelBody)
@@ -796,15 +1042,20 @@ function renderExtrato() {
 
       html += '<div class="form-card" style="padding:12px 14px;margin-bottom:12px">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px"><p class="section-title" style="margin-bottom:0">Grupo ' + (gi + 1) + ' - ' + grupo.linhas.length + ' registros iguais</p><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="manterTodosDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Manter todos</button><button class="btn-sm red" onclick="removerDuplicadoGrupoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Excluir nao mantidos</button></span></div>'
-        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Conta</th>' + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
 
       grupo.linhas.forEach(l => {
         var realIdx = lncs.indexOf(l);
         var checked = _exManterDuplicado[grupo.chave] === l.id ? ' checked' : '';
+        var detalhes = [];
+        if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
+        if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
         html += '<tr class="row-' + l.tipo + '">'
           + '<td><input type="radio" name="dup-' + gi + '" onchange="setManterDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\',\'' + encodeURIComponent(l.id) + '\')" ' + checked + '/></td>'
           + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
-          + '<td>' + esc(l.desc || '') + '</td>'
+          + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
+          + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
+          + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
           + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
           + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
           + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
@@ -842,14 +1093,18 @@ function renderExtrato() {
     html += '<div class="empty-state">Nenhum lancamento encontrado com os filtros atuais.</div>';
   } else {
     html += '<table class="data-table">';
-    html += '<thead><tr><th>Data</th><th>Conta</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+    html += '<thead><tr><th>Data</th><th>Conta</th>' + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
+      var detalhes = [];
+      if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
+      if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
       html += '<tr class="row-' + l.tipo + '">'
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
         + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
-        + '<td>' + esc(l.desc || '') + '</td>'
+        + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
+        + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
         + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
         + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
         + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
@@ -874,6 +1129,8 @@ async function addExtrato() {
   var desc = document.getElementById('ex-desc').value.trim();
   var cat = document.getElementById('ex-cat').value;
   var contaId = ((document.getElementById('ex-conta') || {}).value) || null;
+  var relacionamentoId = clienteAtivoEhPJ() ? ((((document.getElementById('ex-relacionamento') || {}).value) || null)) : null;
+  var observacao = ((document.getElementById('ex-obs') || {}).value || '').trim();
   var valor = parseMoney(document.getElementById('ex-valor'));
 
   if (!desc || !valor) {
@@ -885,16 +1142,23 @@ async function addExtrato() {
     cliente_id: activeClient,
     data_lancamento: dataLanc || null,
     descricao: desc,
+    descricao_original: desc,
     categoria: cat || null,
     tipo: _exTipo,
     valor: Number(valor),
-    conta_id: contaId || null
+    conta_id: contaId || null,
+    relacionamento_id: relacionamentoId || null,
+    observacao: observacao || null
   };
 
   const { error } = await insertLancamentoComFallback(payload);
 
   if (error) {
     console.error(error);
+    if (isMissingRelacionamentoSchemaError(error)) {
+      alert('Os campos de relacionamento ainda nao existem no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      return;
+    }
     alert('Erro ao salvar: ' + (error.message || 'erro desconhecido'));
     return;
   }
@@ -909,6 +1173,7 @@ async function importExtratoXlsx(event) {
   if (!activeClient) return alert('Selecione um cliente primeiro.');
 
   var contaId = (document.getElementById('ex-import-conta') && document.getElementById('ex-import-conta').value) || '';
+  var relacionamentoId = clienteAtivoEhPJ() ? (((document.getElementById('ex-import-relacionamento') && document.getElementById('ex-import-relacionamento').value) || '')) : '';
   if (!contaId) {
     event.target.value = '';
     return alert('Selecione a conta do extrato antes de importar.');
@@ -961,10 +1226,12 @@ async function importExtratoXlsx(event) {
         cliente_id: activeClient,
         data_lancamento: dataFmt || null,
         descricao: desc,
+        descricao_original: desc,
         categoria: cat || 'Outros',
         tipo: tipo,
         valor: Number(valor || 0),
-        conta_id: contaId
+        conta_id: contaId,
+        relacionamento_id: relacionamentoId || null
       });
 
       if (error) {
@@ -1004,11 +1271,16 @@ function openExtratoEditModal(i) {
     + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex: salario, aluguel..."/></div>'
     + '</div>'
     + '<div class="form-row">'
+    + '<div class="form-group"><label>Descricao do banco</label><input type="text" id="ex-edit-desc-original" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div>'
+    + '</div>'
+    + '<div class="form-row">'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-edit-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-edit-conta">' + contasOptionsCliente(lanc.contaId || '') + '</select></div>'
+    + (clienteAtivoEhPJ() ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-edit-relacionamento">' + relacionamentoOptionsCliente(lanc.relacionamentoId || '', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="credito"' + (lanc.tipo === 'credito' ? ' selected' : '') + '>Credito</option><option value="debito"' + (lanc.tipo === 'debito' ? ' selected' : '') + '>Debito</option></select></div>'
     + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="ex-edit-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
+    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-edit-obs" value="' + esc(lanc.observacao || '') + '" placeholder="Opcional. Ex: Pagamento pessoal feito para a empresa."/></div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
     + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
     + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveExtratoEditModal(' + i + ')">Salvar alteracoes</button>'
@@ -1067,10 +1339,14 @@ async function saveExtratoEditModal(i) {
 
   var novaData = document.getElementById('ex-edit-data').value;
   var novaDesc = document.getElementById('ex-edit-desc').value.trim();
+  var descOriginal = document.getElementById('ex-edit-desc-original').value.trim();
   var novaCat = document.getElementById('ex-edit-cat').value;
   var novaContaId = document.getElementById('ex-edit-conta').value || null;
+  var relField = document.getElementById('ex-edit-relacionamento');
+  var novoRelacionamentoId = clienteAtivoEhPJ() && relField ? (relField.value || null) : null;
   var novoTipo = document.getElementById('ex-edit-tipo').value === 'credito' ? 'credito' : 'debito';
   var novoValor = parseMoney(document.getElementById('ex-edit-valor'));
+  var novaObservacao = document.getElementById('ex-edit-obs').value.trim();
 
   if (!novaDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
 
@@ -1080,16 +1356,23 @@ async function saveExtratoEditModal(i) {
       .update({
         data_lancamento: novaData || null,
         descricao: novaDesc,
+        descricao_original: descOriginal || lanc.descOriginal || lanc.desc || null,
         categoria: novaCat || null,
         tipo: novoTipo,
         valor: Number(novoValor || 0),
-        conta_id: novaContaId
+        conta_id: novaContaId,
+        relacionamento_id: novoRelacionamentoId,
+        observacao: novaObservacao || null
       })
       .eq('id', lanc.id)
   );
 
   if (error) {
     console.error('Erro ao editar lancamento:', error);
+    if (isMissingRelacionamentoSchemaError(error)) {
+      alert('Os campos de relacionamento ainda nao existem no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      return;
+    }
     alert('Nao foi possivel editar o lancamento: ' + (error.message || 'erro desconhecido'));
     return;
   }
