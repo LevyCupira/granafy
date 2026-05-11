@@ -3,6 +3,11 @@
 // ====================================================
 
 function openModal(section, tab) {
+  if (section === 'backup' && typeof canSeeBackup === 'function' && !canSeeBackup()) {
+    alert('Backup disponivel apenas para perfis Master e Consultor.');
+    return;
+  }
+
   var overlay = document.getElementById('modalOverlay');
   var modal = overlay ? overlay.querySelector('.modal') : null;
   if (overlay) overlay.classList.add('open');
@@ -381,23 +386,43 @@ function renderSettingsModal(activeTabKey) {
   var clienteTipo = cliente && cliente.tipoCliente ? clientTypeLabel(cliente.tipoCliente) : 'Cliente';
   var ccCount = (loadCatsCC() || []).length;
   var cartaoCount = (loadCatsCartao() || []).length;
+  var showUsersTab = typeof canSeeUsersTab === 'function' ? canSeeUsersTab() : !!authUser;
+  var showAuditoriaTab = typeof canSeeAuditoria === 'function' ? canSeeAuditoria() : true;
+  var isMaster = typeof isAdminUser === 'function' && isAdminUser();
+  var usersTabLabel = isMaster ? 'Usuarios' : 'Minha conta';
+  var heroText = 'Personalize categorias';
+  if (showUsersTab) heroText += ', perfil';
+  if (showAuditoriaTab) heroText += ' e auditoria';
+  heroText += ' sem misturar com os outros clientes da base.';
+  var tabButtons = ''
+    + '<button class="modal-tab settings-tab-rich" data-stab="cats_cc" onclick="switchSettingsTab(\'cats_cc\')"><span class="settings-tab-main">Conta Corrente</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + ccCount + '</span></button>'
+    + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
+
+  if (showUsersTab) {
+    tabButtons += '<button class="modal-tab" data-stab="usuarios" onclick="switchSettingsTab(\'usuarios\')">' + usersTabLabel + '</button>';
+  }
+
+  if (showAuditoriaTab) {
+    tabButtons += '<button class="modal-tab" data-stab="auditoria" onclick="switchSettingsTab(\'auditoria\')">Auditoria</button>';
+  }
+
   document.getElementById('modalTitle').textContent = 'Configuracoes';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-hero">'
-    + '<div><span class="settings-eyebrow">Ambiente do cliente</span><h4>' + esc(clienteNome) + '</h4><p>Personalize categorias, auditoria, usuarios e tema sem misturar com os outros clientes da base.</p></div>'
+    + '<div><span class="settings-eyebrow">Ambiente do cliente</span><h4>' + esc(clienteNome) + '</h4><p>' + heroText + '</p></div>'
     + '<div class="settings-hero-badge">' + esc(clienteTipo) + '</div>'
     + '</div>'
     + '<div class="modal-tabs settings-tabs" id="settingsTabs">'
-    + '<button class="modal-tab settings-tab-rich" data-stab="cats_cc" onclick="switchSettingsTab(\'cats_cc\')"><span class="settings-tab-main">Conta Corrente</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + ccCount + '</span></button>'
-    + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>'
-    + '<button class="modal-tab" data-stab="usuarios" onclick="switchSettingsTab(\'usuarios\')">Usuarios</button>'
-    + '<button class="modal-tab" data-stab="auditoria" onclick="switchSettingsTab(\'auditoria\')">Auditoria</button>'
+    + tabButtons
     + '</div>'
     + '<div id="modal-panel-cats_cc" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
     + '<div id="modal-panel-auditoria" class="modal-panel"></div>';
-  switchSettingsTab(activeTabKey || 'cats_cc');
+  var firstTab = activeTabKey || 'cats_cc';
+  if (firstTab === 'auditoria' && !showAuditoriaTab) firstTab = showUsersTab ? 'usuarios' : 'cats_cc';
+  if (firstTab === 'usuarios' && !showUsersTab) firstTab = 'cats_cc';
+  switchSettingsTab(firstTab);
 }
 
 function switchSettingsTab(tab) {
@@ -408,12 +433,15 @@ function switchSettingsTab(tab) {
     p.classList.remove('active');
   });
   var panel = document.getElementById('modal-panel-' + tab);
-  if (!panel) return;
+  if (!panel) {
+    if (tab !== 'cats_cc') switchSettingsTab('cats_cc');
+    return;
+  }
   panel.classList.add('active');
   if (tab === 'cats_cc') renderCatsPanel('cc');
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
-  if (tab === 'usuarios') renderUsuariosPanel();
-  if (tab === 'auditoria') renderAuditoriaPanel();
+  if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
+  if (tab === 'auditoria' && (typeof canSeeAuditoria !== 'function' || canSeeAuditoria())) renderAuditoriaPanel();
 }
 
 function renderAuditoriaPanel() {
@@ -430,6 +458,16 @@ async function renderUsuariosPanel() {
 
   if (!isAdminUser()) {
     var perfilAtual = accessTypeLabel(authProfile && authProfile.tipo_acesso);
+    var tipoAtual = normalizeAccessType(authProfile && authProfile.tipo_acesso);
+    var limiteAtual = getClientLimit();
+    var resumoAcesso = '<div class="settings-card-badges" style="margin:0 0 16px 0">'
+      + '<span class="settings-card-badge">' + esc(perfilAtual) + '</span>'
+      + '<span class="settings-card-badge subtle">' + (limiteAtual === Infinity ? 'Clientes ilimitados' : ('Limite de ' + limiteAtual + ' cliente' + (limiteAtual === 1 ? '' : 's'))) + '</span>'
+      + '</div>';
+    var profileOptions = [];
+    if (tipoAtual !== 'usuario') profileOptions.push('<option value="usuario">Usuario</option>');
+    if (tipoAtual !== 'consultor') profileOptions.push('<option value="consultor">Consultor</option>');
+    if (tipoAtual !== 'master') profileOptions.push('<option value="master">Master</option>');
     var solicitacaoAtual = authProfile && authProfile.solicitacao_tipo_acesso
       ? '<p style="color:var(--muted);font-size:.8rem;margin-top:12px">Solicitacao atual: <strong style="color:var(--text)">' + esc(accessTypeLabel(authProfile.solicitacao_tipo_acesso)) + '</strong>'
         + (authProfile.solicitacao_perfil_em ? ' em ' + esc(formatDate(authProfile.solicitacao_perfil_em)) : '')
@@ -437,9 +475,10 @@ async function renderUsuariosPanel() {
       : '';
     panel.innerHTML =
       '<div class="settings-section-card">'
-      + '<div class="settings-card-head"><div><h5>Solicitar mudanca de perfil</h5><p>Seu perfil atual: <strong style="color:var(--text)">' + esc(perfilAtual) + '</strong>. Se precisar ampliar o acesso, envie uma solicitacao para o Master.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Minha conta</h5><p>Seu perfil atual: <strong style="color:var(--text)">' + esc(perfilAtual) + '</strong>. Se precisar ajustar seu acesso, envie uma solicitacao para um usuario Master.</p></div></div>'
+      + resumoAcesso
       + '<div class="settings-user-request">'
-      + '<div class="form-group"><label>Perfil solicitado</label><select id="perfil-solicitado"><option value="consultor">Consultor</option><option value="usuario">Usuario</option></select></div>'
+      + '<div class="form-group"><label>Perfil solicitado</label><select id="perfil-solicitado">' + profileOptions.join('') + '</select></div>'
       + '<div class="form-group"><label>Motivo</label><textarea id="perfil-solicitacao-motivo" rows="4" placeholder="Explique por que voce precisa desse perfil."></textarea></div>'
       + '<button class="btn-add" style="margin-top:6px" onclick="solicitarAlteracaoPerfil()">Enviar solicitacao</button>'
       + solicitacaoAtual

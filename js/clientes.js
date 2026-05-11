@@ -208,7 +208,7 @@ function renderClientList() {
   var areaNovo = document.querySelector('.new-client-area');
   if (btnNovo && areaNovo) {
     btnNovo.disabled = !canCreateClient;
-    btnNovo.textContent = canCreateClient ? '+ Cadastrar cliente' : 'Limite de 1 cliente atingido';
+    btnNovo.textContent = canCreateClient ? '+ Cadastrar cliente' : 'Limite do perfil atingido';
     var note = document.getElementById('clientLimitNote');
     if (!canCreateClient) {
       if (!note) {
@@ -216,7 +216,10 @@ function renderClientList() {
         note.id = 'clientLimitNote';
         areaNovo.appendChild(note);
       }
-      note.textContent = 'Seu acesso permite cadastrar somente um cliente.';
+      var limiteTexto = limiteClientes === Infinity
+        ? 'Seu perfil permite cadastrar clientes sem limite.'
+        : ('Seu perfil permite cadastrar ate ' + limiteClientes + ' cliente' + (limiteClientes === 1 ? '' : 's') + '.');
+      note.textContent = limiteTexto;
     } else if (note) {
       note.remove();
     }

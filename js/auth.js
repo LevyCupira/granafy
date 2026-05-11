@@ -4,6 +4,26 @@ var _authResolver = null;
 var userScopeEnabled = true;
 var ADMIN_EMAIL = 'levy_lima@icloud.com';
 
+function normalizeAccessType(tipo) {
+  if (tipo === 'admin') return 'master';
+  if (tipo === 'cliente') return 'usuario';
+  return tipo || 'usuario';
+}
+
+function defaultClientLimitForRole(tipo) {
+  var papel = normalizeAccessType(tipo);
+  if (papel === 'master') return 999999;
+  if (papel === 'consultor') return 10;
+  return 1;
+}
+
+function accessTypeLabel(tipo) {
+  var papel = normalizeAccessType(tipo);
+  if (papel === 'master') return 'Master';
+  if (papel === 'consultor') return 'Consultor';
+  return 'Usuario';
+}
+
 function authEsc(value) {
   return String(value || '').replace(/[&<>"']/g, function(match) {
     return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[match];
@@ -59,13 +79,30 @@ function activeClientStorageKey() {
 }
 
 function isAdminUser() {
-  if (authProfile && authProfile.tipo_acesso === 'admin') return true;
+  if (authProfile && normalizeAccessType(authProfile.tipo_acesso) === 'master') return true;
   return !!(authUser && authUser.email && authUser.email.toLowerCase() === ADMIN_EMAIL);
+}
+
+function isConsultorUser() {
+  return !!(authProfile && normalizeAccessType(authProfile.tipo_acesso) === 'consultor');
+}
+
+function canSeeBackup() {
+  return isAdminUser() || isConsultorUser();
+}
+
+function canSeeAuditoria() {
+  return isAdminUser() || isConsultorUser();
+}
+
+function canSeeUsersTab() {
+  return !!authUser;
 }
 
 function getClientLimit() {
   if (isAdminUser()) return Infinity;
   if (authProfile && Number.isFinite(Number(authProfile.limite_clientes))) return Number(authProfile.limite_clientes);
+  if (authProfile) return defaultClientLimitForRole(authProfile.tipo_acesso);
   return 1;
 }
 
@@ -235,6 +272,13 @@ function renderAuthUser() {
   box.innerHTML = authUser
     ? '<span>' + authEsc((authProfile && authProfile.nome) || authUser.email || 'Usuario conectado') + '</span><button type="button" onclick="logoutUsuario()">Sair</button>'
     : '<span>Sem login</span><button type="button" onclick="forcarLogin()">Entrar</button>';
+
+  applyRoleVisibility();
+}
+
+function applyRoleVisibility() {
+  var backupBtn = document.getElementById('sidebarBackupBtn');
+  if (backupBtn) backupBtn.style.display = canSeeBackup() ? '' : 'none';
 }
 
 async function forcarLogin() {
@@ -254,7 +298,7 @@ function fallbackAuthProfile() {
     id: currentUserId(),
     email: email,
     nome: email,
-    tipo_acesso: admin ? 'admin' : 'cliente',
+    tipo_acesso: admin ? 'master' : 'usuario',
     limite_clientes: admin ? 999999 : 1,
     status: 'ativo',
     telefone: null,
@@ -262,7 +306,10 @@ function fallbackAuthProfile() {
     documento: null,
     perfil_uso: 'pf',
     aceitou_termos_em: null,
-    plano: admin ? 'admin' : 'gratuito',
+    solicitacao_tipo_acesso: null,
+    solicitacao_perfil_motivo: null,
+    solicitacao_perfil_em: null,
+    plano: admin ? 'master' : 'gratuito',
     origem_cadastro: null,
     responsavel_atendimento: null,
     observacoes: null
@@ -277,7 +324,11 @@ function isMissingProfileError(error) {
 function isMissingEnhancedProfileError(error) {
   if (!error) return false;
   var msg = String((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
-  return msg.includes('perfil_uso') || msg.includes('aceitou_termos_em');
+  return msg.includes('perfil_uso')
+    || msg.includes('aceitou_termos_em')
+    || msg.includes('solicitacao_tipo_acesso')
+    || msg.includes('solicitacao_perfil_motivo')
+    || msg.includes('solicitacao_perfil_em');
 }
 
 async function saveAuthProfilePayload(perfil) {
@@ -292,6 +343,9 @@ async function saveAuthProfilePayload(perfil) {
   var fallbackPerfil = Object.assign({}, perfil);
   delete fallbackPerfil.perfil_uso;
   delete fallbackPerfil.aceitou_termos_em;
+  delete fallbackPerfil.solicitacao_tipo_acesso;
+  delete fallbackPerfil.solicitacao_perfil_motivo;
+  delete fallbackPerfil.solicitacao_perfil_em;
 
   return supabaseClient
     .from('perfis')
@@ -311,7 +365,12 @@ async function ensureAuthProfile(extra) {
     empresa: (extra && extra.empresa) || metadata.empresa || null,
     documento: (extra && extra.documento) || metadata.documento || null,
     perfil_uso: (extra && extra.perfil_uso) || metadata.perfil_uso || 'pf',
-    aceitou_termos_em: (extra && extra.aceitou_termos_em) || metadata.aceitou_termos_em || null
+    aceitou_termos_em: (extra && extra.aceitou_termos_em) || metadata.aceitou_termos_em || null,
+    tipo_acesso: normalizeAccessType((extra && extra.tipo_acesso) || metadata.tipo_acesso || fallbackAuthProfile().tipo_acesso),
+    limite_clientes: Number.isFinite(Number((extra && extra.limite_clientes))) ? Number(extra.limite_clientes) : defaultClientLimitForRole((extra && extra.tipo_acesso) || metadata.tipo_acesso || fallbackAuthProfile().tipo_acesso),
+    solicitacao_tipo_acesso: (extra && extra.solicitacao_tipo_acesso) || metadata.solicitacao_tipo_acesso || null,
+    solicitacao_perfil_motivo: (extra && extra.solicitacao_perfil_motivo) || metadata.solicitacao_perfil_motivo || null,
+    solicitacao_perfil_em: (extra && extra.solicitacao_perfil_em) || metadata.solicitacao_perfil_em || null
   });
 
   var response = await saveAuthProfilePayload(perfil);
@@ -342,7 +401,12 @@ async function loadAuthProfile() {
   }
 
   if (response.data) {
-    authProfile = response.data;
+    authProfile = Object.assign({}, response.data, {
+      tipo_acesso: normalizeAccessType(response.data.tipo_acesso),
+      limite_clientes: Number.isFinite(Number(response.data.limite_clientes))
+        ? Number(response.data.limite_clientes)
+        : defaultClientLimitForRole(response.data.tipo_acesso)
+    });
     return authProfile;
   }
 
