@@ -54,11 +54,25 @@ function lerValorImportadoExtrato(rawVal) {
   return parseFloat(String(rawVal).replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
 }
 
-function inferirTipoImportadoExtrato(rawTipo, valor) {
-  var tipoRaw = String(rawTipo || '').toLowerCase().trim();
-  if (tipoRaw === 'credito' || tipoRaw === 'receita' || tipoRaw === 'entrada') return 'credito';
-  if (tipoRaw === 'debito' || tipoRaw === 'despesa' || tipoRaw === 'saida') return 'debito';
+function inferirTipoImportadoExtrato(valor) {
   return Number(valor || 0) < 0 ? 'debito' : 'credito';
+}
+
+function extratoImportGuideHtml() {
+  return '<div class="import-guide">'
+    + '<div class="import-guide-head">Formato da planilha</div>'
+    + '<div class="import-guide-grid">'
+    + '<span class="import-guide-chip required">data</span>'
+    + '<span class="import-guide-chip required">descricao</span>'
+    + '<span class="import-guide-chip required">valor</span>'
+    + '<span class="import-guide-chip">categoria</span>'
+    + '</div>'
+    + '<ul class="import-guide-list">'
+    + '<li>Valor positivo vira <strong>credito</strong>.</li>'
+    + '<li>Valor negativo vira <strong>debito</strong>.</li>'
+    + '<li>A coluna <strong>tipo</strong> nao e mais necessaria.</li>'
+    + '</ul>'
+    + '</div>';
 }
 
 function contasClienteAtivo() {
@@ -156,13 +170,13 @@ function abrirImportacaoExtrato() {
 
 function exportExtratoTemplate() {
   var rows = [
-    ['data', 'descricao', 'valor', 'categoria', 'tipo'],
-    ['01/05/2026', 'Salario', 4200.00, 'Salario', 'credito'],
-    ['02/05/2026', 'Supermercado', -185.70, 'Alimentacao', 'debito'],
-    ['03/05/2026', 'Pix recebido', 150.00, 'Receita extra', 'credito']
+    ['data', 'descricao', 'valor', 'categoria'],
+    ['01/05/2026', 'Salario', 4200.00, 'Salario'],
+    ['02/05/2026', 'Supermercado', -185.70, 'Alimentacao'],
+    ['03/05/2026', 'Pix recebido', 150.00, 'Receita extra']
   ];
   var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:12},{wch:36},{wch:12},{wch:22},{wch:12}];
+  ws['!cols'] = [{wch:12},{wch:36},{wch:12},{wch:22}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Extrato');
   XLSX.writeFile(wb, 'modelo_extrato_granafy.xlsx');
@@ -983,6 +997,7 @@ function renderExtrato() {
 
   var importarPanelBody =
     '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Baixe o modelo, selecione a conta e importe o arquivo.</p>'
+    + extratoImportGuideHtml()
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:260px"><label>Conta do extrato</label><select id="ex-import-conta">' + contasOptionsObrigatoriasCliente('', '-- selecione a conta --') + '</select></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:260px"><label>Relacionado a</label><select id="ex-import-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
@@ -1190,7 +1205,6 @@ async function importExtratoXlsx(event) {
     var iDesc = header.findIndex(h => h.includes('desc'));
     var iVal = header.findIndex(h => h.includes('valor') || h.includes('value') || h.includes('amount'));
     var iCat = header.findIndex(h => h.includes('cat'));
-    var iTipo = header.findIndex(h => h.includes('tipo') || h.includes('type'));
 
     if (iDate < 0 || iDesc < 0 || iVal < 0) {
       return alert('Planilha invalida. Colunas obrigatorias: data, descricao, valor.');
@@ -1204,7 +1218,7 @@ async function importExtratoXlsx(event) {
       var dataFmt = normalizarDataImportada(row[iDate]);
       var desc = String(row[iDesc] || '').trim();
       var valorBruto = lerValorImportadoExtrato(row[iVal]);
-      var tipo = inferirTipoImportadoExtrato(iTipo >= 0 ? row[iTipo] : '', valorBruto);
+      var tipo = inferirTipoImportadoExtrato(valorBruto);
       var valor = Math.abs(Number(valorBruto || 0));
       var cat = iCat >= 0 ? String(row[iCat] || 'Outros').trim() : 'Outros';
 

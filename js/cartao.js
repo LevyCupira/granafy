@@ -7,8 +7,16 @@ var COLS_CARTAO = [
   { key:'desc',   label:'Descricao', render: it => esc(it.desc) },
   { key:'cat',    label:'Categoria', render: it => '<span class="badge badge-cat">' + esc(it.cat || '-') + '</span>' },
   { key:'valor',  label:'Valor',     render: it => it.tipo === 'estorno' ? '<span class="val val-pos">+ ' + fmt(it.valor) + '</span>' : '<span class="val val-neg">- ' + fmt(it.valor) + '</span>' },
-  { key:'_del',   label:'',          render: (it, i) => '<button class="btn-delete" onclick="deleteCartaoItem(' + i + ')">&#128465;</button>' },
+  { key:'_del',   label:'',          render: () => '' },
 ];
+
+var CARTAO_READONLY_MSG = 'Este cliente pertence a outro login e esta disponivel apenas para visualizacao.';
+
+function canEditCartaoClient() {
+  if (canEditActiveClient()) return true;
+  alert(CARTAO_READONLY_MSG);
+  return false;
+}
 
 function getCartaoById(id) {
   return (data.clients[activeClient] && data.clients[activeClient].cartoes || []).find(c => c.id === id);
@@ -27,6 +35,23 @@ function categoriaCartaoOptionsHtml(selectedCat) {
   return loadCatsCartao().map(function(cat) {
     return '<option value="' + esc(cat) + '"' + (cat === selectedCat ? ' selected' : '') + '>' + esc(cat) + '</option>';
   }).join('');
+}
+
+function cartaoImportGuideHtml() {
+  return '<div class="import-guide">'
+    + '<div class="import-guide-head">Formato da planilha</div>'
+    + '<div class="import-guide-grid">'
+    + '<span class="import-guide-chip required">data</span>'
+    + '<span class="import-guide-chip required">descricao</span>'
+    + '<span class="import-guide-chip required">valor</span>'
+    + '<span class="import-guide-chip">categoria</span>'
+    + '</div>'
+    + '<ul class="import-guide-list">'
+    + '<li>Valor positivo vira <strong>lancamento</strong> na fatura.</li>'
+    + '<li>Valor negativo vira <strong>estorno</strong>.</li>'
+    + '<li>A coluna <strong>tipo</strong> nao e mais necessaria.</li>'
+    + '</ul>'
+    + '</div>';
 }
 
 var _ccTipo = 'lancamento';
@@ -171,6 +196,7 @@ function renderCartao() {
     + '</div>';
 
   var importPanelBody = '<p style="font-size:.81rem;color:var(--muted);margin-bottom:12px">Baixe o modelo, preencha e importe.</p>'
+    + cartaoImportGuideHtml()
     + '<div class="form-row" style="margin-bottom:12px">'
     + '<div class="form-group" style="max-width:220px"><label>Cartao da fatura</label><select id="cc-import-cartao">' + (c.cartoes.length === 0 ? '<option value="">-- cadastre um cartao --</option>' : cartaoOpts) + '</select></div>'
     + '</div>'
@@ -308,7 +334,7 @@ function _renderCartaoFiltroETabela() {
 }
 
 async function addCartaoCard() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   var nome = document.getElementById('cc-nome').value.trim();
   var digits = document.getElementById('cc-digits').value.replace(/\D/g, '').slice(0, 4);
   var bandeira = document.getElementById('cc-bandeira').value;
@@ -339,7 +365,7 @@ async function addCartaoCard() {
 }
 
 async function deleteCartaoCard(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   if (!(await appConfirm('Remover cartao?', { title: 'Excluir cartao', confirmText: 'Excluir' }))) return;
 
   const { error } = await applyUserScope(
@@ -360,7 +386,7 @@ async function deleteCartaoCard(id) {
 }
 
 async function addCartaoItem() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   var d_ = document.getElementById('cc-data').value;
   var cartaoId = (document.getElementById('cc-cartao-sel') && document.getElementById('cc-cartao-sel').value) || '';
   var desc = document.getElementById('cc-desc').value.trim();
@@ -404,7 +430,7 @@ async function addCartaoItem() {
 }
 
 async function deleteCartaoItem(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   if (!(await appConfirm('Remover item?', { title: 'Excluir lancamento', confirmText: 'Excluir' }))) return;
 
   var c = data.clients[activeClient];
@@ -430,20 +456,20 @@ async function deleteCartaoItem(i) {
 
 function exportCsvTemplate() {
   var rows = [
-    ['data','descricao','valor','categoria','tipo'],
-    ['15/06/2025','Supermercado Extra',250.00,'Alimentacao','lancamento'],
-    ['16/06/2025','Netflix',55.90,'Streaming','lancamento'],
-    ['17/06/2025','Estorno Supermercado',50.00,'Alimentacao','estorno'],
+    ['data','descricao','valor','categoria'],
+    ['15/06/2025','Supermercado Extra',250.00,'Alimentacao'],
+    ['16/06/2025','Netflix',55.90,'Streaming'],
+    ['17/06/2025','Estorno Supermercado',-50.00,'Alimentacao'],
   ];
   var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:12},{wch:32},{wch:10},{wch:20},{wch:12}];
+  ws['!cols'] = [{wch:12},{wch:32},{wch:10},{wch:20}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Fatura');
   XLSX.writeFile(wb, 'modelo_fatura_granafy.xlsx');
 }
 
 async function editCartaoItem(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   var c = data.clients[activeClient];
   var item = c.cartao[i];
   if (!item || !item.id) return;
@@ -479,7 +505,7 @@ async function editCartaoItem(i) {
 }
 
 async function saveCartaoEditModal(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   var c = data.clients[activeClient];
   var item = c && c.cartao ? c.cartao[i] : null;
   if (!item || !item.id) return;
@@ -520,7 +546,7 @@ async function saveCartaoEditModal(i) {
 }
 
 function abrirImportacaoCartao() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   var sel = document.getElementById('cc-import-cartao');
   if (!sel || !sel.value) {
     alert('Selecione ou cadastre um cartao antes de importar a fatura.');
@@ -550,7 +576,6 @@ async function importXlsx(event) {
     var iDesc = header.findIndex(h => h.includes('desc'));
     var iVal  = header.findIndex(h => h.includes('valor') || h.includes('value') || h.includes('amount'));
     var iCat  = header.findIndex(h => h.includes('cat'));
-    var iTipo = header.findIndex(h => h.includes('tipo') || h.includes('type'));
 
     if (iDate < 0 || iDesc < 0 || iVal < 0) {
       return alert('Planilha invalida. Colunas obrigatorias: data, descricao, valor.');
@@ -562,17 +587,17 @@ async function importXlsx(event) {
     for (const row of rows.slice(1)) {
       var rawDate = String(row[iDate] || '').trim();
       var desc = String(row[iDesc] || '').trim();
-      var valor = 0;
+      var valorBruto = 0;
       var rawVal = row[iVal];
 
-      if (typeof rawVal === 'number') valor = rawVal;
-      else valor = parseFloat(String(rawVal).replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
+      if (typeof rawVal === 'number') valorBruto = rawVal;
+      else valorBruto = parseFloat(String(rawVal).replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
 
-      if (!desc || valor <= 0) continue;
+      if (!desc || !valorBruto) continue;
 
       var cat = iCat >= 0 ? String(row[iCat] || 'Outros').trim() : 'Outros';
-      var tipoRaw = iTipo >= 0 ? String(row[iTipo] || '').toLowerCase().trim() : '';
-      var tipo = tipoRaw === 'estorno' ? 'estorno' : 'lancamento';
+      var tipo = Number(valorBruto || 0) < 0 ? 'estorno' : 'lancamento';
+      var valor = Math.abs(Number(valorBruto || 0));
 
       var dataFmt = '';
       if (typeof rawDate === 'string') {
@@ -624,7 +649,7 @@ async function importXlsx(event) {
 }
 
 async function pagarFaturaCartao() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditCartaoClient()) return;
   var cartaoId = document.getElementById('pg-cartao').value;
   var valor = parseMoney(document.getElementById('pg-valor'));
   var dataPg = document.getElementById('pg-data').value;

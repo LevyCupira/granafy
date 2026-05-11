@@ -1,5 +1,5 @@
 ﻿// ====================================================
-// SETTINGS.JS - Configuracoes e Backup
+// SETTINGS.JS - Configuracoes, perfil e backup
 // ====================================================
 
 function openModal(section, tab) {
@@ -390,10 +390,10 @@ function renderSettingsModal(activeTabKey) {
   var showAuditoriaTab = typeof canSeeAuditoria === 'function' ? canSeeAuditoria() : true;
   var isMaster = typeof isAdminUser === 'function' && isAdminUser();
   var usersTabLabel = isMaster ? 'Usuarios' : 'Minha conta';
-  var heroText = 'Personalize categorias';
-  if (showUsersTab) heroText += ', perfil';
-  if (showAuditoriaTab) heroText += ' e auditoria';
-  heroText += ' sem misturar com os outros clientes da base.';
+  var heroParts = ['Personalize as categorias deste cliente'];
+  if (showUsersTab) heroParts.push(isMaster ? 'gerencie perfis' : 'acompanhe seu perfil');
+  if (showAuditoriaTab) heroParts.push('revise a auditoria');
+  var heroText = heroParts.join(', ') + ' sem misturar dados com os outros clientes da base.';
   var tabButtons = ''
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cc" onclick="switchSettingsTab(\'cats_cc\')"><span class="settings-tab-main">Conta Corrente</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + ccCount + '</span></button>'
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
@@ -700,22 +700,6 @@ function deleteCategory(tipo, i) {
     saveCatsCartao(carts);
   }
   renderCatsPanel(tipo);
-}
-
-function renderTemaPanel() {
-  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  document.getElementById('modal-panel-tema').innerHTML =
-    '<div class="settings-section-card">'
-    + '<div class="settings-card-head"><div><h5>Tema</h5><p>Escolha o visual que fica mais confortavel para o seu uso diario.</p></div></div>'
-    + '<div class="theme-toggle-row">'
-    + '<div class="ttr-info"><span>Tema escuro</span><small>Alterne entre tema escuro e claro</small></div>'
-    + '<label class="toggle-switch">'
-    + '<input type="checkbox" id="themeToggle" ' + (isDark ? 'checked' : '') + ' onchange="toggleTheme(this.checked)"/>'
-    + '<span class="toggle-track"></span>'
-    + '</label></div>'
-    + '<div class="settings-note-box">'
-    + '<p style="font-size:.82rem;color:var(--muted)">A preferencia e salva automaticamente.</p>'
-    + '</div></div>';
 }
 
 function toggleTheme(isDark) {
