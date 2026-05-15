@@ -13,6 +13,7 @@ function openModal(section, tab) {
   if (overlay) overlay.classList.add('open');
   if (overlay) overlay.dataset.mode = section === 'settings' ? 'settings' : 'backup';
   if (modal) modal.classList.toggle('modal-wide', section === 'settings');
+  document.addEventListener('keydown', handleMainModalEscape);
   if (section === 'settings') renderSettingsModal(tab);
   else renderBackupModal();
 }
@@ -25,10 +26,20 @@ function closeModal() {
     delete overlay.dataset.mode;
   }
   if (modal) modal.classList.remove('modal-wide');
+  document.removeEventListener('keydown', handleMainModalEscape);
 }
 
 function closeModalOutside(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+function handleMainModalEscape(event) {
+  if (event.key !== 'Escape') return;
+  var dialogOverlay = document.getElementById('appDialogOverlay');
+  if (dialogOverlay && dialogOverlay.classList.contains('open')) return;
+  var overlay = document.getElementById('modalOverlay');
+  if (!overlay || !overlay.classList.contains('open')) return;
+  closeModal();
 }
 
 function renderBackupModal() {
@@ -681,6 +692,20 @@ function setCatTipo(tipo, i, novoTipo) {
   else cats[i].tipo = novoTipo;
   saveCatsCC(cats);
   renderCatsPanel('cc');
+  refreshCategoryConsumers('cc');
+}
+
+function refreshCategoryConsumers(tipo) {
+  if (typeof activeTab === 'undefined') return;
+
+  if (tipo === 'cartao' && activeTab === 'cartao' && typeof renderCartao === 'function') {
+    renderCartao();
+    return;
+  }
+
+  if (tipo === 'cc' && activeTab === 'extrato' && typeof renderExtrato === 'function') {
+    renderExtrato();
+  }
 }
 
 function addCategory(tipo) {
@@ -702,6 +727,7 @@ function addCategory(tipo) {
 
   if (inp) inp.value = '';
   renderCatsPanel(tipo);
+  refreshCategoryConsumers(tipo);
 }
 
 function deleteCategory(tipo, i) {
@@ -716,6 +742,7 @@ function deleteCategory(tipo, i) {
     saveCatsCartao(carts);
   }
   renderCatsPanel(tipo);
+  refreshCategoryConsumers(tipo);
 }
 
 function toggleTheme(isDark) {
@@ -801,6 +828,7 @@ async function saveCategoryEdit(tipo, i) {
       await renomearCategoriaEmLancamentos('cc', nomeAntigo, nome);
       if (typeof loadData === 'function') await loadData();
       renderSettingsModal('cats_cc');
+      refreshCategoryConsumers('cc');
     } catch (err) {
       alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err.message);
     }
@@ -819,6 +847,7 @@ async function saveCategoryEdit(tipo, i) {
     await renomearCategoriaEmLancamentos('cartao', nomeAntigoCartao, nome);
     if (typeof loadData === 'function') await loadData();
     renderSettingsModal('cats_cartao');
+    refreshCategoryConsumers('cartao');
   } catch (err2) {
     alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err2.message);
   }
@@ -829,4 +858,5 @@ async function resetCategories(tipo) {
   if (tipo === 'cc') await Promise.resolve(saveCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); })));
   else await Promise.resolve(saveCatsCartao(DC_CART.slice()));
   renderCatsPanel(tipo);
+  refreshCategoryConsumers(tipo);
 }

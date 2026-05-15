@@ -1164,7 +1164,7 @@ function renderExtrato() {
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:150px"><label>Data</label><input type="date" id="ex-data"/></div>'
-    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-desc" placeholder="Ex: salario, aluguel..."/></div>'
+    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-desc" placeholder="Ex: salario, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '<div class="form-group" style="max-width:180px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="cadastrarContaCliente()">(+ nova)</span></label><select id="ex-conta">' + contasOptionsCliente('') + '</select></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
@@ -1302,7 +1302,7 @@ function renderExtrato() {
 async function addExtrato() {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var dataLanc = document.getElementById('ex-data').value;
-  var desc = document.getElementById('ex-desc').value.trim();
+  var desc = formatDescriptionTitleCase(document.getElementById('ex-desc').value);
   var cat = document.getElementById('ex-cat').value;
   var contaId = ((document.getElementById('ex-conta') || {}).value) || null;
   var relacionamentoId = clienteAtivoEhPJ() ? ((((document.getElementById('ex-relacionamento') || {}).value) || null)) : null;
@@ -1377,7 +1377,7 @@ async function importExtratoXlsx(event) {
 
     for (const row of rows.slice(1)) {
       var dataFmt = normalizarDataImportada(row[iDate]);
-      var desc = String(row[iDesc] || '').trim();
+      var desc = formatDescriptionTitleCase(String(row[iDesc] || ''));
       var valorBruto = lerValorImportadoExtrato(row[iVal]);
       var tipo = inferirTipoImportadoExtrato(valorBruto);
       var valor = Math.abs(Number(valorBruto || 0));
@@ -1445,7 +1445,7 @@ function openExtratoEditModal(i) {
   document.getElementById('modalBody').innerHTML =
     '<div class="form-row">'
     + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="date" id="ex-edit-data" value="' + esc(lanc.data || '') + '"/></div>'
-    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex: salario, aluguel..."/></div>'
+    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex: salario, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group"><label>Descricao do banco</label><input type="text" id="ex-edit-desc-original" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div>'
@@ -1522,7 +1522,7 @@ async function saveExtratoEditModal(i) {
   if (!lanc || !lanc.id) return;
 
   var novaData = document.getElementById('ex-edit-data').value;
-  var novaDesc = document.getElementById('ex-edit-desc').value.trim();
+  var novaDesc = formatDescriptionTitleCase(document.getElementById('ex-edit-desc').value);
   var descOriginal = document.getElementById('ex-edit-desc-original').value.trim();
   var novaCat = document.getElementById('ex-edit-cat').value;
   var novaContaId = document.getElementById('ex-edit-conta').value || null;

@@ -61,6 +61,7 @@ var _ccFiltroTipo = 'todos';
 var _ccFiltroCat = '';
 var _ccFiltroBusca = '';
 var _ccFiltroMulti = loadCartaoFilterMultiState();
+var _ccLastDateMemory = '';
 var _ccPanels = {
   cadastrados: false,
   importar: false,
@@ -80,6 +81,52 @@ function saveCartaoFilterMultiState(enabled) {
   try {
     localStorage.setItem('granafy_cartao_filter_multi', enabled ? '1' : '0');
   } catch (e) {}
+}
+
+function cartaoLastDateStorageKey() {
+  return 'granafy_cartao_last_date_' + String(activeClient || 'global');
+}
+
+function loadCartaoLastDate() {
+  try {
+    var saved = localStorage.getItem(cartaoLastDateStorageKey());
+    if (saved) return saved;
+  } catch (e) {}
+  return _ccLastDateMemory || new Date().toISOString().slice(0, 10);
+}
+
+function saveCartaoLastDate(value) {
+  var iso = String(value || '').trim();
+  if (!iso) return;
+  _ccLastDateMemory = iso;
+  try {
+    localStorage.setItem(cartaoLastDateStorageKey(), iso);
+  } catch (e) {}
+}
+
+function addMonthsClampedIso(dateIso, monthsToAdd) {
+  var match = String(dateIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return dateIso || '';
+  var year = Number(match[1]);
+  var month = Number(match[2]) - 1;
+  var day = Number(match[3]);
+  var targetMonthIndex = month + Number(monthsToAdd || 0);
+  var targetYear = year + Math.floor(targetMonthIndex / 12);
+  var normalizedMonth = ((targetMonthIndex % 12) + 12) % 12;
+  var lastDay = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+  var clampedDay = Math.min(day, lastDay);
+  var result = new Date(targetYear, normalizedMonth, clampedDay);
+  return result.toISOString().slice(0, 10);
+}
+
+function updateParcelasCartaoState() {
+  var input = document.getElementById('cc-parcelas');
+  if (!input) return;
+  var isEstorno = _ccTipo === 'estorno';
+  if (isEstorno) {
+    input.value = '1';
+  }
+  input.disabled = isEstorno;
 }
 
 function toggleCartaoPanel(key) {
@@ -104,6 +151,7 @@ function setTipoCartao(tipo) {
   var est  = document.getElementById('tc-estorno');
   if (lanc) lanc.classList.toggle('active', tipo === 'lancamento');
   if (est)  est.classList.toggle('active', tipo === 'estorno');
+  updateParcelasCartaoState();
 }
 
 function toggleFiltroCartao(id) {
@@ -212,8 +260,9 @@ function renderCartao() {
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:132px"><label>Data</label><input type="date" id="cc-data"/></div>'
     + '<div class="form-group" style="max-width:172px"><label>Cartao</label><select id="cc-cartao-sel">' + (c.cartoes.length === 0 ? '<option value="">- sem cartao -</option>' : cartaoOpts) + '</select></div>'
-    + '<div class="form-group"><label>Descricao</label><input type="text" id="cc-desc" placeholder="Ex: Supermercado..."/></div>'
+    + '<div class="form-group"><label>Descricao</label><input type="text" id="cc-desc" placeholder="Ex: Supermercado..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '<div class="form-group" style="max-width:165px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cartao\')">(+ gerir)</span></label><select id="cc-cat">' + catOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:118px"><label>Parcelas</label><input type="number" id="cc-parcelas" value="1" min="1" max="120"/></div>'
     + '<div class="form-group" style="max-width:138px"><label>Valor (R$)</label><input type="text" id="cc-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div><button class="btn-add" onclick="addCartaoItem()">Adicionar</button>';
 
@@ -235,7 +284,7 @@ function renderCartao() {
 
   document.getElementById('cartao-content').innerHTML = html;
   var di = document.getElementById('cc-data');
-  if (di) di.value = new Date().toISOString().slice(0, 10);
+  if (di) di.value = loadCartaoLastDate();
 
   var pgData = document.getElementById('pg-data');
   if (pgData) pgData.value = new Date().toISOString().slice(0, 10);
@@ -263,6 +312,11 @@ function _renderCartaoFiltroETabela() {
     if (_ccFiltroCat && it.cat !== _ccFiltroCat) return false;
     if (_ccFiltroBusca && !texto.includes(_ccFiltroBusca)) return false;
     return true;
+  }).slice().sort(function(a, b) {
+    var dataA = String(a && a.data || '');
+    var dataB = String(b && b.data || '');
+    if (dataA !== dataB) return dataB.localeCompare(dataA);
+    return String(a && a.desc || '').localeCompare(String(b && b.desc || ''), 'pt-BR');
   });
 
   var lancs = itens.filter(i => i.tipo !== 'estorno');
@@ -389,35 +443,46 @@ async function addCartaoItem() {
   if (!canEditCartaoClient()) return;
   var d_ = document.getElementById('cc-data').value;
   var cartaoId = (document.getElementById('cc-cartao-sel') && document.getElementById('cc-cartao-sel').value) || '';
-  var desc = document.getElementById('cc-desc').value.trim();
+  var desc = formatDescriptionTitleCase(document.getElementById('cc-desc').value);
   var cat = document.getElementById('cc-cat').value;
+  var parcelas = Math.max(1, parseInt(document.getElementById('cc-parcelas').value, 10) || 1);
   var valor = parseMoney(document.getElementById('cc-valor'));
 
   if (!cartaoId) return alert('Selecione um cartao para o lancamento.');
   if (!desc || !valor) return alert('Preencha descricao e valor.');
 
-  var duplicado = (data.clients[activeClient].cartao || []).find(it =>
-    it.cartaoId === cartaoId
-    && (it.data || '') === (d_ || '')
-    && Number(it.valor || 0) === Number(valor || 0)
-    && (it.tipo || 'lancamento') === _ccTipo
-  );
+  var lancamentosParaInserir = Array.from({ length: parcelas }, function(_, idx) {
+    var dataParcela = _ccTipo === 'estorno' ? d_ : addMonthsClampedIso(d_, idx);
+    var descricaoParcela = parcelas > 1 && _ccTipo !== 'estorno'
+      ? (desc + ' ' + (idx + 1) + '/' + parcelas)
+      : desc;
+    return Object.assign({
+      cliente_id: activeClient,
+      cartao_id: cartaoId,
+      data: dataParcela || null,
+      descricao: descricaoParcela,
+      categoria: cat || null,
+      tipo: _ccTipo,
+      valor: Number(valor || 0)
+    }, getUserScopePayload());
+  });
 
-  if (duplicado && !(await appConfirm('Ja existe um lancamento no mesmo cartao, data, valor e tipo. Deseja lancar novamente?', { title: 'Lancamento duplicado', confirmText: 'Lancar novamente' }))) {
+  var duplicado = lancamentosParaInserir.find(function(payload) {
+    return (data.clients[activeClient].cartao || []).find(function(it) {
+      return it.cartaoId === cartaoId
+        && (it.data || '') === String(payload.data || '')
+        && Number(it.valor || 0) === Number(valor || 0)
+        && (it.tipo || 'lancamento') === _ccTipo;
+    });
+  });
+
+  if (duplicado && !(await appConfirm('Ja existe pelo menos um lancamento no mesmo cartao, data, valor e tipo. Deseja lancar novamente?', { title: 'Lancamento duplicado', confirmText: 'Lancar novamente' }))) {
     return;
   }
 
   const { error } = await supabaseClient
     .from('lancamentos_cartao')
-    .insert([Object.assign({
-      cliente_id: activeClient,
-      cartao_id: cartaoId,
-      data: d_ || null,
-      descricao: desc,
-      categoria: cat || null,
-      tipo: _ccTipo,
-      valor: Number(valor || 0)
-    }, getUserScopePayload())]);
+    .insert(lancamentosParaInserir);
 
   if (error) {
     console.error('Erro ao cadastrar lancamento do cartao:', error);
@@ -425,6 +490,7 @@ async function addCartaoItem() {
     return;
   }
 
+  saveCartaoLastDate(d_);
   await loadData();
   renderCartao();
 }
@@ -482,7 +548,7 @@ async function editCartaoItem(i) {
     + '<div class="form-group" style="max-width:190px"><label>Tipo</label><select id="cc-edit-tipo"><option value="lancamento"' + ((item.tipo || 'lancamento') === 'lancamento' ? ' selected' : '') + '>Lancamento</option><option value="estorno"' + ((item.tipo || '') === 'estorno' ? ' selected' : '') + '>Estorno</option></select></div>'
     + '</div>'
     + '<div class="form-row">'
-    + '<div class="form-group"><label>Descricao</label><input type="text" id="cc-edit-desc" value="' + esc(item.desc || '') + '" placeholder="Ex: supermercado, streaming..."/></div>'
+    + '<div class="form-group"><label>Descricao</label><input type="text" id="cc-edit-desc" value="' + esc(item.desc || '') + '" placeholder="Ex: supermercado, streaming..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:220px"><label>Categoria</label><select id="cc-edit-cat">' + categoriaCartaoOptionsHtml(item.cat || '') + '</select></div>'
@@ -513,7 +579,7 @@ async function saveCartaoEditModal(i) {
   var novaData = document.getElementById('cc-edit-data').value;
   var novoCartaoId = document.getElementById('cc-edit-cartao').value || null;
   var novoTipo = document.getElementById('cc-edit-tipo').value === 'estorno' ? 'estorno' : 'lancamento';
-  var novoDesc = document.getElementById('cc-edit-desc').value.trim();
+  var novoDesc = formatDescriptionTitleCase(document.getElementById('cc-edit-desc').value);
   var novaCat = document.getElementById('cc-edit-cat').value;
   var novoValor = parseMoney(document.getElementById('cc-edit-valor'));
 
@@ -586,7 +652,7 @@ async function importXlsx(event) {
 
     for (const row of rows.slice(1)) {
       var rawDate = String(row[iDate] || '').trim();
-      var desc = String(row[iDesc] || '').trim();
+      var desc = formatDescriptionTitleCase(String(row[iDesc] || ''));
       var valorBruto = 0;
       var rawVal = row[iVal];
 

@@ -19,6 +19,15 @@ function initials(n) {
   return String(n || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
+function formatDescriptionTitleCase(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/(^|[\s\/\-(]+)([a-z\u00c0-\u00ff])/g, function(match, prefix, letter) {
+      return prefix + letter.toUpperCase();
+    });
+}
+
 // ── Máscara de moeda (estilo banco) ──
 // Digitar "1" → "0,01" | "123" → "1,23"
 function applyMoneyMask(el) {
