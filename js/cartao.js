@@ -83,6 +83,22 @@ function saveCartaoFilterMultiState(enabled) {
   } catch (e) {}
 }
 
+function parseCartaoInstallmentInfo(desc) {
+  var texto = String(desc || '').trim();
+  var match = texto.match(/(?:^|\s)(\d{1,3})\s*\/\s*(\d{1,3})(?:\s*$)/);
+  if (!match) return null;
+  var atual = Number(match[1]);
+  var total = Number(match[2]);
+  if (!atual || !total || atual > total) return null;
+  return { atual: atual, total: total };
+}
+
+function isDeferredCartaoInstallment(item) {
+  if (!item || item.tipo === 'estorno') return false;
+  var info = parseCartaoInstallmentInfo(item.desc || '');
+  return !!(info && info.atual > 1);
+}
+
 function cartaoLastDateStorageKey() {
   return 'granafy_cartao_last_date_' + String(activeClient || 'global');
 }
@@ -302,7 +318,7 @@ function _renderCartaoFiltroETabela() {
   if (!Array.isArray(c.cartao)) c.cartao = [];
 
   var cols = getColOrder('cartao', COLS_CARTAO);
-  var meses = [...new Set(c.cartao.map(it => (it.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
+  var meses = [...new Set(c.cartao.map(it => (it.data || '').slice(0, 7)).filter(Boolean))].sort();
   var cats = [...new Set(c.cartao.map(it => it.cat || '').filter(Boolean))].sort(compararCategoriaNome);
   var itensBase = _ccFiltro.size === 0 ? c.cartao : c.cartao.filter(it => _ccFiltro.has(it.cartaoId));
   var itens = itensBase.filter(it => {
@@ -313,9 +329,21 @@ function _renderCartaoFiltroETabela() {
     if (_ccFiltroBusca && !texto.includes(_ccFiltroBusca)) return false;
     return true;
   }).slice().sort(function(a, b) {
+    var deferredA = isDeferredCartaoInstallment(a);
+    var deferredB = isDeferredCartaoInstallment(b);
+    if (deferredA !== deferredB) return deferredA ? 1 : -1;
+
     var dataA = String(a && a.data || '');
     var dataB = String(b && b.data || '');
     if (dataA !== dataB) return dataB.localeCompare(dataA);
+
+    var parcA = parseCartaoInstallmentInfo(a && a.desc || '');
+    var parcB = parseCartaoInstallmentInfo(b && b.desc || '');
+    if (deferredA && deferredB && parcA && parcB) {
+      if (parcA.atual !== parcB.atual) return parcA.atual - parcB.atual;
+      if (parcA.total !== parcB.total) return parcA.total - parcB.total;
+    }
+
     return String(a && a.desc || '').localeCompare(String(b && b.desc || ''), 'pt-BR');
   });
 
