@@ -102,6 +102,7 @@ function coletarRascunhoDivida() {
     tipo: get('dv-tipo'),
     inicio: get('dv-inicio'),
     total: parseMoney(document.getElementById('dv-total')),
+    iof: parseMoney(document.getElementById('dv-iof')),
     parcelas: get('dv-parcelas'),
     vparcela: parseMoney(document.getElementById('dv-vparcela')),
     taxa: get('dv-taxa'),
@@ -123,8 +124,23 @@ function restaurarRascunhoDivida() {
   set('dv-parcelas', _dvDraft.parcelas || '');
   set('dv-taxa', _dvDraft.taxa || '');
   setMoneyInputValue('dv-total', _dvDraft.total || 0);
+  setMoneyInputValue('dv-iof', _dvDraft.iof || 0);
   setMoneyInputValue('dv-vparcela', _dvDraft.vparcela || 0);
   setMoneyInputValue('dv-pago', _dvDraft.pago || 0);
+}
+
+function lerIofDivida(d) {
+  var texto = String((d && d.obs) || (d && d.observacoes) || '').trim();
+  if (!texto) return 0;
+  var match = texto.match(/IOF:\s*R\$\s*([0-9.\-]+(?:,[0-9]{1,2})?)/i);
+  if (!match) return 0;
+  return parseFloat(String(match[1]).replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+function montarObservacaoDivida(iof) {
+  var valor = Number(iof || 0);
+  if (!valor) return null;
+  return 'IOF: ' + moneyInputText(valor);
 }
 
 function calcPrice(pv, iMensal, n) {
@@ -221,7 +237,9 @@ function calcularResultadoRenegociacao(pv, parcelas, valorParcela, taxa) {
 function simularRenegociacaoDivida() {
   _dvDraft = coletarRascunhoDivida();
 
-  var pv = parseMoney(document.getElementById('dv-total'));
+  var valorBase = parseMoney(document.getElementById('dv-total'));
+  var iof = parseMoney(document.getElementById('dv-iof'));
+  var pv = Number(valorBase || 0) + Number(iof || 0);
   var parcelas = parseInt(document.getElementById('dv-parcelas').value) || 0;
   var valorParcela = parseMoney(document.getElementById('dv-vparcela'));
   var taxa = parseFloat(document.getElementById('dv-taxa').value) || 0;
@@ -234,6 +252,9 @@ function simularRenegociacaoDivida() {
   _lastCalc = calcularResultadoRenegociacao(pv, parcelas, valorParcela, taxa);
   if (!_lastCalc) return null;
 
+  _lastCalc.valorBase = Number(valorBase || 0);
+  _lastCalc.iof = Number(iof || 0);
+  _lastCalc.valorFinanciado = pv;
   _dvDraft.taxa = Number(_lastCalc.taxaMensal || 0).toFixed(2);
   _dvDraft.vparcela = Number(_lastCalc.pmt || 0);
 
@@ -386,6 +407,9 @@ function renderDividas() {
 
   var calcHtml = _lastCalc ? (
     '<div class="calc-result-grid">'
+    + '<div class="calc-result-item"><div class="cr-label">Valor base</div><div class="cr-val blue">' + fmt(_lastCalc.valorBase || 0) + '</div></div>'
+    + '<div class="calc-result-item"><div class="cr-label">IOF</div><div class="cr-val yellow">' + fmt(_lastCalc.iof || 0) + '</div></div>'
+    + '<div class="calc-result-item"><div class="cr-label">Valor financiado</div><div class="cr-val blue">' + fmt(_lastCalc.valorFinanciado || 0) + '</div></div>'
     + '<div class="calc-result-item"><div class="cr-label">Parcela</div><div class="cr-val blue">' + fmt(_lastCalc.pmt) + '</div></div>'
     + '<div class="calc-result-item"><div class="cr-label">Total pago</div><div class="cr-val yellow">' + fmt(_lastCalc.totalPago) + '</div></div>'
     + '<div class="calc-result-item"><div class="cr-label">Juros</div><div class="cr-val red">' + fmt(_lastCalc.totalJuros) + '</div></div>'
@@ -408,6 +432,7 @@ function renderDividas() {
       var status = getDvStatus(d);
       var pct = Number(d.total) > 0 ? Math.min(100, Math.round((Number(d.pago || 0) / Number(d.total)) * 100)) : 0;
       var restante = Math.max(0, Number(d.total || 0) - Number(d.pago || 0));
+      var iofDivida = lerIofDivida(d);
       var progressClass = status === 'quitada' ? ' done' : status === 'atrasada' ? ' late' : '';
       var historico = historicoPagamentosDivida(c, d);
       var histOpen = _dvHistOpen.has(i);
@@ -435,6 +460,7 @@ function renderDividas() {
         + '<span>Pago: <strong>' + fmt(d.pago || 0) + '</strong></span>'
         + '<span>Restante: <strong>' + fmt(restante) + '</strong></span>'
         + '<span>Parcela: <strong>' + fmt(d.valorParcela || 0) + '</strong></span>'
+        + '<span>IOF: <strong>' + fmt(iofDivida) + '</strong></span>'
         + '<span>Parcelas restantes: <strong>' + Number(d.restantes || 0) + '</strong></span>'
         + '<span>Inicio: <strong>' + (d.dataInicio ? d.dataInicio.split('-').reverse().join('/') : '-') + '</strong></span>'
         + '</div>'
@@ -471,6 +497,7 @@ function renderDividas() {
     + '</div>'
     + '<div class="form-row" style="margin-top:10px">'
     + '<div class="form-group"><label>Valor da divida</label><input type="text" id="dv-total" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
+    + '<div class="form-group"><label>IOF (R$)</label><input type="text" id="dv-iof" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group"><label>Parcelas</label><input type="number" id="dv-parcelas" min="1" step="1" placeholder="Ex: 24"/></div>'
     + '<div class="form-group"><label>Valor da parcela</label><input type="text" id="dv-vparcela" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group"><label>Taxa mensal (%)</label><input type="number" id="dv-taxa" min="0" step="0.01" placeholder="Ex: 1.5"/></div>'
@@ -535,6 +562,7 @@ async function addDivida() {
   var dataInicio = document.getElementById('dv-inicio').value;
 
   var total = parseMoney(document.getElementById('dv-total'));
+  var iof = parseMoney(document.getElementById('dv-iof'));
   var parcelas = parseInt(document.getElementById('dv-parcelas').value) || 0;
   var valorParcela = parseMoney(document.getElementById('dv-vparcela'));
   var taxa = parseFloat(document.getElementById('dv-taxa').value) || 0;
@@ -544,13 +572,17 @@ async function addDivida() {
     return alert('Preencha pelo menos Órgão e Valor.');
   }
 
+  var principalComIof = Number(total || 0) + Number(iof || 0);
+
   if (parcelas) {
-    var calc = calcularResultadoRenegociacao(total, parcelas, valorParcela, taxa) || _lastCalc;
+    var calc = calcularResultadoRenegociacao(principalComIof, parcelas, valorParcela, taxa) || _lastCalc;
     if (calc && Number(calc.totalPago || 0) > 0) {
       valorParcela = Number(calc.pmt || valorParcela || 0);
       taxa = Number(calc.taxaMensal || taxa || 0);
-      total = Number(calc.totalPago || total || 0);
+      total = Number(calc.totalPago || principalComIof || 0);
     }
+  } else {
+    total = principalComIof;
   }
 
   const payload = {
@@ -563,7 +595,8 @@ async function addDivida() {
     parcelas_restantes: parcelas,
     valor_parcela: valorParcela,
     taxa: taxa,
-    valor_pago: pago
+    valor_pago: pago,
+    observacoes: montarObservacaoDivida(iof)
   };
 
   const { error } = await insertDividaComFallback(payload);

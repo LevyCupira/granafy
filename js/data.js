@@ -201,6 +201,7 @@ async function loadData() {
       taxa: Number(d.taxa || 0),
       pago: Number(d.valor_pago || 0),
       restantes: Number(d.parcelas_restantes || 0),
+      obs: d.observacoes || '',
       pagamentos: []
     });
   });
