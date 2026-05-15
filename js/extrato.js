@@ -102,6 +102,65 @@ function nomeRelacionamento(item) {
   return item && item.nome ? item.nome : 'Nao vinculado';
 }
 
+function normalizarTextoRelacionamento(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function termosRelacionamento(rel) {
+  var set = new Set();
+  var base = [rel && rel.nome, rel && rel.palavrasChave];
+  base.forEach(function(item) {
+    String(item || '')
+      .split(/[,;\n|]+/)
+      .map(function(parte) { return normalizarTextoRelacionamento(parte); })
+      .filter(function(parte) { return parte && parte.length >= 3; })
+      .forEach(function(parte) { set.add(parte); });
+  });
+  return Array.from(set);
+}
+
+function sugerirRelacionamentoPorTexto(texto) {
+  if (!clienteAtivoEhPJ()) return null;
+  var alvo = normalizarTextoRelacionamento(texto);
+  if (!alvo) return null;
+
+  var candidatos = relacionamentosClienteAtivo().map(function(rel) {
+    var termos = termosRelacionamento(rel);
+    var score = 0;
+
+    termos.forEach(function(termo) {
+      if (!termo || !alvo.includes(termo)) return;
+      var bonus = normalizarTextoRelacionamento(rel.nome) === termo ? 3 : 0;
+      score = Math.max(score, termo.length + bonus);
+    });
+
+    return {
+      rel: rel,
+      score: score
+    };
+  }).filter(function(item) {
+    return item.score > 0;
+  }).sort(function(a, b) {
+    return b.score - a.score;
+  });
+
+  if (!candidatos.length) return null;
+  if (candidatos[1] && candidatos[1].score === candidatos[0].score && candidatos[1].rel.id !== candidatos[0].rel.id) return null;
+
+  return {
+    id: candidatos[0].rel.id,
+    nome: nomeRelacionamento(candidatos[0].rel),
+    tipo: tipoRelacionamentoLabel(candidatos[0].rel.tipo),
+    score: candidatos[0].score
+  };
+}
+
 function nomeRelacionamentoPorId(cliente, relacionamentoId) {
   if (!cliente || !relacionamentoId) return '-';
   var rel = (cliente.relacionamentos || []).find(item => item.id === relacionamentoId);
@@ -120,6 +179,65 @@ function relacionamentoOptionsCliente(relacionamentoIdAtual, incluirVazio) {
       + ' (' + esc(tipoRelacionamentoLabel(rel.tipo)) + ')'
       + '</option>';
   }).join('');
+}
+
+function relacionamentoSuggestionHtml(sugestao, selectId, applyFnName) {
+  if (!sugestao) {
+    return '<div class="rel-suggestion rel-suggestion-muted">Sem sugestao automatica para este texto.</div>';
+  }
+  return '<div class="rel-suggestion">'
+    + '<span>Sugestao: <strong>' + esc(sugestao.nome) + '</strong> <small>(' + esc(sugestao.tipo) + ')</small></span>'
+    + '<button class="btn-sm" type="button" onclick="' + applyFnName + '(\'' + esc(selectId) + '\',\'' + esc(sugestao.id) + '\')">Usar sugestao</button>'
+    + '</div>';
+}
+
+function aplicarSugestaoRelacionamento(selectId, relacionamentoId) {
+  var select = document.getElementById(selectId);
+  if (!select) return;
+  select.value = relacionamentoId || '';
+  select.dataset.relMode = relacionamentoId ? 'auto' : '';
+  atualizarSugestaoRelacionamentoNovo();
+  atualizarSugestaoRelacionamentoEdicao();
+}
+
+function atualizarSelectRelacionamentoPorSugestao(selectId, sugestao) {
+  var select = document.getElementById(selectId);
+  if (!select) return;
+  var modo = select.dataset.relMode || '';
+  if (!select.value || modo === 'auto') {
+    select.value = sugestao ? sugestao.id : '';
+    select.dataset.relMode = sugestao ? 'auto' : '';
+  }
+}
+
+function atualizarSugestaoRelacionamentoNovo() {
+  if (!clienteAtivoEhPJ()) return;
+  var info = document.getElementById('ex-rel-suggestion');
+  var select = document.getElementById('ex-relacionamento');
+  var desc = document.getElementById('ex-desc');
+  if (!info || !select || !desc) return;
+
+  var sugestao = sugerirRelacionamentoPorTexto(desc.value || '');
+  atualizarSelectRelacionamentoPorSugestao('ex-relacionamento', sugestao);
+  info.innerHTML = relacionamentoSuggestionHtml(sugestao, 'ex-relacionamento', 'aplicarSugestaoRelacionamento');
+}
+
+function atualizarSugestaoRelacionamentoEdicao() {
+  if (!clienteAtivoEhPJ()) return;
+  var info = document.getElementById('ex-edit-rel-suggestion');
+  var select = document.getElementById('ex-edit-relacionamento');
+  var desc = document.getElementById('ex-edit-desc-original');
+  if (!info || !select || !desc) return;
+
+  var sugestao = sugerirRelacionamentoPorTexto(desc.value || '');
+  atualizarSelectRelacionamentoPorSugestao('ex-edit-relacionamento', sugestao);
+  info.innerHTML = relacionamentoSuggestionHtml(sugestao, 'ex-edit-relacionamento', 'aplicarSugestaoRelacionamento');
+}
+
+function registrarInteracaoManualRelacionamento(selectId) {
+  var select = document.getElementById(selectId);
+  if (!select) return;
+  select.dataset.relMode = 'manual';
 }
 
 function nomeContaCliente(conta) {
@@ -195,6 +313,7 @@ function isMissingRelacionamentoSchemaError(error) {
     || msg.includes('relacionamento_id')
     || msg.includes('descricao_original')
     || msg.includes('relacionamentos_cliente')
+    || msg.includes('palavras_chave')
     || msg.includes('schema cache');
 }
 
@@ -308,14 +427,27 @@ async function cadastrarRelacionamentoCliente() {
   var relacionamento = await abrirFormularioRelacionamentoCliente(null);
   if (!relacionamento) return;
 
-  const { error } = await supabaseClient
+  var payload = Object.assign({
+    cliente_id: activeClient,
+    nome: relacionamento.nome,
+    tipo: relacionamento.tipo,
+    observacao: relacionamento.observacao || null,
+    palavras_chave: relacionamento.palavrasChave || null
+  }, getUserScopePayload());
+
+  var result = await supabaseClient
     .from('relacionamentos_cliente')
-    .insert([Object.assign({
-      cliente_id: activeClient,
-      nome: relacionamento.nome,
-      tipo: relacionamento.tipo,
-      observacao: relacionamento.observacao || null
-    }, getUserScopePayload())]);
+    .insert([payload]);
+
+  if (result.error && isMissingRelacionamentoSchemaError(result.error)) {
+    var fallbackPayload = Object.assign({}, payload);
+    delete fallbackPayload.palavras_chave;
+    result = await supabaseClient
+      .from('relacionamentos_cliente')
+      .insert([fallbackPayload]);
+  }
+
+  const error = result.error;
 
   if (error) {
     console.error('Erro ao cadastrar relacionamento:', error);
@@ -339,16 +471,33 @@ async function editarRelacionamentoCliente(relacionamentoId) {
   var dados = await abrirFormularioRelacionamentoCliente(rel);
   if (!dados) return;
 
-  const { error } = await applyUserScope(
+  var query = applyUserScope(
     supabaseClient
       .from('relacionamentos_cliente')
       .update({
         nome: dados.nome,
         tipo: dados.tipo,
-        observacao: dados.observacao || null
+        observacao: dados.observacao || null,
+        palavras_chave: dados.palavrasChave || null
       })
       .eq('id', rel.id)
   );
+
+  var result = await query;
+  if (result.error && isMissingRelacionamentoSchemaError(result.error)) {
+    result = await applyUserScope(
+      supabaseClient
+        .from('relacionamentos_cliente')
+        .update({
+          nome: dados.nome,
+          tipo: dados.tipo,
+          observacao: dados.observacao || null
+        })
+        .eq('id', rel.id)
+    );
+  }
+
+  const error = result.error;
 
   if (error) {
     console.error('Erro ao editar relacionamento:', error);
@@ -408,6 +557,7 @@ function abrirFormularioRelacionamentoCliente(relacionamento) {
       }).join('') +
       '</select></div>' +
       '</div>' +
+      '<div class="form-group"><label>Palavras-chave</label><input type="text" id="relPalavras" value="' + esc((relacionamento && (relacionamento.palavrasChave || relacionamento.palavras_chave)) || '') + '" placeholder="Ex: levy lima, pix levy, transf levy"/></div>' +
       '<div class="form-group"><label>Observacao</label><input type="text" id="relObs" value="' + esc((relacionamento && relacionamento.observacao) || '') + '" placeholder="Ex: Pagamento pessoal feito para a empresa"/></div>' +
       '<div class="account-form-error" id="relFormError"></div>' +
       '</div>';
@@ -424,6 +574,7 @@ function abrirFormularioRelacionamentoCliente(relacionamento) {
     document.getElementById('relSalvar').onclick = function() {
       var nome = document.getElementById('relNome').value.trim();
       var tipo = document.getElementById('relTipo').value || 'interno';
+      var palavrasChave = document.getElementById('relPalavras').value.trim();
       var observacao = document.getElementById('relObs').value.trim();
       var errorEl = document.getElementById('relFormError');
 
@@ -436,6 +587,7 @@ function abrirFormularioRelacionamentoCliente(relacionamento) {
       close({
         nome: nome,
         tipo: tipo,
+        palavrasChave: palavrasChave,
         observacao: observacao
       });
     };
@@ -998,6 +1150,7 @@ function renderExtrato() {
   var importarPanelBody =
     '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Baixe o modelo, selecione a conta e importe o arquivo.</p>'
     + extratoImportGuideHtml()
+    + (relacionamentoAtivo ? '<div class="rel-suggestion rel-suggestion-muted" style="margin-bottom:14px">Se <strong>Relacionado a</strong> ficar em branco, o sistema tenta sugerir o vinculo pela descricao do banco.</div>' : '')
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:260px"><label>Conta do extrato</label><select id="ex-import-conta">' + contasOptionsObrigatoriasCliente('', '-- selecione a conta --') + '</select></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:260px"><label>Relacionado a</label><select id="ex-import-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
@@ -1017,6 +1170,7 @@ function renderExtrato() {
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
+    + (relacionamentoAtivo ? '<div id="ex-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
     + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-obs" placeholder="Opcional. Ex: Pagamento feito por Levy PF para a Granafy."/></div></div>'
     + '<button class="btn-add" onclick="addExtrato()">Adicionar</button>';
 
@@ -1137,6 +1291,13 @@ function renderExtrato() {
 
   setTipoExtrato(_exTipo);
   initMoneyInputs(area);
+  if (clienteAtivoEhPJ()) {
+    var descInput = document.getElementById('ex-desc');
+    var relSelect = document.getElementById('ex-relacionamento');
+    if (descInput) descInput.addEventListener('input', atualizarSugestaoRelacionamentoNovo);
+    if (relSelect) relSelect.addEventListener('change', function() { registrarInteracaoManualRelacionamento('ex-relacionamento'); });
+    atualizarSugestaoRelacionamentoNovo();
+  }
 }
 async function addExtrato() {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
@@ -1188,7 +1349,7 @@ async function importExtratoXlsx(event) {
   if (!activeClient) return alert('Selecione um cliente primeiro.');
 
   var contaId = (document.getElementById('ex-import-conta') && document.getElementById('ex-import-conta').value) || '';
-  var relacionamentoId = clienteAtivoEhPJ() ? (((document.getElementById('ex-import-relacionamento') && document.getElementById('ex-import-relacionamento').value) || '')) : '';
+  var relacionamentoIdFixo = clienteAtivoEhPJ() ? (((document.getElementById('ex-import-relacionamento') && document.getElementById('ex-import-relacionamento').value) || '')) : '';
   if (!contaId) {
     event.target.value = '';
     return alert('Selecione a conta do extrato antes de importar.');
@@ -1236,6 +1397,8 @@ async function importExtratoXlsx(event) {
         continue;
       }
 
+      var relacionamentoSugerido = !relacionamentoIdFixo && clienteAtivoEhPJ() ? sugerirRelacionamentoPorTexto(desc) : null;
+
       const { error } = await insertLancamentoComFallback({
         cliente_id: activeClient,
         data_lancamento: dataFmt || null,
@@ -1245,7 +1408,7 @@ async function importExtratoXlsx(event) {
         tipo: tipo,
         valor: Number(valor || 0),
         conta_id: contaId,
-        relacionamento_id: relacionamentoId || null
+        relacionamento_id: relacionamentoIdFixo || (relacionamentoSugerido ? relacionamentoSugerido.id : null)
       });
 
       if (error) {
@@ -1294,6 +1457,7 @@ function openExtratoEditModal(i) {
     + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="credito"' + (lanc.tipo === 'credito' ? ' selected' : '') + '>Credito</option><option value="debito"' + (lanc.tipo === 'debito' ? ' selected' : '') + '>Debito</option></select></div>'
     + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="ex-edit-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
+    + (clienteAtivoEhPJ() ? '<div id="ex-edit-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
     + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-edit-obs" value="' + esc(lanc.observacao || '') + '" placeholder="Opcional. Ex: Pagamento pessoal feito para a empresa."/></div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
     + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
@@ -1308,6 +1472,12 @@ function openExtratoEditModal(i) {
     var cents = Math.round(Number(lanc.valor || 0) * 100);
     valorInput.dataset.cents = String(cents);
     valorInput.value = Number(lanc.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  if (clienteAtivoEhPJ()) {
+    var relSelect = document.getElementById('ex-edit-relacionamento');
+    if (relSelect) relSelect.addEventListener('change', function() { registrarInteracaoManualRelacionamento('ex-edit-relacionamento'); });
+    atualizarSugestaoRelacionamentoEdicao();
   }
 }
 

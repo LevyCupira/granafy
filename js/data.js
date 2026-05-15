@@ -181,6 +181,7 @@ async function loadData() {
       id: rel.id,
       nome: rel.nome,
       tipo: rel.tipo || 'interno',
+      palavrasChave: rel.palavras_chave || '',
       observacao: rel.observacao || '',
       userId: rel.user_id || null
     });

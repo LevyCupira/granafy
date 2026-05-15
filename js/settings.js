@@ -271,16 +271,32 @@ async function importarRelacionamentosCliente(clienteId, relacionamentos, resumo
       continue;
     }
 
+    var payload = Object.assign({
+      cliente_id: clienteId,
+      nome: nome,
+      tipo: rel.tipo || 'interno',
+      palavras_chave: rel.palavrasChave || rel.palavras_chave || null,
+      observacao: rel.observacao || null
+    }, getUserScopePayload());
+
     var criado = await supabaseClient
       .from('relacionamentos_cliente')
-      .insert([Object.assign({
-        cliente_id: clienteId,
-        nome: nome,
-        tipo: rel.tipo || 'interno',
-        observacao: rel.observacao || null
-      }, getUserScopePayload())])
+      .insert([payload])
       .select('id')
       .single();
+
+    if (criado.error) {
+      var msg = String((criado.error.message || '') + ' ' + (criado.error.details || '') + ' ' + (criado.error.hint || '')).toLowerCase();
+      if (msg.includes('palavras_chave')) {
+        var fallbackPayload = Object.assign({}, payload);
+        delete fallbackPayload.palavras_chave;
+        criado = await supabaseClient
+          .from('relacionamentos_cliente')
+          .insert([fallbackPayload])
+          .select('id')
+          .single();
+      }
+    }
 
     if (criado.error) throw new Error('Erro ao criar relacionamento "' + nome + '": ' + criado.error.message);
     mapa[rel.id] = criado.data.id;

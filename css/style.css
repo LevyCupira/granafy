@@ -448,6 +448,9 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .import-guide-chip.required{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));color:var(--accent)}
 .import-guide-list{margin:0;padding-left:18px;color:var(--muted);font-size:.8rem;display:grid;gap:6px}
 .import-guide-list strong{color:var(--text)}
+.rel-suggestion{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(91,140,255,.24);border-radius:8px;background:rgba(91,140,255,.08);font-size:.8rem;color:var(--text)}
+.rel-suggestion small{color:var(--muted)}
+.rel-suggestion-muted{border-color:var(--border);background:var(--surface);color:var(--muted)}
 
 /* ── Rodapé ── */
 .footer-bar{position:fixed;bottom:0;left:0;right:0;text-align:center;padding:5px;font-size:.62rem;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:10;letter-spacing:.3px}
