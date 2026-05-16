@@ -3,10 +3,16 @@
 var COLS_CARTAO = [
   { key:'data',   label:'Data',      render: it => '<span style="color:var(--muted);font-size:.78rem">' + (it.data ? it.data.split('-').reverse().join('/') : '-') + '</span>' },
   { key:'cartao', label:'Cartao',    render: it => { var cc = getCartaoById(it.cartaoId); return cc ? '<span class="badge badge-card">' + esc(cc.nome) + '</span>' : '<span style="color:var(--muted);font-size:.76rem">-</span>'; } },
-  { key:'tipo',   label:'Tipo',      render: it => it.tipo === 'estorno' ? '<span class="badge badge-estorno">Estorno</span>' : '<span style="font-size:.75rem;color:var(--muted)">Lancamento</span>' },
+  { key:'tipo',   label:'Tipo',      render: it => it.tipo === 'estorno'
+      ? '<span class="badge badge-estorno">Estorno</span>'
+      : (it.tipo === 'pagamento'
+        ? '<span class="badge badge-card">Pagamento</span>'
+        : '<span style="font-size:.75rem;color:var(--muted)">Lancamento</span>') },
   { key:'desc',   label:'Descricao', render: it => esc(it.desc) },
   { key:'cat',    label:'Categoria', render: it => '<span class="badge badge-cat">' + esc(it.cat || '-') + '</span>' },
-  { key:'valor',  label:'Valor',     render: it => it.tipo === 'estorno' ? '<span class="val val-pos">+ ' + fmt(it.valor) + '</span>' : '<span class="val val-neg">- ' + fmt(it.valor) + '</span>' },
+  { key:'valor',  label:'Valor',     render: it => it.tipo === 'estorno'
+      ? '<span class="val val-pos">+ ' + fmt(it.valor) + '</span>'
+      : '<span class="val val-neg">- ' + fmt(it.valor) + '</span>' },
   { key:'_del',   label:'',          render: () => '' },
 ];
 
@@ -94,7 +100,7 @@ function parseCartaoInstallmentInfo(desc) {
 }
 
 function isDeferredCartaoInstallment(item) {
-  if (!item || item.tipo === 'estorno') return false;
+  if (!item || item.tipo === 'estorno' || item.tipo === 'pagamento') return false;
   var info = parseCartaoInstallmentInfo(item.desc || '');
   return !!(info && info.atual > 1);
 }
@@ -347,10 +353,12 @@ function _renderCartaoFiltroETabela() {
     return String(a && a.desc || '').localeCompare(String(b && b.desc || ''), 'pt-BR');
   });
 
-  var lancs = itens.filter(i => i.tipo !== 'estorno');
+  var lancs = itens.filter(i => i.tipo !== 'estorno' && i.tipo !== 'pagamento');
   var ests  = itens.filter(i => i.tipo === 'estorno');
+  var pags  = itens.filter(i => i.tipo === 'pagamento');
   var tL = lancs.reduce((s, i) => s + Number(i.valor), 0);
   var tE = ests.reduce((s, i) => s + Number(i.valor), 0);
+  var tP = pags.reduce((s, i) => s + Number(i.valor), 0);
 
   var sumEl = document.getElementById('cc-summary-area');
   if (sumEl) {
@@ -358,6 +366,7 @@ function _renderCartaoFiltroETabela() {
       + '<div class="summary-card"><div class="s-label">Total fatura' + (_ccFiltro.size ? ' <span style="color:var(--accent);font-size:.6rem">(filtrado)</span>' : '') + '</div><div class="s-val red">' + fmt(tL - tE) + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + fmt(tL) + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Estornos</div><div class="s-val green">' + fmt(tE) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Pagamentos</div><div class="s-val blue">' + fmt(tP) + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Qtd. itens</div><div class="s-val blue">' + itens.length + '</div></div>'
       + '</div>';
   }
@@ -392,7 +401,7 @@ function _renderCartaoFiltroETabela() {
   filterHtml += '<div class="form-card"><h3>Filtros</h3>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:150px"><label>Periodo</label><select id="cc-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
-    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="cc-filtro-tipo"><option value="todos"' + (_ccFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="lancamento"' + (_ccFiltroTipo === 'lancamento' ? ' selected' : '') + '>Lancamento</option><option value="estorno"' + (_ccFiltroTipo === 'estorno' ? ' selected' : '') + '>Estorno</option></select></div>'
+    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="cc-filtro-tipo"><option value="todos"' + (_ccFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="lancamento"' + (_ccFiltroTipo === 'lancamento' ? ' selected' : '') + '>Lancamento</option><option value="estorno"' + (_ccFiltroTipo === 'estorno' ? ' selected' : '') + '>Estorno</option><option value="pagamento"' + (_ccFiltroTipo === 'pagamento' ? ' selected' : '') + '>Pagamento</option></select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="cc-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
     + '<div class="form-group"><label>Busca</label><input type="text" id="cc-filtro-busca" value="' + esc(_ccFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosCartao()"/></div>'
     + '</div>'
@@ -573,7 +582,7 @@ async function editCartaoItem(i) {
     '<div class="form-row">'
     + '<div class="form-group" style="max-width:170px"><label>Data</label><input type="date" id="cc-edit-data" value="' + esc(item.data || '') + '"/></div>'
     + '<div class="form-group" style="max-width:220px"><label>Cartao</label><select id="cc-edit-cartao">' + cartaoOptionsHtml(item.cartaoId || '') + '</select></div>'
-    + '<div class="form-group" style="max-width:190px"><label>Tipo</label><select id="cc-edit-tipo"><option value="lancamento"' + ((item.tipo || 'lancamento') === 'lancamento' ? ' selected' : '') + '>Lancamento</option><option value="estorno"' + ((item.tipo || '') === 'estorno' ? ' selected' : '') + '>Estorno</option></select></div>'
+    + '<div class="form-group" style="max-width:190px"><label>Tipo</label><select id="cc-edit-tipo"><option value="lancamento"' + ((item.tipo || 'lancamento') === 'lancamento' ? ' selected' : '') + '>Lancamento</option><option value="estorno"' + ((item.tipo || '') === 'estorno' ? ' selected' : '') + '>Estorno</option><option value="pagamento"' + ((item.tipo || '') === 'pagamento' ? ' selected' : '') + '>Pagamento</option></select></div>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group"><label>Descricao</label><input type="text" id="cc-edit-desc" value="' + esc(item.desc || '') + '" placeholder="Ex: supermercado, streaming..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
@@ -606,7 +615,8 @@ async function saveCartaoEditModal(i) {
 
   var novaData = document.getElementById('cc-edit-data').value;
   var novoCartaoId = document.getElementById('cc-edit-cartao').value || null;
-  var novoTipo = document.getElementById('cc-edit-tipo').value === 'estorno' ? 'estorno' : 'lancamento';
+  var tipoSelecionado = document.getElementById('cc-edit-tipo').value;
+  var novoTipo = tipoSelecionado === 'estorno' ? 'estorno' : (tipoSelecionado === 'pagamento' ? 'pagamento' : 'lancamento');
   var novoDesc = formatDescriptionTitleCase(document.getElementById('cc-edit-desc').value);
   var novaCat = document.getElementById('cc-edit-cat').value;
   var novoValor = parseMoney(document.getElementById('cc-edit-valor'));
@@ -754,14 +764,16 @@ async function pagarFaturaCartao() {
 
   var cartao = getCartaoById(cartaoId);
   var nomeCartao = cartao ? cartao.nome : 'Cartao';
+  var dataPagamento = dataPg || new Date().toISOString().slice(0, 10);
+  var descricaoPagamento = 'Pagamento fatura - ' + nomeCartao;
 
   const payload = {
     cliente_id: activeClient,
     tipo: 'debito',
-    descricao: 'Pagamento fatura - ' + nomeCartao,
+    descricao: descricaoPagamento,
     categoria: 'Cartao de Credito',
     valor: Number(valor || 0),
-    data_lancamento: dataPg || new Date().toISOString().slice(0, 10)
+    data_lancamento: dataPagamento
   };
 
   const { error } = await supabaseClient
@@ -771,6 +783,26 @@ async function pagarFaturaCartao() {
   if (error) {
     console.error(error);
     alert('Erro ao registrar pagamento.');
+    return;
+  }
+
+  const { error: cardError } = await supabaseClient
+    .from('lancamentos_cartao')
+    .insert([Object.assign({
+      cliente_id: activeClient,
+      cartao_id: cartaoId,
+      data: dataPagamento,
+      descricao: descricaoPagamento,
+      categoria: 'Pagamento de Fatura',
+      tipo: 'pagamento',
+      valor: Number(valor || 0)
+    }, getUserScopePayload())]);
+
+  if (cardError) {
+    console.error(cardError);
+    alert('O pagamento entrou no extrato, mas nao foi possivel registrar no historico do cartao.');
+    await loadData();
+    renderCartao();
     return;
   }
 
