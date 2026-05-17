@@ -256,6 +256,8 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .drag-handle{display:inline-block;margin-right:4px;color:var(--border);font-size:.6rem;vertical-align:middle;pointer-events:none}
 .row-estorno td{background:rgba(62,207,176,.04)!important}
 .row-estorno td:first-child{border-left:3px solid var(--success)}
+.row-payment td{background:rgba(91,140,255,.05)!important}
+.row-payment td:first-child{border-left:3px solid var(--accent)}
 .row-credito td:first-child{border-left:3px solid var(--success)}
 .row-debito  td:first-child{border-left:3px solid var(--danger)}
 
@@ -265,11 +267,13 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .badge-org{background:rgba(62,207,176,.15);color:var(--accent3)}
 .badge-card{background:rgba(255,198,107,.15);color:var(--warning)}
 .badge-estorno{background:rgba(62,207,176,.12);color:var(--success);border:1px solid rgba(62,207,176,.3)}
+.badge-payment{background:rgba(91,140,255,.16);color:var(--accent);border:1px solid rgba(91,140,255,.25)}
 .val{font-weight:600;font-variant-numeric:tabular-nums}
 .val-neg{color:var(--danger)}
 .val-pos{color:var(--success)}
 .prog-bar{width:88px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle}
 .prog-fill{height:100%;border-radius:3px;background:var(--accent3)}
+.installment-note{color:var(--muted);font-size:.72rem;margin-top:3px}
 
 /* ── Summary cards ── */
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:11px;margin-bottom:22px}
@@ -310,6 +314,10 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .cc-filter-count{font-size:.72rem;color:var(--muted);white-space:nowrap}
 .cc-filter-toggle{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:.72rem;font-weight:600;white-space:nowrap}
 .cc-toggle-switch{width:42px;height:24px}
+.cartao-helper-text{color:var(--muted);font-size:.75rem;line-height:1.45;margin-top:10px}
+.parcel-series-box{margin-top:10px;padding:14px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px}
+.parcel-series-check{display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--text);font-size:.82rem;font-weight:600}
+.parcel-series-check input{accent-color:var(--accent)}
 
 /* ── Categorias (barras) ── */
 .cat-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}

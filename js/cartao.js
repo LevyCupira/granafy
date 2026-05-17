@@ -6,9 +6,13 @@ var COLS_CARTAO = [
   { key:'tipo',   label:'Tipo',      render: it => it.tipo === 'estorno'
       ? '<span class="badge badge-estorno">Estorno</span>'
       : (it.tipo === 'pagamento'
-        ? '<span class="badge badge-card">Pagamento</span>'
+        ? '<span class="badge badge-payment">Pagamento</span>'
         : '<span style="font-size:.75rem;color:var(--muted)">Lancamento</span>') },
-  { key:'desc',   label:'Descricao', render: it => esc(it.desc) },
+  { key:'desc',   label:'Descricao', render: it => {
+      var info = parseCartaoInstallmentInfo(it.desc || '');
+      if (!info || info.total < 2) return esc(it.desc);
+      return esc(it.desc) + '<div class="installment-note">Compra parcelada ' + info.atual + '/' + info.total + '</div>';
+    } },
   { key:'cat',    label:'Categoria', render: it => '<span class="badge badge-cat">' + esc(it.cat || '-') + '</span>' },
   { key:'valor',  label:'Valor',     render: it => it.tipo === 'estorno'
       ? '<span class="val val-pos">+ ' + fmt(it.valor) + '</span>'
@@ -103,6 +107,43 @@ function isDeferredCartaoInstallment(item) {
   if (!item || item.tipo === 'estorno' || item.tipo === 'pagamento') return false;
   var info = parseCartaoInstallmentInfo(item.desc || '');
   return !!(info && info.atual > 1);
+}
+
+function cartaoInstallmentBaseDesc(desc) {
+  return String(desc || '').replace(/\s+\d{1,3}\s*\/\s*\d{1,3}\s*$/, '').trim();
+}
+
+function normalizeCartaoSeriesKey(text) {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cartaoInstallmentSeriesKey(item) {
+  var info = parseCartaoInstallmentInfo(item && item.desc || '');
+  if (!info || info.total < 2) return null;
+  return [
+    item.cartaoId || '',
+    item.tipo || 'lancamento',
+    normalizeCartaoSeriesKey(cartaoInstallmentBaseDesc(item.desc || '')),
+    Number(item.valor || 0).toFixed(2),
+    info.total
+  ].join('|');
+}
+
+function getCartaoInstallmentSeriesItems(item, cartaoItems) {
+  var key = cartaoInstallmentSeriesKey(item);
+  if (!key) return [];
+  return (cartaoItems || []).filter(function(entry) {
+    return cartaoInstallmentSeriesKey(entry) === key;
+  }).slice().sort(function(a, b) {
+    var infoA = parseCartaoInstallmentInfo(a.desc || '');
+    var infoB = parseCartaoInstallmentInfo(b.desc || '');
+    return (infoA ? infoA.atual : 0) - (infoB ? infoB.atual : 0);
+  });
 }
 
 function cartaoLastDateStorageKey() {
@@ -286,13 +327,16 @@ function renderCartao() {
     + '<div class="form-group" style="max-width:165px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cartao\')">(+ gerir)</span></label><select id="cc-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:118px"><label>Parcelas</label><input type="number" id="cc-parcelas" value="1" min="1" max="120"/></div>'
     + '<div class="form-group" style="max-width:138px"><label>Valor (R$)</label><input type="text" id="cc-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
-    + '</div><button class="btn-add" onclick="addCartaoItem()">Adicionar</button>';
+    + '</div>'
+    + '<div class="cartao-helper-text">A partir de 2 parcelas, o sistema cria as proximas competencias automaticamente.</div>'
+    + '<button class="btn-add" onclick="addCartaoItem()">Adicionar</button>';
 
   var pagarPanelBody = '<div class="form-row">'
     + '<div class="form-group" style="max-width:180px"><label>Cartao</label><select id="pg-cartao">' + (c.cartoes.length === 0 ? '<option value="">- sem cartao -</option>' : cartaoOpts) + '</select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="pg-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="date" id="pg-data"/></div>'
     + '</div>'
+    + '<div class="cartao-helper-text">Registra a saida no extrato e tambem entra no historico do cartao como pagamento.</div>'
     + '<button class="btn-add" onclick="pagarFaturaCartao()">Pagar fatura</button>';
 
   var html = '<div id="cc-summary-area"></div>'
@@ -419,7 +463,11 @@ function _renderCartaoFiltroETabela() {
           ? '<td><div class="row-actions"><button class="btn-icon" onclick="editCartaoItem(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteCartaoItem(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
           : '<td>' + col.render(item, realIdx) + '</td>'
         ).join('');
-      }, r => r.tipo === 'estorno' ? 'row-estorno' : '');
+      }, function(r) {
+        if (r.tipo === 'estorno') return 'row-estorno';
+        if (r.tipo === 'pagamento') return 'row-payment';
+        return '';
+      });
 
   initDrag('cartao', COLS_CARTAO, () => _renderCartaoFiltroETabela());
 }
@@ -534,17 +582,29 @@ async function addCartaoItem() {
 
 async function deleteCartaoItem(i) {
   if (!canEditCartaoClient()) return;
-  if (!(await appConfirm('Remover item?', { title: 'Excluir lancamento', confirmText: 'Excluir' }))) return;
-
   var c = data.clients[activeClient];
   var item = c.cartao[i];
   if (!item || !item.id) return;
+  var serie = getCartaoInstallmentSeriesItems(item, c.cartao || []);
+  var idsParaExcluir = [item.id];
+
+  if (serie.length > 1) {
+    var excluirTodas = await appConfirm(
+      'Esta compra tem ' + serie.length + ' parcelas. Deseja excluir todas as parcelas? Se escolher "' + 'Apenas esta' + '", removeremos so a parcela atual.',
+      { title: 'Excluir compra parcelada', confirmText: 'Excluir todas', cancelText: 'Apenas esta' }
+    );
+    if (excluirTodas) {
+      idsParaExcluir = serie.map(function(entry) { return entry.id; }).filter(Boolean);
+    }
+  } else {
+    if (!(await appConfirm('Remover item?', { title: 'Excluir lancamento', confirmText: 'Excluir' }))) return;
+  }
 
   const { error } = await applyUserScope(
     supabaseClient
       .from('lancamentos_cartao')
       .delete()
-      .eq('id', item.id)
+      .in('id', idsParaExcluir)
   );
 
   if (error) {
@@ -576,6 +636,9 @@ async function editCartaoItem(i) {
   var c = data.clients[activeClient];
   var item = c.cartao[i];
   if (!item || !item.id) return;
+  var infoParcela = parseCartaoInstallmentInfo(item.desc || '');
+  var serie = getCartaoInstallmentSeriesItems(item, c.cartao || []);
+  var baseDesc = cartaoInstallmentBaseDesc(item.desc || '');
 
   document.getElementById('modalTitle').textContent = 'Editar lancamento do cartao';
   document.getElementById('modalBody').innerHTML =
@@ -585,12 +648,15 @@ async function editCartaoItem(i) {
     + '<div class="form-group" style="max-width:190px"><label>Tipo</label><select id="cc-edit-tipo"><option value="lancamento"' + ((item.tipo || 'lancamento') === 'lancamento' ? ' selected' : '') + '>Lancamento</option><option value="estorno"' + ((item.tipo || '') === 'estorno' ? ' selected' : '') + '>Estorno</option><option value="pagamento"' + ((item.tipo || '') === 'pagamento' ? ' selected' : '') + '>Pagamento</option></select></div>'
     + '</div>'
     + '<div class="form-row">'
-    + '<div class="form-group"><label>Descricao</label><input type="text" id="cc-edit-desc" value="' + esc(item.desc || '') + '" placeholder="Ex: supermercado, streaming..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
+    + '<div class="form-group"><label>Descricao</label><input type="text" id="cc-edit-desc" value="' + esc(infoParcela ? baseDesc : (item.desc || '')) + '" placeholder="Ex: supermercado, streaming..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:220px"><label>Categoria</label><select id="cc-edit-cat">' + categoriaCartaoOptionsHtml(item.cat || '') + '</select></div>'
     + '<div class="form-group" style="max-width:160px"><label>Valor (R$)</label><input type="text" id="cc-edit-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
+    + (serie.length > 1
+      ? '<div class="parcel-series-box"><label class="parcel-series-check"><input type="checkbox" id="cc-edit-serie" checked/> <span>Aplicar em todas as ' + serie.length + ' parcelas desta compra</span></label><p class="cartao-helper-text">Mantemos o numero de cada parcela e reajustamos as datas em sequencia a partir da data informada.</p></div>'
+      : '')
     + '<div style="display:flex;gap:12px;justify-content:flex-end;margin-top:18px">'
     + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
     + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveCartaoEditModal(' + i + ')">Salvar alteracoes</button>'
@@ -620,23 +686,57 @@ async function saveCartaoEditModal(i) {
   var novoDesc = formatDescriptionTitleCase(document.getElementById('cc-edit-desc').value);
   var novaCat = document.getElementById('cc-edit-cat').value;
   var novoValor = parseMoney(document.getElementById('cc-edit-valor'));
+  var serie = getCartaoInstallmentSeriesItems(item, c.cartao || []);
+  var aplicarSerie = serie.length > 1 && !!(document.getElementById('cc-edit-serie') && document.getElementById('cc-edit-serie').checked);
+  var infoItemAtual = parseCartaoInstallmentInfo(item.desc || '');
 
   if (!novoCartaoId) return alert('Selecione um cartao.');
   if (!novoDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
 
-  const { error } = await applyUserScope(
-    supabaseClient
-      .from('lancamentos_cartao')
-      .update({
-        cartao_id: novoCartaoId,
-        data: novaData || null,
-        descricao: novoDesc,
-        categoria: novaCat || null,
-        tipo: novoTipo,
-        valor: Number(novoValor || 0)
-      })
-      .eq('id', item.id)
-  );
+  var error = null;
+  if (aplicarSerie) {
+    var infoAtual = parseCartaoInstallmentInfo(item.desc || '');
+    var baseDate = novaData || item.data || null;
+    for (var idx = 0; idx < serie.length; idx++) {
+      var entry = serie[idx];
+      var infoEntry = parseCartaoInstallmentInfo(entry.desc || '');
+      var offset = infoEntry && infoAtual ? (infoEntry.atual - infoAtual.atual) : 0;
+      var dataSerie = baseDate ? addMonthsClampedIso(baseDate, offset) : (entry.data || null);
+      var descSerie = infoEntry ? (novoDesc + ' ' + infoEntry.atual + '/' + infoEntry.total) : novoDesc;
+      var resposta = await applyUserScope(
+        supabaseClient
+          .from('lancamentos_cartao')
+          .update({
+            cartao_id: novoCartaoId,
+            data: dataSerie || null,
+            descricao: descSerie,
+            categoria: novaCat || null,
+            tipo: novoTipo,
+            valor: Number(novoValor || 0)
+          })
+          .eq('id', entry.id)
+      );
+      if (resposta && resposta.error) {
+        error = resposta.error;
+        break;
+      }
+    }
+  } else {
+    var respostaUnica = await applyUserScope(
+      supabaseClient
+        .from('lancamentos_cartao')
+        .update({
+          cartao_id: novoCartaoId,
+          data: novaData || null,
+          descricao: infoItemAtual ? (novoDesc + ' ' + infoItemAtual.atual + '/' + infoItemAtual.total) : novoDesc,
+          categoria: novaCat || null,
+          tipo: novoTipo,
+          valor: Number(novoValor || 0)
+        })
+        .eq('id', item.id)
+    );
+    error = respostaUnica && respostaUnica.error ? respostaUnica.error : null;
+  }
 
   if (error) {
     console.error('Erro ao editar item do cartao:', error);
