@@ -75,6 +75,7 @@ function exportPDF() {
     : todas.filter(function(l) { return l.tipo === 'debito'; }).reduce(function(s, l) { return s + l.valor; }, 0);
   var saldo = tR - tD;
   var faturaTotal = cartaoFiltrado.reduce(function(s, it) {
+    if (it.tipo === 'pagamento') return s;
     return s + (it.tipo === 'estorno' ? -Number(it.valor || 0) : Number(it.valor || 0));
   }, 0);
 
@@ -225,7 +226,7 @@ function exportPDF() {
           cc ? cc.nome : '-',
           it.desc,
           it.cat || '-',
-          it.tipo === 'estorno' ? 'Estorno' : 'Lancamento',
+          it.tipo === 'estorno' ? 'Estorno' : (it.tipo === 'pagamento' ? 'Pagamento' : 'Lancamento'),
           it.tipo === 'estorno' ? fmtPos(it.valor) : fmtNeg(it.valor)
         ];
       });
