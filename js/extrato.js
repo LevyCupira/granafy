@@ -85,6 +85,29 @@ function clienteAtivoEhPJ() {
   return !!(c && String(c.tipoCliente || '').toLowerCase() === 'pj');
 }
 
+function naturezaFinanceiraDoExtrato(tipo) {
+  return tipo === 'debito' ? 'pagar' : 'receber';
+}
+
+function baixasFinanceirasDoLancamento(lanc) {
+  if (!lanc || !lanc.id || typeof tfBaixasPorLancamentoId !== 'function') return [];
+  return tfBaixasPorLancamentoId(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'credito'));
+}
+
+function valorConciliadoDoLancamento(lanc) {
+  if (!lanc || !lanc.id || typeof tfValorConciliadoLancamento !== 'function') return 0;
+  return tfValorConciliadoLancamento(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'credito'));
+}
+
+function resumoConciliacaoLancamento(lanc) {
+  var baixas = baixasFinanceirasDoLancamento(lanc);
+  if (!baixas.length) return '';
+  var conciliado = valorConciliadoDoLancamento(lanc);
+  var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var prefixo = restante > 0 ? 'Financeiro parcial' : 'Financeiro conciliado';
+  return prefixo + ': ' + fmt(conciliado) + (restante > 0 ? ' · saldo pendente ' + fmt(restante) : '');
+}
+
 function relacionamentosClienteAtivo() {
   var c = data.clients[activeClient];
   return c && Array.isArray(c.relacionamentos) ? c.relacionamentos : [];
@@ -1219,6 +1242,8 @@ function renderExtrato() {
         var detalhes = [];
         if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
         if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
+        var concResumo = resumoConciliacaoLancamento(l);
+        if (concResumo) detalhes.push(concResumo);
         html += '<tr class="row-' + l.tipo + '">'
           + '<td><input type="radio" name="dup-' + gi + '" onchange="setManterDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\',\'' + encodeURIComponent(l.id) + '\')" ' + checked + '/></td>'
           + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
@@ -1228,7 +1253,9 @@ function renderExtrato() {
           + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
           + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
           + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
-          + '<td><div class="row-actions"><button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
+          + '<td><div class="row-actions">'
+          + (relacionamentoAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
+          + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
           + '</tr>';
       });
 
@@ -1269,6 +1296,8 @@ function renderExtrato() {
       var detalhes = [];
       if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
       if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
+      var concResumo = resumoConciliacaoLancamento(l);
+      if (concResumo) detalhes.push(concResumo);
       html += '<tr class="row-' + l.tipo + '">'
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
         + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
@@ -1277,7 +1306,9 @@ function renderExtrato() {
         + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
         + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
         + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
-        + '<td><div class="row-actions"><button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
+        + '<td><div class="row-actions">'
+        + (relacionamentoAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
+        + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
         + '</tr>';
     });
 
@@ -1481,12 +1512,204 @@ function openExtratoEditModal(i) {
   }
 }
 
+function extratoConciliacaoOptionsHtml(natureza, selecionadoId) {
+  if (typeof tfTitulosDisponiveisParaNatureza !== 'function') return '<option value="">Sem titulos disponiveis</option>';
+  var titulos = tfTitulosDisponiveisParaNatureza(natureza);
+  if (!titulos.length) return '<option value="">Sem titulos disponiveis</option>';
+  return '<option value="">Selecione um titulo</option>' + titulos.map(function(item) {
+    return '<option value="' + esc(item.id) + '" data-saldo="' + esc(String(tfSaldo(item))) + '"' + (item.id === selecionadoId ? ' selected' : '') + '>'
+      + esc(item.pessoaNome || '-')
+      + ' - ' + esc(item.descricao || '-')
+      + ' (saldo ' + fmt(tfSaldo(item)) + ')'
+      + '</option>';
+  }).join('');
+}
+
+function syncExtratoConciliacaoValor(lancamentoValor) {
+  var select = document.getElementById('ex-conciliar-titulo');
+  var valorInput = document.getElementById('ex-conciliar-valor');
+  if (!select || !valorInput) return;
+  var option = select.options[select.selectedIndex];
+  var saldo = option ? Number(option.dataset.saldo || 0) : 0;
+  var restante = Number(lancamentoValor || 0);
+  if (!saldo || !restante) {
+    valorInput.value = '0,00';
+    valorInput.dataset.cents = '0';
+    return;
+  }
+  var alvo = Math.min(saldo, restante);
+  valorInput.value = Number(alvo).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  valorInput.dataset.cents = String(Math.round(alvo * 100));
+}
+
+function openExtratoConciliacaoModal(i) {
+  if (!clienteAtivoEhPJ()) return alert('A conciliacao financeira esta disponivel apenas para clientes PJ.');
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
+  var naturezaLabel = natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
+  var acaoLabel = natureza === 'receber' ? 'Conciliar recebimento' : 'Conciliar pagamento';
+  var conciliado = valorConciliadoDoLancamento(lanc);
+  var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var baixas = baixasFinanceirasDoLancamento(lanc);
+  var baixasHtml = baixas.length
+    ? baixas.map(function(item) {
+        return '<div class="tf-baixa-item">'
+          + '<div><strong>' + esc(item.tituloPessoa || '-') + '</strong><small>' + esc(item.tituloDescricao || '-') + ' · ' + esc(formatDate(item.baixa.data)) + '</small></div>'
+          + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.baixa.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoBaixa(\'' + esc(lanc.id) + '\',\'' + esc(item.tituloId) + '\',\'' + esc(item.baixa.id) + '\',' + i + ')" title="Desconciliar">&#128465;</button></div>'
+          + '</div>';
+      }).join('')
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliacao registrada neste lancamento.</div>';
+
+  document.getElementById('modalTitle').textContent = acaoLabel;
+  document.getElementById('modalBody').innerHTML =
+    '<div class="settings-card-badges" style="margin:0 0 18px 0">'
+      + '<span class="settings-card-badge">' + esc(naturezaLabel) + '</span>'
+      + '<span class="settings-card-badge subtle">Lancamento ' + fmt(lanc.valor || 0) + '</span>'
+      + '<span class="settings-card-badge subtle">Conciliado ' + fmt(conciliado) + '</span>'
+      + '<span class="settings-card-badge subtle">Restante ' + fmt(restante) + '</span>'
+    + '</div>'
+    + '<div class="settings-section-card" style="margin-bottom:16px">'
+      + '<div class="settings-card-head"><div><h5>Lancamento do extrato</h5><p>Use este credito ou debito do banco para baixar um titulo financeiro do cliente PJ.</p></div></div>'
+      + '<div class="form-row">'
+        + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="text" value="' + esc(formatDate(lanc.data)) + '" readonly/></div>'
+        + '<div class="form-group" style="max-width:180px"><label>Conta</label><input type="text" value="' + esc(nomeContaPorId(c, lanc.contaId)) + '" readonly/></div>'
+        + '<div class="form-group" style="max-width:160px"><label>Tipo</label><input type="text" value="' + esc(lanc.tipo === 'credito' ? 'Credito' : 'Debito') + '" readonly/></div>'
+        + '<div class="form-group" style="max-width:170px"><label>Valor</label><input type="text" value="' + esc(fmt(lanc.valor || 0)) + '" readonly/></div>'
+      + '</div>'
+      + '<div class="form-row"><div class="form-group"><label>Descricao do banco</label><input type="text" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div></div>'
+      + (lanc.relacionamentoId ? '<div class="form-row"><div class="form-group"><label>Relacionado a</label><input type="text" value="' + esc(nomeRelacionamentoPorId(c, lanc.relacionamentoId)) + '" readonly/></div></div>' : '')
+    + '</div>'
+    + '<div class="settings-section-card">'
+      + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Voce pode vincular este lancamento a mais de um titulo, desde que o total conciliado nao ultrapasse o valor do banco.</p></div></div>'
+      + baixasHtml
+      + '<div class="form-row" style="margin-top:16px">'
+        + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, '') + '</select></div>'
+      + '</div>'
+      + '<div class="form-row">'
+        + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+        + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: recebimento parcial, pagamento fornecedor"/></div>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
+        + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
+        + '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLancamento(' + i + ')">' + acaoLabel + '</button>'
+      + '</div>'
+    + '</div>';
+
+  document.getElementById('modalOverlay').classList.add('open');
+  initMoneyInputs(document.getElementById('modalBody'));
+  syncExtratoConciliacaoValor(restante);
+}
+
+async function conciliarExtratoLancamento(i) {
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
+  var tituloId = ((document.getElementById('ex-conciliar-titulo') || {}).value) || '';
+  var valor = parseMoney(document.getElementById('ex-conciliar-valor'));
+  var observacao = ((document.getElementById('ex-conciliar-obs') || {}).value || '').trim();
+
+  if (!tituloId) return alert('Selecione um titulo para conciliar.');
+  if (!valor || valor <= 0) return alert('Informe um valor de baixa maior que zero.');
+
+  if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
+  var titulo = tfFindTituloById(tituloId);
+  if (!titulo) return alert('Titulo nao encontrado.');
+
+  var saldoTitulo = tfSaldo(titulo);
+  var restanteLanc = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
+  if (valor > saldoTitulo) return alert('O valor informado ultrapassa o saldo do titulo.');
+  if (valor > restanteLanc) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+
+  var response = await supabaseClient
+    .from('titulos_financeiros_baixas')
+    .insert([Object.assign({
+      titulo_id: tituloId,
+      cliente_id: activeClient,
+      data_baixa: lanc.data || new Date().toISOString().slice(0, 10),
+      valor: Number(valor),
+      observacao: observacao || ('Conciliado pelo extrato: ' + (lanc.descOriginal || lanc.desc || '')),
+      origem: 'extrato',
+      extrato_lancamento_id: lanc.id
+    }, getUserScopePayload())])
+    .select()
+    .single();
+
+  if (response.error) {
+    console.error(response.error);
+    alert('Nao foi possivel conciliar este lancamento. Verifique se a migracao 20260520_titulos_financeiros_pj.sql ja foi aplicada no Supabase.');
+    return;
+  }
+
+  if (!Array.isArray(titulo.baixas)) titulo.baixas = [];
+  titulo.baixas.push({
+    id: response.data.id,
+    data: response.data.data_baixa || null,
+    valor: Number(response.data.valor || 0),
+    observacao: response.data.observacao || '',
+    origem: response.data.origem || 'extrato',
+    lancamentoId: response.data.extrato_lancamento_id || null,
+    userId: response.data.user_id || null
+  });
+
+  closeModal();
+  renderExtrato();
+}
+
+async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extratoIdx) {
+  var ok = await appConfirm('Desconciliar esta baixa do extrato?', { title: 'Desconciliar baixa', confirmText: 'Desconciliar' });
+  if (!ok) return;
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('titulos_financeiros_baixas')
+      .delete()
+      .eq('id', baixaId)
+  );
+
+  if (response.error) {
+    console.error(response.error);
+    alert('Nao foi possivel desfazer a conciliacao.');
+    return;
+  }
+
+  if (typeof tfFindTituloById === 'function') {
+    var titulo = tfFindTituloById(tituloId);
+    if (titulo) titulo.baixas = (titulo.baixas || []).filter(function(baixa) { return baixa.id !== baixaId; });
+  }
+
+  openExtratoConciliacaoModal(extratoIdx);
+  renderExtrato();
+}
+
 async function deleteExtrato(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var c = data.clients[activeClient];
   var lanc = c.extrato[i];
 
   if (!lanc) return;
+
+  if (typeof tfBaixasPorLancamentoId === 'function') {
+    var baixasFinanceiras = tfBaixasPorLancamentoId(lanc.id);
+    for (var bi = 0; bi < baixasFinanceiras.length; bi++) {
+      var baixaInfo = baixasFinanceiras[bi];
+      const { error: baixaError } = await applyUserScope(
+        supabaseClient
+          .from('titulos_financeiros_baixas')
+          .delete()
+          .eq('id', baixaInfo.baixa.id)
+      );
+      if (baixaError) {
+        console.error(baixaError);
+        alert('Nao foi possivel remover as conciliacoes financeiras antes de excluir o lancamento.');
+        return;
+      }
+    }
+  }
 
   const { error } = await applyUserScope(
     supabaseClient
@@ -1533,6 +1756,14 @@ async function saveExtratoEditModal(i) {
   var novaObservacao = document.getElementById('ex-edit-obs').value.trim();
 
   if (!novaDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
+
+  var valorConciliado = valorConciliadoDoLancamento(lanc);
+  if (valorConciliado > 0 && novoTipo !== (lanc.tipo || 'credito')) {
+    return alert('Desfaca primeiro a conciliacao financeira antes de mudar o tipo deste lancamento.');
+  }
+  if (valorConciliado > 0 && Number(novoValor || 0) < valorConciliado) {
+    return alert('O novo valor nao pode ser menor que o valor ja conciliado no Financeiro.');
+  }
 
   const { error } = await applyUserScope(
     supabaseClient

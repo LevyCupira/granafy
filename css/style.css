@@ -268,6 +268,15 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .badge-card{background:rgba(255,198,107,.15);color:var(--warning)}
 .badge-estorno{background:rgba(62,207,176,.12);color:var(--success);border:1px solid rgba(62,207,176,.3)}
 .badge-payment{background:rgba(91,140,255,.16);color:var(--accent);border:1px solid rgba(91,140,255,.25)}
+.tf-status-badge{display:inline-flex;align-items:center;justify-content:center;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:700;white-space:nowrap}
+.tf-status-badge.aberto{background:rgba(91,140,255,.15);color:var(--accent)}
+.tf-status-badge.parcial{background:rgba(255,198,107,.15);color:var(--warning)}
+.tf-status-badge.quitado{background:rgba(62,207,176,.15);color:var(--success)}
+.tf-status-badge.atrasado{background:rgba(255,107,107,.15);color:var(--danger)}
+.tf-baixa-item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.tf-baixa-item:last-child{border-bottom:none}
+.tf-baixa-item small{display:block;color:var(--muted);font-size:.74rem;margin-top:3px}
+.row-overdue td{box-shadow:inset 3px 0 0 rgba(255,107,107,.55)}
 .val{font-weight:600;font-variant-numeric:tabular-nums}
 .val-neg{color:var(--danger)}
 .val-pos{color:var(--success)}

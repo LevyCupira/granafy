@@ -30,6 +30,11 @@ var DC_CART = [
   'Viagem', 'Restaurante', 'Combustivel', 'Outros'
 ];
 
+var DC_FINANCEIRO = [
+  'Mensalidade', 'Servicos', 'Produtos', 'Eventos', 'Honorarios',
+  'Impostos', 'Fornecedores', 'Aluguel', 'Marketing', 'Salarios', 'Outros'
+];
+
 function normalizarNomeCategoria(nome) {
   return String(nome || '')
     .normalize('NFD')
@@ -75,6 +80,11 @@ function catsCCStorageKey(clientId) {
 function catsCartaoStorageKey(clientId) {
   var id = getCategoryClientId(clientId);
   return id ? ('fb_cats_cartao__' + id) : 'fb_cats_cartao';
+}
+
+function catsFinanceiroStorageKey(clientId) {
+  var id = getCategoryClientId(clientId);
+  return id ? ('fb_cats_financeiro__' + id) : 'fb_cats_financeiro';
 }
 
 function isCategoriasClienteTableMissing(error) {
@@ -220,6 +230,21 @@ function sincronizarCatsCartao(lista) {
   return ordenarCategoriasCartao(Array.from(mapa.values()));
 }
 
+function sincronizarCatsFinanceiro(lista) {
+  var mapa = new Map();
+  var origem = Array.isArray(lista) && lista.length ? lista : DC_FINANCEIRO.slice();
+
+  origem.forEach(function(cat) {
+    var nome = String(cat || '').trim();
+    if (!nome) return;
+    var chave = normalizarNomeCategoria(nome);
+    if (mapa.has(chave)) return;
+    mapa.set(chave, nome);
+  });
+
+  return ordenarCategoriasCartao(Array.from(mapa.values()));
+}
+
 function loadCatsCartao(clientId) {
   var alvo = getCategoryClientId(clientId);
   if (!alvo) return sincronizarCatsCartao(DC_CART.slice());
@@ -238,6 +263,24 @@ function loadCatsCartao(clientId) {
   }
 }
 
+function loadCatsFinanceiro(clientId) {
+  var alvo = getCategoryClientId(clientId);
+  if (!alvo) return sincronizarCatsFinanceiro(DC_FINANCEIRO.slice());
+
+  try {
+    var cliente = data && data.clients ? data.clients[alvo] : null;
+    var emMemoria = cliente && Array.isArray(cliente.catsFinanceiro) ? cliente.catsFinanceiro : null;
+    if (emMemoria && emMemoria.length) return sincronizarCatsFinanceiro(emMemoria);
+
+    var salvo = JSON.parse(localStorage.getItem(catsFinanceiroStorageKey(alvo)));
+    var lista = sincronizarCatsFinanceiro(salvo);
+    if (cliente) cliente.catsFinanceiro = lista.slice();
+    return lista;
+  } catch (e) {
+    return sincronizarCatsFinanceiro(DC_FINANCEIRO.slice());
+  }
+}
+
 function saveCatsCartao(lista, clientId) {
   var alvo = getCategoryClientId(clientId);
   var normalizada = sincronizarCatsCartao(lista);
@@ -250,12 +293,52 @@ function saveCatsCartao(lista, clientId) {
   return syncPromise;
 }
 
+function saveCatsFinanceiro(lista, clientId) {
+  var alvo = getCategoryClientId(clientId);
+  var normalizada = sincronizarCatsFinanceiro(lista);
+  if (alvo && data && data.clients && data.clients[alvo]) data.clients[alvo].catsFinanceiro = normalizada.slice();
+  localStorage.setItem(catsFinanceiroStorageKey(alvo), JSON.stringify(normalizada));
+  var linhas = normalizada.map(function(nome) {
+    return Object.assign({
+      cliente_id: alvo,
+      escopo: 'financeiro',
+      nome: nome,
+      tipo: 'receita',
+      fixa: false
+    }, getUserScopePayload());
+  });
+  var syncPromise = (async function() {
+    if (!alvo || typeof supabaseClient === 'undefined' || !supabaseClient || typeof currentUserId !== 'function' || !currentUserId()) return;
+    var deleteQuery = supabaseClient.from('categorias_cliente').delete().eq('cliente_id', alvo).eq('escopo', 'financeiro');
+    deleteQuery = typeof applyUserScope === 'function' ? applyUserScope(deleteQuery) : deleteQuery;
+    var deleteRes = await deleteQuery;
+    if (deleteRes && deleteRes.error) {
+      if (isCategoriasClienteTableMissing(deleteRes.error)) return;
+      throw new Error(deleteRes.error.message || 'Erro ao limpar categorias financeiras.');
+    }
+    if (!linhas.length) return;
+    var insertRes = await supabaseClient.from('categorias_cliente').insert(linhas);
+    if (insertRes && insertRes.error) {
+      if (isCategoriasClienteTableMissing(insertRes.error)) return;
+      throw new Error(insertRes.error.message || 'Erro ao salvar categorias financeiras.');
+    }
+  })();
+  syncPromise.catch(function(err) {
+    console.error('Nao foi possivel sincronizar categorias financeiras no Supabase:', err);
+  });
+  return syncPromise;
+}
+
 function nomesCC(clientId) {
   return loadCatsCC(clientId).map(function(c) { return c.nome; });
 }
 
 function nomesCartao(clientId) {
   return loadCatsCartao(clientId).slice();
+}
+
+function nomesFinanceiro(clientId) {
+  return loadCatsFinanceiro(clientId).slice();
 }
 
 function tipoCat(nomeCategoria, clientId) {

@@ -15,6 +15,49 @@ function fmt(v) {
   return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatDate(value) {
+  if (!value) return '-';
+  var text = String(value).trim();
+  var iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return iso[3] + '/' + iso[2] + '/' + iso[1];
+  var br = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) return text;
+  var parsed = new Date(text);
+  if (!isNaN(parsed.getTime())) return parsed.toLocaleDateString('pt-BR');
+  return text;
+}
+
+function normalizeFlexibleDateInput(value) {
+  var text = String(value || '').trim();
+  if (!text) return '';
+  var iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  var brFull = text.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+  if (brFull) return brFull[3] + '-' + brFull[2] + '-' + brFull[1];
+  var brShort = text.match(/^(\d{2})[\/\-](\d{2})$/);
+  if (brShort) return String(new Date().getFullYear()) + '-' + brShort[2] + '-' + brShort[1];
+  return '';
+}
+
+function applyFlexibleDateMask(el) {
+  if (!el) return;
+  var normalized = normalizeFlexibleDateInput(el.value);
+  if (normalized) {
+    el.dataset.isoDate = normalized;
+    el.value = formatDate(normalized);
+    return;
+  }
+  delete el.dataset.isoDate;
+}
+
+function readFlexibleDateInput(el) {
+  if (!el) return '';
+  var normalized = normalizeFlexibleDateInput(el.value || el.dataset.isoDate || '');
+  if (!normalized) return '';
+  el.dataset.isoDate = normalized;
+  return normalized;
+}
+
 function initials(n) {
   return String(n || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
@@ -46,7 +89,12 @@ function parseMoney(el) {
 
 function initMoneyInputs(scope) {
   (scope || document).querySelectorAll('.money-input').forEach(el => {
-    if (!el.dataset.cents) el.dataset.cents = '0';
+    if (!el.dataset.cents) {
+      if (el.value && String(el.value).trim()) applyMoneyMask(el);
+      else el.dataset.cents = '0';
+    } else if (el.value && String(el.value).trim()) {
+      applyMoneyMask(el);
+    }
     el.removeEventListener('input', el._moneyHandler);
     el._moneyHandler = () => applyMoneyMask(el);
     el.addEventListener('input', el._moneyHandler);
@@ -65,6 +113,15 @@ function applySidebarMenuState(minimized) {
   btn.textContent = minimized ? '\u2630' : 'Recolher';
   btn.title = minimized ? 'Abrir menu' : 'Minimizar menu';
   btn.setAttribute('aria-expanded', minimized ? 'false' : 'true');
+}
+
+function initFlexibleDateInputs(scope) {
+  (scope || document).querySelectorAll('.flex-date-input').forEach(el => {
+    if (el.value && String(el.value).trim()) applyFlexibleDateMask(el);
+    el.removeEventListener('blur', el._flexDateBlur);
+    el._flexDateBlur = function() { applyFlexibleDateMask(el); };
+    el.addEventListener('blur', el._flexDateBlur);
+  });
 }
 
 function toggleSidebarMenu() {

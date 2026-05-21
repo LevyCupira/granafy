@@ -10,10 +10,16 @@ var TAB_DEFS = [
   { key: 'cartao', label: 'Cartão', contentId: 'cartao-content', render: () => renderCartao() },
   { key: 'dividas', label: 'Dívidas', contentId: 'dividas-content', render: () => renderDividas() },
   { key: 'extrato', label: 'Extrato', contentId: 'extrato-content', render: () => renderExtrato() },
+  { key: 'financeiro', label: 'Financeiro', contentId: 'financeiro-content', render: () => renderFinanceiro(), visible: () => isActiveClientPJ() },
   { key: 'resumo', label: 'Resumo', contentId: 'resumo-content', render: () => renderResumo() },
   { key: 'dre', label: 'DRE', contentId: 'dre-content', render: () => renderDRE() },
   { key: 'graficos', label: 'Gráficos', contentId: 'graficos-content', render: () => renderGraficos() }
 ];
+
+function isActiveClientPJ() {
+  var cliente = activeClient && data && data.clients ? data.clients[activeClient] : null;
+  return !!(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj');
+}
 
 async function loadData() {
   data = { clients: {} };
@@ -104,6 +110,50 @@ async function loadData() {
     return res;
   }
 
+  async function carregarTitulosComEscopo(usarEscopo) {
+    const filtrarUsuario = usarEscopo && !isAdminUser();
+    var query = supabaseClient.from('titulos_financeiros').select('*');
+    if (filtrarUsuario) query = query.eq('user_id', uid);
+    var res = await query.order('vencimento', { ascending: true, nullsFirst: false });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('titulos_financeiros')) {
+      console.warn('Tabela titulos_financeiros ainda nao existe no Supabase. Rode a migracao 20260520_titulos_financeiros_pj.sql.');
+      return { data: [], error: null };
+    }
+
+    if (usarEscopo && isMissingUserScopeError(res.error)) {
+      return carregarTitulosComEscopo(false);
+    }
+
+    return res;
+  }
+
+  async function carregarBaixasTitulosComEscopo(usarEscopo) {
+    const filtrarUsuario = usarEscopo && !isAdminUser();
+    var query = supabaseClient.from('titulos_financeiros_baixas').select('*');
+    if (filtrarUsuario) query = query.eq('user_id', uid);
+    var res = await query.order('data_baixa', { ascending: true, nullsFirst: false });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('titulos_financeiros_baixas')) {
+      console.warn('Tabela titulos_financeiros_baixas ainda nao existe no Supabase. Rode a migracao 20260520_titulos_financeiros_pj.sql.');
+      return { data: [], error: null };
+    }
+
+    if (usarEscopo && isMissingUserScopeError(res.error)) {
+      return carregarBaixasTitulosComEscopo(false);
+    }
+
+    return res;
+  }
+
   let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo(userScopeEnabled);
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
@@ -139,6 +189,16 @@ async function loadData() {
     console.warn('Nao foi possivel carregar relacionamentos personalizados:', relacionamentosRes.error);
   }
   const relacionamentosRows = relacionamentosRes.data || [];
+  const titulosRes = await carregarTitulosComEscopo(userScopeEnabled);
+  if (titulosRes.error) {
+    console.warn('Nao foi possivel carregar titulos financeiros:', titulosRes.error);
+  }
+  const titulosRows = titulosRes.data || [];
+  const baixasTitulosRes = await carregarBaixasTitulosComEscopo(userScopeEnabled);
+  if (baixasTitulosRes.error) {
+    console.warn('Nao foi possivel carregar baixas de titulos:', baixasTitulosRes.error);
+  }
+  const baixasTitulosRows = baixasTitulosRes.data || [];
 
   const contasPorCliente = {};
   (contasRows || []).forEach(conta => {
@@ -155,6 +215,7 @@ async function loadData() {
 
   const catsCCPorCliente = {};
   const catsCartaoPorCliente = {};
+  const catsFinanceiroPorCliente = {};
   (categoriasRows || []).forEach(cat => {
     if (!cat || !cat.cliente_id || !cat.nome) return;
     if (cat.escopo === 'cc') {
@@ -170,6 +231,12 @@ async function loadData() {
     if (cat.escopo === 'cartao') {
       if (!catsCartaoPorCliente[cat.cliente_id]) catsCartaoPorCliente[cat.cliente_id] = [];
       catsCartaoPorCliente[cat.cliente_id].push(cat.nome);
+      return;
+    }
+
+    if (cat.escopo === 'financeiro') {
+      if (!catsFinanceiroPorCliente[cat.cliente_id]) catsFinanceiroPorCliente[cat.cliente_id] = [];
+      catsFinanceiroPorCliente[cat.cliente_id].push(cat.nome);
     }
   });
 
@@ -243,6 +310,41 @@ async function loadData() {
     });
   });
 
+  const baixasPorTitulo = {};
+  (baixasTitulosRows || []).forEach(b => {
+    if (!b || !b.titulo_id) return;
+    if (!baixasPorTitulo[b.titulo_id]) baixasPorTitulo[b.titulo_id] = [];
+    baixasPorTitulo[b.titulo_id].push({
+      id: b.id,
+      data: b.data_baixa || null,
+      valor: Number(b.valor || 0),
+      observacao: b.observacao || '',
+      origem: b.origem || 'manual',
+      lancamentoId: b.extrato_lancamento_id || null,
+      userId: b.user_id || null
+    });
+  });
+
+  const titulosPorCliente = {};
+  (titulosRows || []).forEach(t => {
+    if (!t || !t.cliente_id) return;
+    if (!titulosPorCliente[t.cliente_id]) titulosPorCliente[t.cliente_id] = [];
+    titulosPorCliente[t.cliente_id].push({
+      id: t.id,
+      natureza: t.natureza || 'receber',
+      pessoaNome: t.pessoa_nome || '',
+      descricao: t.descricao || '',
+      categoria: t.categoria || '',
+      vencimento: t.vencimento || null,
+      valorTotal: Number(t.valor_total || 0),
+      observacao: t.observacao || '',
+      createdAt: t.created_at || null,
+      updatedAt: t.updated_at || null,
+      baixas: baixasPorTitulo[t.id] || [],
+      userId: t.user_id || null
+    });
+  });
+
   (clientesRows || []).forEach(c => {
     data.clients[c.id] = {
       id: c.id,
@@ -260,10 +362,12 @@ async function loadData() {
       cartao: lancCartaoPorCliente[c.id] || [],
       contas: contasPorCliente[c.id] || [],
       relacionamentos: relacionamentosPorCliente[c.id] || [],
+      titulos: titulosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],
       catsCC: catsCCPorCliente[c.id] ? sincronizarCatsCC(catsCCPorCliente[c.id]) : loadCatsCC(c.id),
-      catsCartao: catsCartaoPorCliente[c.id] ? sincronizarCatsCartao(catsCartaoPorCliente[c.id]) : loadCatsCartao(c.id)
+      catsCartao: catsCartaoPorCliente[c.id] ? sincronizarCatsCartao(catsCartaoPorCliente[c.id]) : loadCatsCartao(c.id),
+      catsFinanceiro: catsFinanceiroPorCliente[c.id] ? sincronizarCatsFinanceiro(catsFinanceiroPorCliente[c.id]) : loadCatsFinanceiro(c.id)
     };
   });
 }
@@ -293,6 +397,12 @@ function saveTabOrder(keys) {
   try { localStorage.setItem(tabOrderStorageKey(), JSON.stringify(keys)); } catch (e) {}
 }
 
+function getVisibleTabs() {
+  return getOrderedTabs().filter(function(tab) {
+    return !tab.visible || tab.visible();
+  });
+}
+
 function moveTabBefore(srcKey, dstKey) {
   if (!srcKey || !dstKey || srcKey === dstKey) return;
 
@@ -311,7 +421,13 @@ function renderTabs() {
   const container = document.getElementById('tabsContainer');
   if (!container) return;
 
-  container.innerHTML = getOrderedTabs().map(tab =>
+  var visibleTabs = getVisibleTabs();
+  if (!visibleTabs.length) return;
+  if (!visibleTabs.some(function(tab) { return tab.key === activeTab; })) {
+    activeTab = visibleTabs[0].key;
+  }
+
+  container.innerHTML = visibleTabs.map(tab =>
     '<button class="tab-btn' + (tab.key === activeTab ? ' active' : '') + '" draggable="true" data-tab="' + tab.key + '" onclick="switchTab(\'' + tab.key + '\')">' +
     tab.label +
     '</button>'
@@ -389,13 +505,15 @@ function initTabDrag(container) {
 }
 
 function switchTab(tabKey) {
-  activeTab = TAB_DEFS.find(tab => tab.key === tabKey) ? tabKey : 'cartao';
+  var visibleTabs = getVisibleTabs();
+  activeTab = visibleTabs.find(function(tab) { return tab.key === tabKey; }) ? tabKey : (visibleTabs[0] ? visibleTabs[0].key : 'cartao');
   renderTabs();
   renderTab(activeTab);
 }
 
 function renderTab(tabKey) {
-  const tab = TAB_DEFS.find(item => item.key === tabKey) || TAB_DEFS[0];
+  const visibleTabs = getVisibleTabs();
+  const tab = visibleTabs.find(function(item) { return item.key === tabKey; }) || visibleTabs[0] || TAB_DEFS[0];
   activeTab = tab.key;
 
   renderTabs();

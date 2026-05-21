@@ -100,6 +100,8 @@ async function importData(event) {
         'Backup importado para o Supabase!\n\n'
         + 'Clientes criados: ' + resumo.clientes + '\n'
         + 'Dividas: ' + resumo.dividas + '\n'
+        + 'Titulos financeiros: ' + resumo.titulos + '\n'
+        + 'Baixas financeiras: ' + resumo.baixasTitulos + '\n'
         + 'Relacionamentos: ' + resumo.relacionamentos + '\n'
         + 'Lancamentos do extrato: ' + resumo.lancamentos + '\n'
         + 'Cartoes: ' + resumo.cartoes + '\n'
@@ -116,7 +118,7 @@ async function importData(event) {
 }
 
 async function importarBackupJsonParaSupabase(backup) {
-  var resumo = { clientes: 0, dividas: 0, relacionamentos: 0, lancamentos: 0, cartoes: 0, lancamentosCartao: 0, ignorados: 0 };
+  var resumo = { clientes: 0, dividas: 0, titulos: 0, baixasTitulos: 0, relacionamentos: 0, lancamentos: 0, cartoes: 0, lancamentosCartao: 0, ignorados: 0 };
   var clientes = backup.clients || {};
 
   for (const [, cliente] of Object.entries(clientes)) {
@@ -128,6 +130,7 @@ async function importarBackupJsonParaSupabase(backup) {
     var mapaRelacionamentos = await importarRelacionamentosCliente(clienteId, cliente.relacionamentos || [], resumo);
 
     await importarDividasCliente(clienteId, cliente.dividas || [], resumo);
+    await importarTitulosFinanceirosCliente(clienteId, cliente.titulos || [], resumo);
     await importarExtratoCliente(clienteId, cliente.extrato || [], mapaRelacionamentos, resumo);
     await importarLancamentosCartaoCliente(clienteId, cliente.cartao || [], mapaCartoes, resumo);
   }
@@ -255,6 +258,94 @@ async function importarDividasCliente(clienteId, dividas, resumo) {
 
     if (inserido.error) throw new Error('Erro ao importar divida de "' + (payload.credor || '-') + '": ' + inserido.error.message);
     resumo.dividas++;
+  }
+}
+
+async function importarTitulosFinanceirosCliente(clienteId, titulos, resumo) {
+  for (const titulo of titulos) {
+    var payload = {
+      cliente_id: clienteId,
+      natureza: titulo.natureza === 'pagar' ? 'pagar' : 'receber',
+      pessoa_nome: titulo.pessoaNome || titulo.pessoa_nome || null,
+      descricao: titulo.descricao || titulo.desc || null,
+      categoria: titulo.categoria || titulo.cat || null,
+      vencimento: titulo.vencimento || null,
+      valor_total: Number(titulo.valorTotal || titulo.valor_total || 0),
+      observacao: titulo.observacao || titulo.obs || null
+    };
+
+    if (!payload.pessoa_nome || !payload.descricao || payload.valor_total <= 0) {
+      resumo.ignorados++;
+      continue;
+    }
+
+    var busca = applyUserScope(
+      supabaseClient
+        .from('titulos_financeiros')
+        .select('id')
+        .eq('cliente_id', clienteId)
+        .eq('natureza', payload.natureza)
+        .eq('valor_total', payload.valor_total)
+        .limit(1)
+    );
+    busca = queryCampoOpcional(busca, 'pessoa_nome', payload.pessoa_nome);
+    busca = queryCampoOpcional(busca, 'descricao', payload.descricao);
+    busca = queryCampoOpcional(busca, 'vencimento', payload.vencimento);
+
+    var existente = await busca.maybeSingle();
+    if (existente.error) throw new Error('Erro ao buscar titulo financeiro "' + (payload.descricao || '-') + '": ' + existente.error.message);
+
+    var tituloId = existente.data ? existente.data.id : null;
+    if (!tituloId) {
+      var criado = await supabaseClient
+        .from('titulos_financeiros')
+        .insert([Object.assign(payload, getUserScopePayload())])
+        .select('id')
+        .single();
+
+      if (criado.error) throw new Error('Erro ao importar titulo financeiro "' + (payload.descricao || '-') + '": ' + criado.error.message);
+      tituloId = criado.data.id;
+      resumo.titulos++;
+    } else {
+      resumo.ignorados++;
+    }
+
+    for (const baixa of (titulo.baixas || [])) {
+      var baixaPayload = {
+        titulo_id: tituloId,
+        cliente_id: clienteId,
+        data_baixa: baixa.data || baixa.data_baixa || null,
+        valor: Number(baixa.valor || 0),
+        observacao: baixa.observacao || null,
+        origem: baixa.origem || 'manual'
+      };
+      if (baixaPayload.valor <= 0) continue;
+
+      var buscaBaixa = applyUserScope(
+        supabaseClient
+          .from('titulos_financeiros_baixas')
+          .select('id')
+          .eq('titulo_id', tituloId)
+          .eq('valor', baixaPayload.valor)
+          .limit(1)
+      );
+      buscaBaixa = queryCampoOpcional(buscaBaixa, 'data_baixa', baixaPayload.data_baixa);
+      buscaBaixa = queryCampoOpcional(buscaBaixa, 'observacao', baixaPayload.observacao);
+
+      var baixaExistente = await buscaBaixa.maybeSingle();
+      if (baixaExistente.error) throw new Error('Erro ao buscar baixa financeira "' + (payload.descricao || '-') + '": ' + baixaExistente.error.message);
+      if (baixaExistente.data) {
+        resumo.ignorados++;
+        continue;
+      }
+
+      var baixaCriada = await supabaseClient
+        .from('titulos_financeiros_baixas')
+        .insert([Object.assign(baixaPayload, getUserScopePayload())]);
+
+      if (baixaCriada.error) throw new Error('Erro ao importar baixa financeira "' + (payload.descricao || '-') + '": ' + baixaCriada.error.message);
+      resumo.baixasTitulos++;
+    }
   }
 }
 
@@ -413,6 +504,7 @@ function renderSettingsModal(activeTabKey) {
   var clienteTipo = cliente && cliente.tipoCliente ? clientTypeLabel(cliente.tipoCliente) : 'Cliente';
   var ccCount = (loadCatsCC() || []).length;
   var cartaoCount = (loadCatsCartao() || []).length;
+  var financeiroCount = cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj' ? (loadCatsFinanceiro() || []).length : 0;
   var showUsersTab = typeof canSeeUsersTab === 'function' ? canSeeUsersTab() : !!authUser;
   var showAuditoriaTab = typeof canSeeAuditoria === 'function' ? canSeeAuditoria() : true;
   var isMaster = typeof isAdminUser === 'function' && isAdminUser();
@@ -424,6 +516,9 @@ function renderSettingsModal(activeTabKey) {
   var tabButtons = ''
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cc" onclick="switchSettingsTab(\'cats_cc\')"><span class="settings-tab-main">Conta Corrente</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + ccCount + '</span></button>'
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
+  if (cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj') {
+    tabButtons += '<button class="modal-tab settings-tab-rich" data-stab="cats_financeiro" onclick="switchSettingsTab(\'cats_financeiro\')"><span class="settings-tab-main">Financeiro</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + financeiroCount + '</span></button>';
+  }
 
   if (showUsersTab) {
     tabButtons += '<button class="modal-tab" data-stab="usuarios" onclick="switchSettingsTab(\'usuarios\')">' + usersTabLabel + '</button>';
@@ -444,11 +539,13 @@ function renderSettingsModal(activeTabKey) {
     + '</div>'
     + '<div id="modal-panel-cats_cc" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
+    + '<div id="modal-panel-cats_financeiro" class="modal-panel"></div>'
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
     + '<div id="modal-panel-auditoria" class="modal-panel"></div>';
   var firstTab = activeTabKey || 'cats_cc';
   if (firstTab === 'auditoria' && !showAuditoriaTab) firstTab = showUsersTab ? 'usuarios' : 'cats_cc';
   if (firstTab === 'usuarios' && !showUsersTab) firstTab = 'cats_cc';
+  if (firstTab === 'cats_financeiro' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
   switchSettingsTab(firstTab);
 }
 
@@ -467,6 +564,7 @@ function switchSettingsTab(tab) {
   panel.classList.add('active');
   if (tab === 'cats_cc') renderCatsPanel('cc');
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
+  if (tab === 'cats_financeiro') renderCatsPanel('financeiro');
   if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
   if (tab === 'auditoria' && (typeof canSeeAuditoria !== 'function' || canSeeAuditoria())) renderAuditoriaPanel();
 }
@@ -624,14 +722,15 @@ async function solicitarAlteracaoPerfil() {
 }
 
 function renderCatsPanel(tipo) {
+  var panelSuffix = tipo === 'cc' ? 'cc' : (tipo === 'cartao' ? 'cartao' : 'financeiro');
   if (!activeClient || !data.clients || !data.clients[activeClient]) {
-    document.getElementById('modal-panel-cats_' + (tipo === 'cc' ? 'cc' : 'cartao')).innerHTML =
+    document.getElementById('modal-panel-cats_' + panelSuffix).innerHTML =
       '<p style="color:var(--muted);font-size:.83rem">Selecione um cliente para personalizar as categorias dele.</p>';
     return;
   }
 
-  var cats = tipo === 'cc' ? loadCatsCC() : loadCatsCartao();
-  var pid = 'modal-panel-cats_' + (tipo === 'cc' ? 'cc' : 'cartao');
+  var cats = tipo === 'cc' ? loadCatsCC() : (tipo === 'cartao' ? loadCatsCartao() : loadCatsFinanceiro());
+  var pid = 'modal-panel-cats_' + panelSuffix;
   var TIPOS_DRE = { receita: 'Receita', fixa: 'Fixa', variavel: 'Variavel', transferencia: 'Transferencia' };
   var clienteNome = (data.clients[activeClient] && data.clients[activeClient].name) || 'cliente atual';
 
@@ -659,21 +758,23 @@ function renderCatsPanel(tipo) {
       return '<div class="settings-cat-item">'
         + '<div class="settings-cat-main"><span class="settings-cat-name">' + esc(c) + '</span><span class="settings-cat-flag">Editavel</span></div>'
         + '<div class="settings-cat-actions">'
-        + '<button class="btn-icon" type="button" onclick="openEditCategoryModal(\'cartao\',' + i + ')" title="Editar categoria">&#9998;</button>'
-        + '<button class="tag-del" onclick="deleteCategory(\'cartao\',' + i + ')">x</button>'
+        + '<button class="btn-icon" type="button" onclick="openEditCategoryModal(\'' + tipo + '\',' + i + ')" title="Editar categoria">&#9998;</button>'
+        + '<button class="tag-del" onclick="deleteCategory(\'' + tipo + '\',' + i + ')">x</button>'
         + '</div></div>';
     }).join('');
   }
 
   var desc = tipo === 'cc'
     ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
-    : 'Categorias dos lancamentos do <strong style="color:var(--text)">Cartao de Credito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variavel no DRE.';
+    : (tipo === 'cartao'
+      ? 'Categorias dos lancamentos do <strong style="color:var(--text)">Cartao de Credito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variavel no DRE.'
+      : 'Categorias do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Use essas opcoes em contas a receber e contas a pagar.');
   var clienteTipo = data.clients[activeClient] && data.clients[activeClient].tipoCliente ? clientTypeLabel(data.clients[activeClient].tipoCliente) : 'Cliente';
   var totalCats = cats.length;
 
   document.getElementById(pid).innerHTML =
     '<div class="settings-section-card">'
-    + '<div class="settings-card-head"><div><h5>' + (tipo === 'cc' ? 'Categorias da conta corrente' : 'Categorias do cartao') + '</h5><p>' + desc + '</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + totalCats + ' categorias</span></div></div>'
+    + '<div class="settings-card-head"><div><h5>' + (tipo === 'cc' ? 'Categorias da conta corrente' : (tipo === 'cartao' ? 'Categorias do cartao' : 'Categorias do financeiro')) + '</h5><p>' + desc + '</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + totalCats + ' categorias</span></div></div>'
     + '<div class="settings-cat-grid" id="tagList-' + tipo + '">' + tagHtml + '</div>'
     + '<div class="tag-input-row settings-tag-input-row">'
     + '<input type="text" id="newCatInput-' + tipo + '" placeholder="Nova categoria..." onkeydown="if(event.key===\'Enter\')addCategory(\'' + tipo + '\')"/>'
@@ -705,6 +806,11 @@ function refreshCategoryConsumers(tipo) {
 
   if (tipo === 'cc' && activeTab === 'extrato' && typeof renderExtrato === 'function') {
     renderExtrato();
+    return;
+  }
+
+  if (tipo === 'financeiro' && activeTab === 'financeiro' && typeof renderFinanceiro === 'function') {
+    renderFinanceiro();
   }
 }
 
@@ -718,11 +824,16 @@ function addCategory(tipo) {
     if (cats.find(function(c) { return normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
     cats.push({ nome: val, tipo: 'variavel' });
     saveCatsCC(cats);
-  } else {
+  } else if (tipo === 'cartao') {
     var carts = loadCatsCartao();
     if (carts.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
     carts.push(val);
     saveCatsCartao(carts);
+  } else {
+    var fins = loadCatsFinanceiro();
+    if (fins.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
+    fins.push(val);
+    saveCatsFinanceiro(fins);
   }
 
   if (inp) inp.value = '';
@@ -736,10 +847,14 @@ function deleteCategory(tipo, i) {
     if (cats[i] && cats[i].fixa) return;
     cats.splice(i, 1);
     saveCatsCC(cats);
-  } else {
+  } else if (tipo === 'cartao') {
     var carts = loadCatsCartao();
     carts.splice(i, 1);
     saveCatsCartao(carts);
+  } else {
+    var fins = loadCatsFinanceiro();
+    fins.splice(i, 1);
+    saveCatsFinanceiro(fins);
   }
   renderCatsPanel(tipo);
   refreshCategoryConsumers(tipo);
@@ -761,7 +876,7 @@ function syncSidebarThemeToggle() {
 }
 
 function openEditCategoryModal(tipo, i) {
-  var cats = tipo === 'cc' ? loadCatsCC() : loadCatsCartao();
+  var cats = tipo === 'cc' ? loadCatsCC() : (tipo === 'cartao' ? loadCatsCartao() : loadCatsFinanceiro());
   var cat = cats[i];
   if (!cat) return;
   if (tipo === 'cc' && cat.fixa) return;
@@ -778,7 +893,7 @@ function openEditCategoryModal(tipo, i) {
       : '')
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
-    + '<button class="btn-sm red" type="button" onclick="renderSettingsModal(\'' + (tipo === 'cc' ? 'cats_cc' : 'cats_cartao') + '\')">Cancelar</button>'
+    + '<button class="btn-sm red" type="button" onclick="renderSettingsModal(\'' + (tipo === 'cc' ? 'cats_cc' : (tipo === 'cartao' ? 'cats_cartao' : 'cats_financeiro')) + '\')">Cancelar</button>'
     + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveCategoryEdit(\'' + tipo + '\',' + i + ')">Salvar alteracoes</button>'
     + '</div>';
 }
@@ -835,28 +950,40 @@ async function saveCategoryEdit(tipo, i) {
     return;
   }
 
-  var carts = loadCatsCartao();
-  if (!carts[i]) return;
-  if (carts.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
+  if (tipo === 'cartao') {
+    var carts = loadCatsCartao();
+    if (!carts[i]) return;
+    if (carts.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
 
-  var nomeAntigoCartao = String(carts[i] || '');
-  carts[i] = nome;
-  await Promise.resolve(saveCatsCartao(carts));
+    var nomeAntigoCartao = String(carts[i] || '');
+    carts[i] = nome;
+    await Promise.resolve(saveCatsCartao(carts));
 
-  try {
-    await renomearCategoriaEmLancamentos('cartao', nomeAntigoCartao, nome);
-    if (typeof loadData === 'function') await loadData();
-    renderSettingsModal('cats_cartao');
-    refreshCategoryConsumers('cartao');
-  } catch (err2) {
-    alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err2.message);
+    try {
+      await renomearCategoriaEmLancamentos('cartao', nomeAntigoCartao, nome);
+      if (typeof loadData === 'function') await loadData();
+      renderSettingsModal('cats_cartao');
+      refreshCategoryConsumers('cartao');
+    } catch (err2) {
+      alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err2.message);
+    }
+    return;
   }
+
+  var fins = loadCatsFinanceiro();
+  if (!fins[i]) return;
+  if (fins.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
+  fins[i] = nome;
+  await Promise.resolve(saveCatsFinanceiro(fins));
+  renderSettingsModal('cats_financeiro');
+  refreshCategoryConsumers('financeiro');
 }
 
 async function resetCategories(tipo) {
   if (!(await appConfirm('Restaurar categorias padrao?', { title: 'Restaurar categorias', confirmText: 'Restaurar' }))) return;
   if (tipo === 'cc') await Promise.resolve(saveCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); })));
-  else await Promise.resolve(saveCatsCartao(DC_CART.slice()));
+  else if (tipo === 'cartao') await Promise.resolve(saveCatsCartao(DC_CART.slice()));
+  else await Promise.resolve(saveCatsFinanceiro(DC_FINANCEIRO.slice()));
   renderCatsPanel(tipo);
   refreshCategoryConsumers(tipo);
 }

@@ -42,7 +42,7 @@ function clearActiveClientView() {
   document.getElementById('toggleAvatar').style.display = 'none';
   document.getElementById('toggleLabel').textContent = 'Selecionar cliente...';
 
-  ['cartao-content', 'dividas-content', 'extrato-content', 'resumo-content', 'dre-content', 'graficos-content']
+  ['cartao-content', 'dividas-content', 'extrato-content', 'financeiro-content', 'resumo-content', 'dre-content', 'graficos-content']
     .forEach(function(tabId) {
       var el = document.getElementById(tabId);
       if (el) el.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
