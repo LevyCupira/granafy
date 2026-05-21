@@ -32,9 +32,16 @@ function normalizeFlexibleDateInput(value) {
   if (!text) return '';
   var iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  var compact = text.replace(/\D/g, '');
+  if (compact.length === 8) {
+    return compact.slice(4, 8) + '-' + compact.slice(2, 4) + '-' + compact.slice(0, 2);
+  }
+  if (compact.length === 4) {
+    return String(new Date().getFullYear()) + '-' + compact.slice(2, 4) + '-' + compact.slice(0, 2);
+  }
   var brFull = text.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
   if (brFull) return brFull[3] + '-' + brFull[2] + '-' + brFull[1];
-  var brShort = text.match(/^(\d{2})[\/\-](\d{2})$/);
+  var brShort = text.match(/^(\d{2})[\/\-](\d{2})(?:[\/\-](?:a{2,4}|_+))?$/i);
   if (brShort) return String(new Date().getFullYear()) + '-' + brShort[2] + '-' + brShort[1];
   return '';
 }
