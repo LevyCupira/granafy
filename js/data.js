@@ -27,8 +27,7 @@ async function loadData() {
 
   if (!uid) return;
 
-  async function carregarComEscopo(usarEscopo) {
-    const filtrarUsuario = usarEscopo && !isAdminUser();
+  async function carregarComEscopo() {
     const [
       clientesRes,
       dividasRes,
@@ -36,20 +35,18 @@ async function loadData() {
       cartoesRes,
       lancCartaoRes
     ] = await Promise.all([
-      (filtrarUsuario ? supabaseClient.from('clientes').select('*').eq('user_id', uid) : supabaseClient.from('clientes').select('*')).order('nome', { ascending: true }),
-      filtrarUsuario ? supabaseClient.from('dividas').select('*').eq('user_id', uid) : supabaseClient.from('dividas').select('*'),
-      filtrarUsuario ? supabaseClient.from('lancamentos').select('*').eq('user_id', uid) : supabaseClient.from('lancamentos').select('*'),
-      filtrarUsuario ? supabaseClient.from('cartoes').select('*').eq('user_id', uid) : supabaseClient.from('cartoes').select('*'),
-      filtrarUsuario ? supabaseClient.from('lancamentos_cartao').select('*').eq('user_id', uid) : supabaseClient.from('lancamentos_cartao').select('*')
+      supabaseClient.from('clientes').select('*').order('nome', { ascending: true }),
+      supabaseClient.from('dividas').select('*'),
+      supabaseClient.from('lancamentos').select('*'),
+      supabaseClient.from('cartoes').select('*'),
+      supabaseClient.from('lancamentos_cartao').select('*')
     ]);
 
     return { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes };
   }
 
-  async function carregarContasComEscopo(usarEscopo) {
-    const filtrarUsuario = usarEscopo && !isAdminUser();
+  async function carregarContasComEscopo() {
     var query = supabaseClient.from('contas').select('*');
-    if (filtrarUsuario) query = query.eq('user_id', uid);
     var res = await query.order('banco', { ascending: true });
 
     if (!res.error) return res;
@@ -61,17 +58,11 @@ async function loadData() {
       return { data: [], error: null };
     }
 
-    if (usarEscopo && isMissingUserScopeError(res.error)) {
-      return carregarContasComEscopo(false);
-    }
-
     return res;
   }
 
-  async function carregarCategoriasComEscopo(usarEscopo) {
-    const filtrarUsuario = usarEscopo && !isAdminUser();
+  async function carregarCategoriasComEscopo() {
     var query = supabaseClient.from('categorias_cliente').select('*');
-    if (filtrarUsuario) query = query.eq('user_id', uid);
     var res = await query.order('nome', { ascending: true });
 
     if (!res.error) return res;
@@ -81,17 +72,11 @@ async function loadData() {
       return { data: [], error: null };
     }
 
-    if (usarEscopo && isMissingUserScopeError(res.error)) {
-      return carregarCategoriasComEscopo(false);
-    }
-
     return res;
   }
 
-  async function carregarRelacionamentosComEscopo(usarEscopo) {
-    const filtrarUsuario = usarEscopo && !isAdminUser();
+  async function carregarRelacionamentosComEscopo() {
     var query = supabaseClient.from('relacionamentos_cliente').select('*');
-    if (filtrarUsuario) query = query.eq('user_id', uid);
     var res = await query.order('nome', { ascending: true });
 
     if (!res.error) return res;
@@ -103,17 +88,11 @@ async function loadData() {
       return { data: [], error: null };
     }
 
-    if (usarEscopo && isMissingUserScopeError(res.error)) {
-      return carregarRelacionamentosComEscopo(false);
-    }
-
     return res;
   }
 
-  async function carregarTitulosComEscopo(usarEscopo) {
-    const filtrarUsuario = usarEscopo && !isAdminUser();
+  async function carregarTitulosComEscopo() {
     var query = supabaseClient.from('titulos_financeiros').select('*');
-    if (filtrarUsuario) query = query.eq('user_id', uid);
     var res = await query.order('vencimento', { ascending: true, nullsFirst: false });
 
     if (!res.error) return res;
@@ -125,17 +104,11 @@ async function loadData() {
       return { data: [], error: null };
     }
 
-    if (usarEscopo && isMissingUserScopeError(res.error)) {
-      return carregarTitulosComEscopo(false);
-    }
-
     return res;
   }
 
-  async function carregarBaixasTitulosComEscopo(usarEscopo) {
-    const filtrarUsuario = usarEscopo && !isAdminUser();
+  async function carregarBaixasTitulosComEscopo() {
     var query = supabaseClient.from('titulos_financeiros_baixas').select('*');
-    if (filtrarUsuario) query = query.eq('user_id', uid);
     var res = await query.order('data_baixa', { ascending: true, nullsFirst: false });
 
     if (!res.error) return res;
@@ -147,26 +120,32 @@ async function loadData() {
       return { data: [], error: null };
     }
 
-    if (usarEscopo && isMissingUserScopeError(res.error)) {
-      return carregarBaixasTitulosComEscopo(false);
+    return res;
+  }
+
+  async function carregarAcessosClientes() {
+    var query = supabaseClient.from('clientes_acessos').select('*');
+    var res = await query.order('created_at', { ascending: true });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('clientes_acessos')) {
+      console.warn('Tabela clientes_acessos ainda nao existe no Supabase. Rode a migracao 20260521_acesso_compartilhado_clientes.sql.');
+      return { data: [], error: null };
     }
 
     return res;
   }
 
-  let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo(userScopeEnabled);
+  let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo();
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
   if (loadError) {
-    if (userScopeEnabled && isMissingUserScopeError(loadError)) {
-      console.warn('Coluna user_id ainda nao existe. Carregando dados em modo compatibilidade ate aplicar a migracao RLS.');
-      setUserScopeEnabled(false);
-      ({ clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo(false));
-    } else {
-      console.error('Erro ao carregar dados do usuario:', loadError);
-      alert('Nao foi possivel carregar os dados do usuario. Verifique se a migracao user_id/RLS ja foi aplicada no Supabase.');
-      return;
-    }
+    console.error('Erro ao carregar dados do usuario:', loadError);
+    alert('Nao foi possivel carregar os dados do usuario. Verifique se as migracoes mais recentes ja foram aplicadas no Supabase.');
+    return;
   }
 
   const clientesRows = clientesRes.data || [];
@@ -174,27 +153,27 @@ async function loadData() {
   const lancRows = lancRes.data || [];
   const cartoesRows = cartoesRes.data || [];
   const lancCartaoRows = lancCartaoRes.data || [];
-  const contasRes = await carregarContasComEscopo(userScopeEnabled);
+  const contasRes = await carregarContasComEscopo();
   if (contasRes.error) {
     console.warn('Nao foi possivel carregar contas cadastradas:', contasRes.error);
   }
   const contasRows = contasRes.data || [];
-  const categoriasRes = await carregarCategoriasComEscopo(userScopeEnabled);
+  const categoriasRes = await carregarCategoriasComEscopo();
   if (categoriasRes.error) {
     console.warn('Nao foi possivel carregar categorias personalizadas:', categoriasRes.error);
   }
   const categoriasRows = categoriasRes.data || [];
-  const relacionamentosRes = await carregarRelacionamentosComEscopo(userScopeEnabled);
+  const relacionamentosRes = await carregarRelacionamentosComEscopo();
   if (relacionamentosRes.error) {
     console.warn('Nao foi possivel carregar relacionamentos personalizados:', relacionamentosRes.error);
   }
   const relacionamentosRows = relacionamentosRes.data || [];
-  const titulosRes = await carregarTitulosComEscopo(userScopeEnabled);
+  const titulosRes = await carregarTitulosComEscopo();
   if (titulosRes.error) {
     console.warn('Nao foi possivel carregar titulos financeiros:', titulosRes.error);
   }
   const titulosRows = titulosRes.data || [];
-  const baixasTitulosRes = await carregarBaixasTitulosComEscopo(userScopeEnabled);
+  const baixasTitulosRes = await carregarBaixasTitulosComEscopo();
   if (baixasTitulosRes.error) {
     console.warn('Nao foi possivel carregar baixas de titulos:', baixasTitulosRes.error);
   }
@@ -345,6 +324,22 @@ async function loadData() {
     });
   });
 
+  const acessosPorCliente = {};
+  (acessosClientesRows || []).forEach(function(acesso) {
+    if (!acesso || !acesso.cliente_id) return;
+    if (!acessosPorCliente[acesso.cliente_id]) acessosPorCliente[acesso.cliente_id] = [];
+    acessosPorCliente[acesso.cliente_id].push({
+      id: acesso.id,
+      usuarioId: acesso.usuario_id || null,
+      email: acesso.email || '',
+      nome: acesso.nome || '',
+      papel: acesso.papel || 'visualizador',
+      status: acesso.status || 'ativo',
+      createdBy: acesso.created_by || null,
+      createdAt: acesso.created_at || null
+    });
+  });
+
   (clientesRows || []).forEach(c => {
     data.clients[c.id] = {
       id: c.id,
@@ -363,6 +358,7 @@ async function loadData() {
       contas: contasPorCliente[c.id] || [],
       relacionamentos: relacionamentosPorCliente[c.id] || [],
       titulos: titulosPorCliente[c.id] || [],
+      acessos: acessosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],
       catsCC: catsCCPorCliente[c.id] ? sincronizarCatsCC(catsCCPorCliente[c.id]) : loadCatsCC(c.id),
@@ -569,3 +565,8 @@ function renderTab(tabKey) {
   }
   if (typeof syncSidebarThemeToggle === 'function') syncSidebarThemeToggle();
 })();
+  const acessosClientesRes = await carregarAcessosClientes();
+  if (acessosClientesRes.error) {
+    console.warn('Nao foi possivel carregar acessos compartilhados:', acessosClientesRes.error);
+  }
+  const acessosClientesRows = acessosClientesRes.data || [];

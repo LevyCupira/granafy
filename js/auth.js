@@ -74,6 +74,10 @@ function currentUserId() {
   return authUser && authUser.id ? authUser.id : null;
 }
 
+function currentUserEmail() {
+  return authUser && authUser.email ? String(authUser.email).trim().toLowerCase() : '';
+}
+
 function activeClientStorageKey() {
   return 'fb_activeClient_' + (currentUserId() || 'anon');
 }
@@ -112,11 +116,42 @@ function isBlockedUser() {
 
 function isOwnClient(clientId) {
   var c = data && data.clients ? data.clients[clientId] : null;
-  return !c || !c.userId || c.userId === currentUserId();
+  return !!(isAdminUser() || !c || !c.userId || c.userId === currentUserId());
+}
+
+function accessRoleLabel(role) {
+  return role === 'editor' ? 'Editor' : 'Visualizador';
+}
+
+function getClientAccessEntry(clientId) {
+  var c = data && data.clients ? data.clients[clientId] : null;
+  if (!c || !Array.isArray(c.acessos)) return null;
+  var uid = currentUserId();
+  var email = currentUserEmail();
+  return c.acessos.find(function(item) {
+    if (!item || item.status !== 'ativo') return false;
+    if (uid && item.usuarioId && item.usuarioId === uid) return true;
+    return !!(email && item.email && String(item.email).trim().toLowerCase() === email);
+  }) || null;
+}
+
+function canManageClientAccess(clientId) {
+  return isOwnClient(clientId);
+}
+
+function canEditClient(clientId) {
+  if (!clientId) return false;
+  if (isOwnClient(clientId)) return true;
+  var acesso = getClientAccessEntry(clientId);
+  return !!(acesso && acesso.papel === 'editor');
+}
+
+function isSharedClient(clientId) {
+  return !isOwnClient(clientId) && !!getClientAccessEntry(clientId);
 }
 
 function canEditActiveClient() {
-  return !!activeClient && isOwnClient(activeClient);
+  return !!activeClient && canEditClient(activeClient);
 }
 
 function isMissingUserScopeError(error) {
@@ -133,8 +168,11 @@ function getUserScopePayload() {
   return userScopeEnabled ? { user_id: currentUserId() } : {};
 }
 
-function applyUserScope(query) {
-  return userScopeEnabled ? query.eq('user_id', currentUserId()) : query;
+function applyUserScope(query, clientId) {
+  if (!userScopeEnabled || isAdminUser()) return query;
+  var scopedClientId = clientId || activeClient || null;
+  if (scopedClientId && !isOwnClient(scopedClientId)) return query;
+  return query.eq('user_id', currentUserId());
 }
 
 function statusSegurancaUsuario() {

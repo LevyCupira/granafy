@@ -8,7 +8,22 @@ function clientTypeLabel(tipo) {
 }
 
 function currentClientLimitReached() {
-  return Object.keys(data.clients || {}).length >= getClientLimit();
+  var totalProprios = Object.values(data.clients || {}).filter(function(cliente) {
+    return isOwnClient(cliente.id);
+  }).length;
+  return totalProprios >= getClientLimit();
+}
+
+function canCreateOwnedClient() {
+  var clientes = Object.values(data.clients || {});
+  var totalProprios = clientes.filter(function(cliente) {
+    return isOwnClient(cliente.id);
+  }).length;
+  var possuiAcessoCompartilhado = clientes.some(function(cliente) {
+    return isSharedClient(cliente.id);
+  });
+  if (totalProprios === 0 && possuiAcessoCompartilhado && !isAdminUser() && !isConsultorUser()) return false;
+  return totalProprios < getClientLimit();
 }
 
 function isMissingClientProfileColumnError(error) {
@@ -29,7 +44,12 @@ async function refreshClientsFromSupabase() {
   renderClientList();
 
   if (activeClient && data.clients[activeClient]) {
-    document.getElementById('clientTitle').textContent = data.clients[activeClient].name;
+    var cliente = data.clients[activeClient];
+    var acesso = getClientAccessEntry(activeClient);
+    var sufixo = '';
+    if (isAdminUser() && !isOwnClient(activeClient)) sufixo = ' · Outro login';
+    else if (acesso) sufixo = ' · ' + accessRoleLabel(acesso.papel);
+    document.getElementById('clientTitle').textContent = cliente.name + sufixo;
     renderTab(activeTab);
   } else {
     clearActiveClientView();
@@ -45,7 +65,7 @@ function clearActiveClientView() {
   ['cartao-content', 'dividas-content', 'extrato-content', 'financeiro-content', 'resumo-content', 'dre-content', 'graficos-content']
     .forEach(function(tabId) {
       var el = document.getElementById(tabId);
-      if (el) el.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
+      if (el) el.innerHTML = '<div class="empty-state"><div class="icon">&#128071;</div>Selecione um cliente.</div>';
     });
 }
 
@@ -60,9 +80,35 @@ function syncClientFormByType() {
   });
 }
 
+function renderClientAccessSection(clientId) {
+  if (!clientId || !canManageClientAccess(clientId)) return '';
+  var cliente = data && data.clients ? data.clients[clientId] : null;
+  var acessos = cliente && Array.isArray(cliente.acessos)
+    ? cliente.acessos.filter(function(item) { return item && item.status === 'ativo'; })
+    : [];
+
+  return '<div class="settings-section-card" style="margin-top:18px">'
+    + '<div class="settings-card-head"><div><h5>Acesso compartilhado</h5><p>Convide outro login para acessar somente este cliente, sem abrir sua base geral.</p></div></div>'
+    + (acessos.length
+      ? '<div class="settings-cat-grid">' + acessos.map(function(item) {
+          return '<div class="settings-cat-item">'
+            + '<div class="settings-cat-main"><span class="settings-cat-name">' + esc(item.nome || item.email || '-') + '</span><span class="settings-cat-flag">' + esc(accessRoleLabel(item.papel)) + '</span></div>'
+            + '<div class="settings-cat-actions"><small style="color:var(--muted)">' + esc(item.email || '') + '</small><button class="tag-del" type="button" onclick="revokeClientAccess(\'' + clientId + '\',\'' + item.id + '\')">x</button></div>'
+            + '</div>';
+        }).join('') + '</div>'
+      : '<p style="color:var(--muted);font-size:.83rem;margin:0 0 16px">Nenhum acesso compartilhado ainda.</p>')
+    + '<div class="form-row">'
+      + '<div class="form-group"><label>E-mail do login convidado</label><input type="email" id="client-access-email" placeholder="cliente@empresa.com"/></div>'
+      + '<div class="form-group" style="max-width:180px"><label>Papel</label><select id="client-access-role"><option value="visualizador">Visualizador</option><option value="editor">Editor</option></select></div>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end"><button class="btn-add" type="button" style="margin-top:6px" onclick="grantClientAccess(\'' + clientId + '\')">Conceder acesso</button></div>'
+    + '</div>';
+}
+
 function openClientFormModal(id) {
   var cliente = id && data.clients ? data.clients[id] : null;
   var tipo = cliente && cliente.tipoCliente ? cliente.tipoCliente : 'pf';
+  var accessSection = cliente ? renderClientAccessSection(cliente.id) : '';
 
   document.getElementById('modalTitle').textContent = cliente ? 'Editar cliente' : 'Cadastrar cliente';
   document.getElementById('modalBody').innerHTML =
@@ -95,7 +141,8 @@ function openClientFormModal(id) {
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
       + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
       + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveClientForm(' + (cliente ? ('\'' + cliente.id + '\'') : 'null') + ')">' + (cliente ? 'Salvar cliente' : 'Cadastrar cliente') + '</button>'
-    + '</div>';
+    + '</div>'
+    + accessSection;
 
   document.getElementById('modalOverlay').classList.add('open');
   syncClientFormByType();
@@ -134,15 +181,15 @@ async function saveClientForm(id) {
     return;
   }
 
-  if (!id && currentClientLimitReached()) {
-    alert('Seu acesso permite cadastrar somente um cliente.');
+  if (!id && !canCreateOwnedClient()) {
+    alert('Seu acesso nao pode cadastrar novos clientes nesta base.');
     return;
   }
 
   var query = id
     ? supabaseClient.from('clientes').update(payload).eq('id', id)
     : supabaseClient.from('clientes').insert([Object.assign({}, payload, getUserScopePayload())]).select().single();
-  query = applyUserScope(query);
+  query = applyUserScope(query, id || activeClient || null);
 
   var resposta = await query;
   if (resposta.error) {
@@ -164,7 +211,15 @@ async function saveClientForm(id) {
 }
 
 async function addClient() {
-  if (currentClientLimitReached()) {
+  if (!canCreateOwnedClient()) {
+    var clientes = Object.values(data.clients || {});
+    var possuiAcessoCompartilhado = clientes.some(function(cliente) {
+      return isSharedClient(cliente.id);
+    });
+    if (possuiAcessoCompartilhado && !isAdminUser() && !isConsultorUser()) {
+      alert('Este login foi vinculado a clientes especificos. O cadastro de novos clientes permanece com o responsavel da base.');
+      return;
+    }
     alert('Seu acesso permite cadastrar somente um cliente.');
     return;
   }
@@ -175,20 +230,34 @@ function renderClientList() {
   var menu = document.getElementById('clientDropdownMenu');
   var entries = Object.entries(data.clients);
   var limiteClientes = getClientLimit();
-  var canCreateClient = entries.length < limiteClientes;
+  var totalProprios = entries.filter(function(entry) {
+    return isOwnClient(entry[0]);
+  }).length;
+  var possuiAcessoCompartilhado = entries.some(function(entry) {
+    return isSharedClient(entry[0]);
+  });
+  var canCreateClient = canCreateOwnedClient();
 
   menu.innerHTML = entries.length === 0
     ? '<div class="client-dropdown-empty">Nenhum cliente cadastrado.</div>'
     : entries.map(function(entry) {
         var id = entry[0];
         var c = entry[1];
+        var acesso = getClientAccessEntry(id);
+        var compartilhado = !isOwnClient(id) && !!acesso;
+        var subtitulo = clientTypeLabel(c.tipoCliente)
+          + (c.documento ? ' · ' + esc(c.documento) : '')
+          + (compartilhado ? ' · ' + esc(accessRoleLabel(acesso.papel)) : '');
+        var acoes = isOwnClient(id)
+          ? '<button style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:.75rem;flex-shrink:0" onclick="openClientFormModal(\'' + id + '\')" title="Editar cliente">&#9998;</button>'
+            + '<button style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:.75rem;flex-shrink:0" onclick="deleteClient(\'' + id + '\')" title="Excluir cliente">&#128465;</button>'
+          : '';
         return '<div class="client-dropdown-item ' + (id === activeClient ? 'active' : '') + '" style="justify-content:space-between">'
           + '<button style="background:none;border:none;color:inherit;font-family:inherit;font-size:inherit;font-weight:inherit;cursor:pointer;display:flex;align-items:center;gap:7px;flex:1;text-align:left;padding:0" onclick="selectClient(\'' + id + '\')">'
           + '<div class="avatar">' + initials(c.name) + '</div>'
-          + '<span style="display:flex;flex-direction:column;gap:2px"><strong>' + esc(c.name) + '</strong><small style="color:var(--muted)">' + clientTypeLabel(c.tipoCliente) + (c.documento ? ' · ' + esc(c.documento) : '') + '</small></span>'
+          + '<span style="display:flex;flex-direction:column;gap:2px"><strong>' + esc(c.name) + '</strong><small style="color:var(--muted)">' + subtitulo + '</small></span>'
           + '</button>'
-          + '<button style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:.75rem;flex-shrink:0" onclick="openClientFormModal(\'' + id + '\')" title="Editar cliente">&#9998;</button>'
-          + '<button style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:.75rem;flex-shrink:0" onclick="deleteClient(\'' + id + '\')" title="Excluir cliente">🗑</button>'
+          + acoes
           + '</div>';
       }).join('');
 
@@ -216,9 +285,11 @@ function renderClientList() {
         note.id = 'clientLimitNote';
         areaNovo.appendChild(note);
       }
-      var limiteTexto = limiteClientes === Infinity
-        ? 'Seu perfil permite cadastrar clientes sem limite.'
-        : ('Seu perfil permite cadastrar ate ' + limiteClientes + ' cliente' + (limiteClientes === 1 ? '' : 's') + '.');
+      var limiteTexto = (totalProprios === 0 && possuiAcessoCompartilhado && !isAdminUser() && !isConsultorUser())
+        ? 'Este login possui acesso compartilhado e nao pode cadastrar clientes proprios.'
+        : (limiteClientes === Infinity
+          ? 'Seu perfil permite cadastrar clientes sem limite.'
+          : ('Seu perfil permite cadastrar ate ' + limiteClientes + ' cliente' + (limiteClientes === 1 ? '' : 's') + '.'));
       note.textContent = limiteTexto;
     } else if (note) {
       note.remove();
@@ -227,7 +298,10 @@ function renderClientList() {
 }
 
 async function deleteClient(id) {
-  if (!isOwnClient(id)) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!isOwnClient(id)) {
+    alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+    return;
+  }
   var c = data.clients[id];
   if (!c) return;
 
@@ -239,7 +313,8 @@ async function deleteClient(id) {
     supabaseClient
       .from('clientes')
       .delete()
-      .eq('id', id)
+      .eq('id', id),
+    id
   );
 
   if (res.error) {
@@ -250,6 +325,7 @@ async function deleteClient(id) {
 
   localStorage.removeItem(catsCCStorageKey(id));
   localStorage.removeItem(catsCartaoStorageKey(id));
+  localStorage.removeItem(catsFinanceiroStorageKey(id));
 
   if (activeClient === id) {
     localStorage.removeItem('fb_activeClient');
@@ -285,6 +361,7 @@ function selectClient(id) {
   if (!Array.isArray(c.contas)) c.contas = [];
   if (!Array.isArray(c.catsCC)) c.catsCC = loadCatsCC(id);
   if (!Array.isArray(c.catsCartao)) c.catsCartao = loadCatsCartao(id);
+  if (!Array.isArray(c.catsFinanceiro)) c.catsFinanceiro = loadCatsFinanceiro(id);
 
   _ccFiltro = new Set();
   _ccFiltroMes = '';
@@ -301,6 +378,100 @@ function selectClient(id) {
   _exFiltroBusca = '';
 
   renderClientList();
-  document.getElementById('clientTitle').textContent = c.name + (isAdminUser() && !isOwnClient(id) ? ' · Outro login' : '');
+  var acesso = getClientAccessEntry(id);
+  var sufixo = '';
+  if (isAdminUser() && !isOwnClient(id)) sufixo = ' · Outro login';
+  else if (acesso) sufixo = ' · ' + accessRoleLabel(acesso.papel);
+  document.getElementById('clientTitle').textContent = c.name + sufixo;
   renderTab(activeTab);
+}
+
+async function grantClientAccess(clientId) {
+  if (!canManageClientAccess(clientId)) {
+    alert('Apenas o responsavel por este cliente pode compartilhar acesso.');
+    return;
+  }
+
+  var emailEl = document.getElementById('client-access-email');
+  var roleEl = document.getElementById('client-access-role');
+  var email = emailEl ? String(emailEl.value || '').trim().toLowerCase() : '';
+  var papel = roleEl ? roleEl.value : 'visualizador';
+
+  if (!email) {
+    alert('Informe o e-mail do login convidado.');
+    return;
+  }
+  if (email === currentUserEmail()) {
+    alert('Seu proprio login ja possui acesso total a este cliente.');
+    return;
+  }
+
+  var usuarioId = null;
+  var nome = '';
+  var perfilRes = await supabaseClient
+    .from('perfis')
+    .select('id,nome,email')
+    .ilike('email', email)
+    .maybeSingle();
+  if (!perfilRes.error && perfilRes.data) {
+    usuarioId = perfilRes.data.id || null;
+    nome = perfilRes.data.nome || '';
+  }
+
+  var response = await supabaseClient
+    .from('clientes_acessos')
+    .upsert([{
+      cliente_id: clientId,
+      usuario_id: usuarioId,
+      email: email,
+      nome: nome || null,
+      papel: papel,
+      status: 'ativo',
+      created_by: currentUserId()
+    }], { onConflict: 'cliente_id,email' })
+    .select();
+
+  if (response.error) {
+    console.error('Erro ao conceder acesso ao cliente:', response.error);
+    alert('Nao foi possivel conceder o acesso agora.');
+    return;
+  }
+
+  if (emailEl) emailEl.value = '';
+  await loadData();
+  openClientFormModal(clientId);
+}
+
+async function revokeClientAccess(clientId, accessId) {
+  if (!canManageClientAccess(clientId)) {
+    alert('Apenas o responsavel por este cliente pode revogar acessos.');
+    return;
+  }
+
+  var cliente = data && data.clients ? data.clients[clientId] : null;
+  var acesso = cliente && Array.isArray(cliente.acessos)
+    ? cliente.acessos.find(function(item) { return item && item.id === accessId; })
+    : null;
+  if (!acesso) return;
+
+  var confirmed = await appConfirm(
+    'Revogar o acesso de "' + (acesso.nome || acesso.email || 'este login') + '" para este cliente?',
+    { title: 'Revogar acesso', confirmText: 'Revogar' }
+  );
+  if (!confirmed) return;
+
+  var response = await supabaseClient
+    .from('clientes_acessos')
+    .update({ status: 'revogado' })
+    .eq('id', accessId)
+    .eq('cliente_id', clientId);
+
+  if (response.error) {
+    console.error('Erro ao revogar acesso ao cliente:', response.error);
+    alert('Nao foi possivel revogar o acesso agora.');
+    return;
+  }
+
+  await loadData();
+  openClientFormModal(clientId);
 }

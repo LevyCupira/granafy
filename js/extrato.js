@@ -7,6 +7,8 @@ var _exFiltroMes = getPreviousMonthKey();
 var _exFiltroConta = '';
 var _exFiltroRelacionamento = '';
 var _exFiltroBusca = '';
+var _exSelecaoLote = false;
+var _exSelecionados = new Set();
 var _exMostrarDuplicados = false;
 var _exManterDuplicado = {};
 var _exDuplicadosResolvidos = carregarDuplicadosResolvidosExtrato();
@@ -83,6 +85,10 @@ function contasClienteAtivo() {
 function clienteAtivoEhPJ() {
   var c = data.clients[activeClient];
   return !!(c && String(c.tipoCliente || '').toLowerCase() === 'pj');
+}
+
+function extratoRelacionamentoAtivo() {
+  return false;
 }
 
 function naturezaFinanceiraDoExtrato(tipo) {
@@ -836,6 +842,72 @@ function manterTodosDuplicadoExtrato(chave) {
   renderExtrato();
 }
 
+function toggleSelecaoLoteExtrato() {
+  _exSelecaoLote = !_exSelecaoLote;
+  if (!_exSelecaoLote) _exSelecionados = new Set();
+  renderExtrato();
+}
+
+function toggleLinhaSelecaoExtrato(id) {
+  if (!id) return;
+  if (_exSelecionados.has(id)) _exSelecionados.delete(id);
+  else _exSelecionados.add(id);
+  renderExtrato();
+}
+
+function toggleSelecionarTodosVisiveisExtrato(ids) {
+  var lista = Array.isArray(ids) ? ids.filter(Boolean) : [];
+  if (!lista.length) return;
+  var todosMarcados = lista.every(function(id) { return _exSelecionados.has(id); });
+  if (todosMarcados) {
+    lista.forEach(function(id) { _exSelecionados.delete(id); });
+  } else {
+    lista.forEach(function(id) { _exSelecionados.add(id); });
+  }
+  renderExtrato();
+}
+
+async function aplicarCategoriaEmLoteExtrato() {
+  if (!canEditActiveClient()) {
+    alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+    return;
+  }
+  var categoriaEl = document.getElementById('ex-lote-categoria');
+  var categoria = categoriaEl ? String(categoriaEl.value || '').trim() : '';
+  var ids = Array.from(_exSelecionados);
+  if (!ids.length) {
+    alert('Selecione ao menos um lancamento.');
+    return;
+  }
+  if (!categoria) {
+    alert('Escolha a categoria que deseja aplicar.');
+    return;
+  }
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('lancamentos')
+      .update({ categoria: categoria || null })
+      .eq('cliente_id', activeClient)
+      .in('id', ids),
+    activeClient
+  );
+
+  if (response.error) {
+    console.error('Erro ao atualizar categorias em lote do extrato:', response.error);
+    alert('Nao foi possivel atualizar as categorias selecionadas.');
+    return;
+  }
+
+  ids.forEach(function(id) {
+    var item = (data.clients[activeClient].extrato || []).find(function(l) { return l.id === id; });
+    if (item) item.cat = categoria;
+  });
+  _exSelecionados = new Set();
+  _exSelecaoLote = false;
+  renderExtrato();
+}
+
 function chaveDuplicidadeExtrato(l) {
   var data = l.data || l.data_lancamento || '';
   var desc = String(l.desc || l.descricao || '')
@@ -1087,8 +1159,12 @@ function renderExtrato() {
     return;
   }
 
-  var relacionamentoAtivo = clienteAtivoEhPJ();
+  var financeiroPJAtivo = clienteAtivoEhPJ();
+  var relacionamentoAtivo = extratoRelacionamentoAtivo();
   var lncs = c.extrato || [];
+  _exSelecionados = new Set(Array.from(_exSelecionados).filter(function(id) {
+    return lncs.some(function(l) { return l.id === id; });
+  }));
   var meses = [...new Set(lncs.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort(compararCategoriaNome);
   var filtradosBrutos = lncs.filter(l => {
@@ -1115,6 +1191,7 @@ function renderExtrato() {
 
   var saldo = totalCredito - totalDebito;
   var catOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
+  var catLoteOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var filtroCatOpts = catsLanc.map(cat => '<option value="' + esc(cat) + '"' + (_exFiltroCat === cat ? ' selected' : '') + '>' + esc(cat) + '</option>').join('');
   var contas = contasClienteAtivo();
   var relacionamentos = relacionamentoAtivo ? relacionamentosClienteAtivo() : [];
@@ -1207,6 +1284,22 @@ function renderExtrato() {
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>';
+  var idsFiltrados = filtrados.map(function(l) { return l.id; }).filter(Boolean);
+  var selecionadosVisiveis = idsFiltrados.filter(function(id) { return _exSelecionados.has(id); }).length;
+  var idsFiltradosJs = idsFiltrados.map(function(id) {
+    return '\'' + String(id).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\'';
+  }).join(',');
+  var loteToolbarHtml = '<div class="extrato-bulk-bar">'
+    + '<label class="extrato-bulk-toggle"><input type="checkbox"' + (_exSelecaoLote ? ' checked' : '') + ' onchange="toggleSelecaoLoteExtrato()"/><span>Selecionar varios</span></label>'
+    + (_exSelecaoLote
+      ? '<div class="extrato-bulk-actions">'
+        + '<button class="btn-sm" type="button" onclick="toggleSelecionarTodosVisiveisExtrato([' + idsFiltradosJs + '])">' + (selecionadosVisiveis === idsFiltrados.length && idsFiltrados.length ? 'Desmarcar visiveis' : 'Marcar visiveis') + '</button>'
+        + '<span class="extrato-bulk-count">' + _exSelecionados.size + ' selecionado(s)</span>'
+        + '<select id="ex-lote-categoria"><option value="">Categoria em lote</option>' + catLoteOpts + '</select>'
+        + '<button class="btn-sm" type="button" onclick="aplicarCategoriaEmLoteExtrato()">Aplicar categoria</button>'
+        + '</div>'
+      : '')
+    + '</div>';
 
   var html =
     '<div class="summary-grid">'
@@ -1234,7 +1327,7 @@ function renderExtrato() {
 
       html += '<div class="form-card" style="padding:12px 14px;margin-bottom:12px">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px"><p class="section-title" style="margin-bottom:0">Grupo ' + (gi + 1) + ' - ' + grupo.linhas.length + ' registros iguais</p><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="manterTodosDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Manter todos</button><button class="btn-sm red" onclick="removerDuplicadoGrupoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Excluir nao mantidos</button></span></div>'
-        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Conta</th>' + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Conta</th>' + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
 
       grupo.linhas.forEach(l => {
         var realIdx = lncs.indexOf(l);
@@ -1251,10 +1344,9 @@ function renderExtrato() {
           + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
           + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
           + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
-          + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
           + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
           + '<td><div class="row-actions">'
-          + (relacionamentoAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
+          + (financeiroPJAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
           + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
           + '</tr>';
       });
@@ -1266,7 +1358,7 @@ function renderExtrato() {
   if (false && _exMostrarDuplicados && dedupe.duplicados.length) {
     html += '<p class="section-title">Duplicados ocultos</p>'
       + '<table class="data-table" style="margin-bottom:18px">'
-      + '<thead><tr><th>Data</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+      + '<thead><tr><th>Data</th><th>Descricao</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...dedupe.duplicados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
@@ -1288,8 +1380,9 @@ function renderExtrato() {
   } else if (filtrados.length === 0) {
     html += '<div class="empty-state">Nenhum lancamento encontrado com os filtros atuais.</div>';
   } else {
+    html += loteToolbarHtml;
     html += '<table class="data-table">';
-    html += '<thead><tr><th>Data</th><th>Conta</th>' + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>';
+    html += '<thead><tr>' + (_exSelecaoLote ? '<th style="width:42px">Sel.</th>' : '') + '<th>Data</th><th>Conta</th>' + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
@@ -1299,15 +1392,15 @@ function renderExtrato() {
       var concResumo = resumoConciliacaoLancamento(l);
       if (concResumo) detalhes.push(concResumo);
       html += '<tr class="row-' + l.tipo + '">'
+        + (_exSelecaoLote ? '<td><input type="checkbox" onchange="toggleLinhaSelecaoExtrato(\'' + esc(l.id) + '\')"' + (_exSelecionados.has(l.id) ? ' checked' : '') + '/></td>' : '')
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
         + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
         + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
         + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
         + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
-        + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
         + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
         + '<td><div class="row-actions">'
-        + (relacionamentoAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
+        + (financeiroPJAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
         + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
         + '</tr>';
     });
@@ -1322,7 +1415,7 @@ function renderExtrato() {
 
   setTipoExtrato(_exTipo);
   initMoneyInputs(area);
-  if (clienteAtivoEhPJ()) {
+  if (financeiroPJAtivo && relacionamentoAtivo) {
     var descInput = document.getElementById('ex-desc');
     var relSelect = document.getElementById('ex-relacionamento');
     if (descInput) descInput.addEventListener('input', atualizarSugestaoRelacionamentoNovo);
@@ -1336,7 +1429,7 @@ async function addExtrato() {
   var desc = formatDescriptionTitleCase(document.getElementById('ex-desc').value);
   var cat = document.getElementById('ex-cat').value;
   var contaId = ((document.getElementById('ex-conta') || {}).value) || null;
-  var relacionamentoId = clienteAtivoEhPJ() ? ((((document.getElementById('ex-relacionamento') || {}).value) || null)) : null;
+  var relacionamentoId = extratoRelacionamentoAtivo() ? ((((document.getElementById('ex-relacionamento') || {}).value) || null)) : null;
   var observacao = ((document.getElementById('ex-obs') || {}).value || '').trim();
   var valor = parseMoney(document.getElementById('ex-valor'));
 
@@ -1380,7 +1473,7 @@ async function importExtratoXlsx(event) {
   if (!activeClient) return alert('Selecione um cliente primeiro.');
 
   var contaId = (document.getElementById('ex-import-conta') && document.getElementById('ex-import-conta').value) || '';
-  var relacionamentoIdFixo = clienteAtivoEhPJ() ? (((document.getElementById('ex-import-relacionamento') && document.getElementById('ex-import-relacionamento').value) || '')) : '';
+  var relacionamentoIdFixo = extratoRelacionamentoAtivo() ? (((document.getElementById('ex-import-relacionamento') && document.getElementById('ex-import-relacionamento').value) || '')) : '';
   if (!contaId) {
     event.target.value = '';
     return alert('Selecione a conta do extrato antes de importar.');
@@ -1428,7 +1521,7 @@ async function importExtratoXlsx(event) {
         continue;
       }
 
-      var relacionamentoSugerido = !relacionamentoIdFixo && clienteAtivoEhPJ() ? sugerirRelacionamentoPorTexto(desc) : null;
+      var relacionamentoSugerido = !relacionamentoIdFixo && extratoRelacionamentoAtivo() ? sugerirRelacionamentoPorTexto(desc) : null;
 
       const { error } = await insertLancamentoComFallback({
         cliente_id: activeClient,
@@ -1484,11 +1577,11 @@ function openExtratoEditModal(i) {
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-edit-cat">' + catOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-edit-conta">' + contasOptionsCliente(lanc.contaId || '') + '</select></div>'
-    + (clienteAtivoEhPJ() ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-edit-relacionamento">' + relacionamentoOptionsCliente(lanc.relacionamentoId || '', true) + '</select></div>' : '')
+    + (extratoRelacionamentoAtivo() ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-edit-relacionamento">' + relacionamentoOptionsCliente(lanc.relacionamentoId || '', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="credito"' + (lanc.tipo === 'credito' ? ' selected' : '') + '>Credito</option><option value="debito"' + (lanc.tipo === 'debito' ? ' selected' : '') + '>Debito</option></select></div>'
     + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="ex-edit-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
-    + (clienteAtivoEhPJ() ? '<div id="ex-edit-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
+    + (extratoRelacionamentoAtivo() ? '<div id="ex-edit-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
     + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-edit-obs" value="' + esc(lanc.observacao || '') + '" placeholder="Opcional. Ex: Pagamento pessoal feito para a empresa."/></div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
     + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
@@ -1496,6 +1589,7 @@ function openExtratoEditModal(i) {
     + '</div>';
 
   document.getElementById('modalOverlay').classList.add('open');
+  document.addEventListener('keydown', handleMainModalEscape);
   initMoneyInputs(document.getElementById('modalBody'));
 
   var valorInput = document.getElementById('ex-edit-valor');
@@ -1505,7 +1599,7 @@ function openExtratoEditModal(i) {
     valorInput.value = Number(lanc.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  if (clienteAtivoEhPJ()) {
+  if (extratoRelacionamentoAtivo()) {
     var relSelect = document.getElementById('ex-edit-relacionamento');
     if (relSelect) relSelect.addEventListener('change', function() { registrarInteracaoManualRelacionamento('ex-edit-relacionamento'); });
     atualizarSugestaoRelacionamentoEdicao();
@@ -1580,7 +1674,7 @@ function openExtratoConciliacaoModal(i) {
         + '<div class="form-group" style="max-width:170px"><label>Valor</label><input type="text" value="' + esc(fmt(lanc.valor || 0)) + '" readonly/></div>'
       + '</div>'
       + '<div class="form-row"><div class="form-group"><label>Descricao do banco</label><input type="text" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div></div>'
-      + (lanc.relacionamentoId ? '<div class="form-row"><div class="form-group"><label>Relacionado a</label><input type="text" value="' + esc(nomeRelacionamentoPorId(c, lanc.relacionamentoId)) + '" readonly/></div></div>' : '')
+      + (extratoRelacionamentoAtivo() && lanc.relacionamentoId ? '<div class="form-row"><div class="form-group"><label>Relacionado a</label><input type="text" value="' + esc(nomeRelacionamentoPorId(c, lanc.relacionamentoId)) + '" readonly/></div></div>' : '')
     + '</div>'
     + '<div class="settings-section-card">'
       + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Voce pode vincular este lancamento a mais de um titulo, desde que o total conciliado nao ultrapasse o valor do banco.</p></div></div>'
@@ -1599,6 +1693,7 @@ function openExtratoConciliacaoModal(i) {
     + '</div>';
 
   document.getElementById('modalOverlay').classList.add('open');
+  document.addEventListener('keydown', handleMainModalEscape);
   initMoneyInputs(document.getElementById('modalBody'));
   syncExtratoConciliacaoValor(restante);
 }
@@ -1750,7 +1845,7 @@ async function saveExtratoEditModal(i) {
   var novaCat = document.getElementById('ex-edit-cat').value;
   var novaContaId = document.getElementById('ex-edit-conta').value || null;
   var relField = document.getElementById('ex-edit-relacionamento');
-  var novoRelacionamentoId = clienteAtivoEhPJ() && relField ? (relField.value || null) : null;
+  var novoRelacionamentoId = extratoRelacionamentoAtivo() && relField ? (relField.value || null) : null;
   var novoTipo = document.getElementById('ex-edit-tipo').value === 'credito' ? 'credito' : 'debito';
   var novoValor = parseMoney(document.getElementById('ex-edit-valor'));
   var novaObservacao = document.getElementById('ex-edit-obs').value.trim();

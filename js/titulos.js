@@ -10,7 +10,7 @@ var COLS_TITULOS = [
   { key: 'descricao', label: 'Descricao', render: item => esc(item.descricao || '-') + (item.observacao ? '<div class="installment-note">' + esc(item.observacao) + '</div>' : '') },
   { key: 'categoria', label: 'Categoria', render: item => '<span class="badge badge-cat">' + esc(item.categoria || 'Sem categoria') + '</span>' },
   { key: 'status', label: 'Status', render: item => '<span class="tf-status-badge ' + esc(tfStatusOf(item)) + '">' + esc(tfStatusLabel(tfStatusOf(item))) + '</span>' },
-  { key: 'total', label: 'Total', render: item => '<span class="val ' + (_tfNatureza === 'receber' ? 'val-pos' : 'val-neg') + '">' + (_tfNatureza === 'receber' ? '' : '- ') + fmt(item.valorTotal || 0) + '</span>' },
+  { key: 'total', label: 'Total', render: item => '<span class="val ' + (_tfNatureza === 'receber' ? 'val-pos' : 'val-neg') + '">' + (_tfNatureza === 'receber' ? fmt(item.valorTotal || 0) : ('- ' + fmt(item.valorTotal || 0)) ) + '</span>' },
   { key: 'baixado', label: 'Baixado', render: item => '<span style="color:var(--accent3);font-weight:700">' + fmt(tfTotalBaixado(item)) + '</span>' },
   { key: 'saldo', label: 'Saldo', render: item => '<span style="color:' + (tfSaldo(item) > 0 ? 'var(--warning)' : 'var(--success)') + ';font-weight:700">' + fmt(tfSaldo(item)) + '</span>' },
   { key: '_del', label: '', render: () => '' }
@@ -338,7 +338,7 @@ function tfOpenTituloModal(id) {
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>Categoria (<a href="#" onclick="openModal(\'settings\',\'cats_financeiro\');return false;">+ gerir</a>)</label><select id="tf-edit-categoria">' + tfCategoriasOptionsHtml(item.categoria || '') + '</select></div>'
-      + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="tf-edit-vencimento" class="flex-date-input" value="' + esc(item.vencimento ? formatDate(item.vencimento) : '') + '" placeholder="dd/mm/aaaa"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="tf-edit-vencimento" class="flex-date-input" value="' + esc(item.vencimento ? formatDate(item.vencimento) : '') + '" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
       + '<div class="form-group" style="max-width:170px"><label>Valor total</label><input type="text" id="tf-edit-valor" class="money-input" value="' + esc((Number(item.valorTotal || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
     + '</div>'
     + '<div class="form-row">'
@@ -352,7 +352,7 @@ function tfOpenTituloModal(id) {
       + '<div class="settings-card-head"><div><h5>Baixas registradas</h5><p>Registre recebimentos ou pagamentos parciais para acompanhar o saldo deste titulo.</p></div></div>'
       + baixasHtml
       + '<div class="form-row" style="margin-top:16px">'
-        + '<div class="form-group" style="max-width:170px"><label>Data da baixa</label><input type="text" id="tf-baixa-data" class="flex-date-input" value="' + esc(formatDate(new Date().toISOString().slice(0, 10))) + '" placeholder="dd/mm/aaaa"/></div>'
+        + '<div class="form-group" style="max-width:170px"><label>Data da baixa</label><input type="text" id="tf-baixa-data" class="flex-date-input" value="' + esc(formatDate(new Date().toISOString().slice(0, 10))) + '" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor</label><input type="text" id="tf-baixa-valor" class="money-input" value="' + esc(Math.max(tfSaldo(item), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
         + '<div class="form-group"><label>Observacao</label><input type="text" id="tf-baixa-observacao" placeholder="Ex.: Pix, TED, boleto"/></div>'
       + '</div>'
@@ -552,7 +552,7 @@ function renderFinanceiro() {
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group"><label>Categoria (<a href="#" onclick="openModal(\'settings\',\'cats_financeiro\');return false;">+ gerir</a>)</label><select id="' + tfFormPrefix() + '-categoria">' + tfCategoriasOptionsHtml('') + '</select></div>'
-        + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm/aaaa"/></div>'
+        + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="' + tfFormPrefix() + '-valor" class="money-input" value="0,00"/></div>'
       + '</div>'
       + '<div class="form-row">'
