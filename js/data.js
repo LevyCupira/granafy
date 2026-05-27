@@ -178,6 +178,11 @@ async function loadData() {
     console.warn('Nao foi possivel carregar baixas de titulos:', baixasTitulosRes.error);
   }
   const baixasTitulosRows = baixasTitulosRes.data || [];
+  const acessosClientesRes = await carregarAcessosClientes();
+  if (acessosClientesRes.error) {
+    console.warn('Nao foi possivel carregar acessos compartilhados:', acessosClientesRes.error);
+  }
+  const acessosClientesRows = acessosClientesRes.data || [];
 
   const contasPorCliente = {};
   (contasRows || []).forEach(conta => {
@@ -565,8 +570,3 @@ function renderTab(tabKey) {
   }
   if (typeof syncSidebarThemeToggle === 'function') syncSidebarThemeToggle();
 })();
-  const acessosClientesRes = await carregarAcessosClientes();
-  if (acessosClientesRes.error) {
-    console.warn('Nao foi possivel carregar acessos compartilhados:', acessosClientesRes.error);
-  }
-  const acessosClientesRows = acessosClientesRes.data || [];
