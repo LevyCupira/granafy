@@ -105,6 +105,26 @@ function renderClientAccessSection(clientId) {
     + '</div>';
 }
 
+function buildClientInviteLink(email, clientId, papel) {
+  var cliente = data && data.clients ? data.clients[clientId] : null;
+  var base = window.location.origin + window.location.pathname;
+  var params = new URLSearchParams();
+  params.set('invite_email', String(email || '').trim().toLowerCase());
+  if (cliente && cliente.name) params.set('invite_client_name', cliente.name);
+  if (papel) params.set('invite_role', papel);
+  return base + '?' + params.toString();
+}
+
+async function copyTextSafe(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 function openClientFormModal(id) {
   var cliente = id && data.clients ? data.clients[id] : null;
   var tipo = cliente && cliente.tipoCliente ? cliente.tipoCliente : 'pf';
@@ -418,26 +438,63 @@ async function grantClientAccess(clientId) {
     nome = perfilRes.data.nome || '';
   }
 
-  var response = await supabaseClient
-    .from('clientes_acessos')
-    .upsert([{
-      cliente_id: clientId,
-      usuario_id: usuarioId,
-      email: email,
-      nome: nome || null,
-      papel: papel,
-      status: 'ativo',
-      created_by: currentUserId()
-    }], { onConflict: 'cliente_id,email' })
-    .select();
+  var cliente = data && data.clients ? data.clients[clientId] : null;
+  var existingAccess = cliente && Array.isArray(cliente.acessos)
+    ? cliente.acessos.find(function(item) {
+        return item && String(item.email || '').trim().toLowerCase() === email;
+      })
+    : null;
+
+  var response;
+  if (existingAccess && existingAccess.id) {
+    response = await supabaseClient
+      .from('clientes_acessos')
+      .update({
+        usuario_id: usuarioId,
+        email: email,
+        nome: nome || null,
+        papel: papel,
+        status: 'ativo'
+      })
+      .eq('id', existingAccess.id)
+      .eq('cliente_id', clientId)
+      .select();
+  } else {
+    response = await supabaseClient
+      .from('clientes_acessos')
+      .insert([{
+        cliente_id: clientId,
+        usuario_id: usuarioId,
+        email: email,
+        nome: nome || null,
+        papel: papel,
+        status: 'ativo',
+        created_by: currentUserId()
+      }])
+      .select();
+  }
 
   if (response.error) {
     console.error('Erro ao conceder acesso ao cliente:', response.error);
-    alert('Nao foi possivel conceder o acesso agora.');
+    alert('Nao foi possivel conceder o acesso agora: ' + (response.error.message || 'erro desconhecido'));
     return;
   }
 
   if (emailEl) emailEl.value = '';
+  if (existingAccess && existingAccess.id) {
+    await appAlert('Acesso atualizado para ' + email + '. Esse login ja pode entrar com a conta que usa hoje.', 'Acesso compartilhado');
+  } else if (usuarioId) {
+    await appAlert('Acesso liberado para ' + email + '. Como esse login ja existe, a pessoa pode entrar normalmente no Granafy.', 'Acesso compartilhado');
+  } else {
+    var inviteLink = buildClientInviteLink(email, clientId, papel);
+    var copied = await copyTextSafe(inviteLink);
+    await appAlert(
+      'Acesso liberado para ' + email + '.\n\nEsse e-mail ainda nao tem conta no Granafy. A pessoa deve usar o primeiro acesso pelo link abaixo:\n'
+      + inviteLink
+      + (copied ? '\n\nO link ja foi copiado para a area de transferencia.' : '\n\nCopie esse link e envie para a pessoa.'),
+      'Primeiro acesso'
+    );
+  }
   await loadData();
   openClientFormModal(clientId);
 }

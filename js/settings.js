@@ -505,11 +505,13 @@ function renderSettingsModal(activeTabKey) {
   var ccCount = (loadCatsCC() || []).length;
   var cartaoCount = (loadCatsCartao() || []).length;
   var financeiroCount = cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj' ? (loadCatsFinanceiro() || []).length : 0;
+  var showTabsPanel = !!cliente;
   var showUsersTab = typeof canSeeUsersTab === 'function' ? canSeeUsersTab() : !!authUser;
   var showAuditoriaTab = typeof canSeeAuditoria === 'function' ? canSeeAuditoria() : true;
   var isMaster = typeof isAdminUser === 'function' && isAdminUser();
   var usersTabLabel = isMaster ? 'Usuarios' : 'Minha conta';
   var heroParts = ['Personalize as categorias deste cliente'];
+  if (showTabsPanel) heroParts.push('organize as abas usadas no dia a dia');
   if (showUsersTab) heroParts.push(isMaster ? 'gerencie perfis' : 'acompanhe seu perfil');
   if (showAuditoriaTab) heroParts.push('revise a auditoria');
   var heroText = heroParts.join(', ') + ' sem misturar dados com os outros clientes da base.';
@@ -518,6 +520,9 @@ function renderSettingsModal(activeTabKey) {
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
   if (cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj') {
     tabButtons += '<button class="modal-tab settings-tab-rich" data-stab="cats_financeiro" onclick="switchSettingsTab(\'cats_financeiro\')"><span class="settings-tab-main">Financeiro</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + financeiroCount + '</span></button>';
+  }
+  if (showTabsPanel) {
+    tabButtons += '<button class="modal-tab" data-stab="visual" onclick="switchSettingsTab(\'visual\')">Abas</button>';
   }
 
   if (showUsersTab) {
@@ -540,11 +545,13 @@ function renderSettingsModal(activeTabKey) {
     + '<div id="modal-panel-cats_cc" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_financeiro" class="modal-panel"></div>'
+    + '<div id="modal-panel-visual" class="modal-panel"></div>'
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
     + '<div id="modal-panel-auditoria" class="modal-panel"></div>';
   var firstTab = activeTabKey || 'cats_cc';
   if (firstTab === 'auditoria' && !showAuditoriaTab) firstTab = showUsersTab ? 'usuarios' : 'cats_cc';
   if (firstTab === 'usuarios' && !showUsersTab) firstTab = 'cats_cc';
+  if (firstTab === 'visual' && !showTabsPanel) firstTab = 'cats_cc';
   if (firstTab === 'cats_financeiro' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
   switchSettingsTab(firstTab);
 }
@@ -565,8 +572,60 @@ function switchSettingsTab(tab) {
   if (tab === 'cats_cc') renderCatsPanel('cc');
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
   if (tab === 'cats_financeiro') renderCatsPanel('financeiro');
+  if (tab === 'visual') renderClientTabsPanel();
   if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
   if (tab === 'auditoria' && (typeof canSeeAuditoria !== 'function' || canSeeAuditoria())) renderAuditoriaPanel();
+}
+
+function renderClientTabsPanel() {
+  var panel = document.getElementById('modal-panel-visual');
+  if (!panel) return;
+  if (!activeClient || !data.clients || !data.clients[activeClient]) {
+    panel.innerHTML = '<p style="color:var(--muted);font-size:.83rem">Selecione um cliente para definir quais abas ficam visiveis.</p>';
+    return;
+  }
+
+  var cliente = data.clients[activeClient];
+  var tabs = typeof getConfigurableTabs === 'function' ? getConfigurableTabs(activeClient) : [];
+  var hidden = typeof loadHiddenTabsForClient === 'function' ? loadHiddenTabsForClient(activeClient) : [];
+  var hiddenSet = new Set(hidden);
+  var visibleCount = Math.max(0, tabs.length - hidden.length);
+
+  panel.innerHTML =
+    '<div class="settings-section-card">'
+    + '<div class="settings-card-head"><div><h5>Abas deste cliente</h5><p>Mostre so o que faz sentido para <strong style="color:var(--text)">' + esc(cliente.name || 'este cliente') + '</strong>. Se uma aba estiver oculta, ela sai apenas da navegacao principal.</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clientTypeLabel(cliente.tipoCliente || 'cliente')) + '</span><span class="settings-card-badge subtle">' + visibleCount + ' visiveis</span></div></div>'
+    + '<div class="settings-visibility-list">'
+    + tabs.map(function(tab) {
+        var checked = !hiddenSet.has(tab.key);
+        var disableHide = checked && visibleCount <= 1;
+        return '<div class="settings-visibility-item">'
+          + '<div><strong>' + esc(tab.label) + '</strong><p>' + (disableHide ? 'Mantenha pelo menos uma aba visivel.' : 'Mostre ou oculte esta aba na navegacao principal.') + '</p></div>'
+          + '<label class="toggle-switch">'
+          + '<input type="checkbox" ' + (checked ? 'checked ' : '') + (disableHide ? 'disabled ' : '') + 'onchange="toggleClientTabVisibility(\'' + esc(tab.key) + '\',this.checked)"/>'
+          + '<span class="toggle-track"></span>'
+          + '</label>'
+          + '</div>';
+      }).join('')
+    + '</div>'
+    + '</div>';
+}
+
+function toggleClientTabVisibility(tabKey, shouldShow) {
+  if (!activeClient || !tabKey || typeof getConfigurableTabs !== 'function') return;
+  var tabs = getConfigurableTabs(activeClient);
+  var hidden = typeof loadHiddenTabsForClient === 'function' ? loadHiddenTabsForClient(activeClient) : [];
+  var hiddenSet = new Set(hidden);
+  var currentlyVisible = tabs.filter(function(tab) { return !hiddenSet.has(tab.key); }).length;
+  if (!shouldShow && currentlyVisible <= 1) {
+    if (typeof appAlert === 'function') appAlert('Deixe pelo menos uma aba visivel para este cliente.');
+    renderClientTabsPanel();
+    return;
+  }
+
+  if (typeof setClientTabVisible === 'function') setClientTabVisible(activeClient, tabKey, shouldShow);
+  renderClientTabsPanel();
+  if (typeof renderTabs === 'function') renderTabs();
+  if (typeof renderTab === 'function') renderTab(activeTab);
 }
 
 function renderAuditoriaPanel() {

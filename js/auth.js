@@ -3,6 +3,8 @@ var authProfile = null;
 var _authResolver = null;
 var userScopeEnabled = true;
 var ADMIN_EMAIL = 'levy_lima@icloud.com';
+var _authInviteContext = null;
+var _authSkipInviteOnce = false;
 
 function normalizeAccessType(tipo) {
   if (tipo === 'admin') return 'master';
@@ -197,6 +199,57 @@ function setAuthLoading(isLoading) {
   });
 }
 
+function readAuthInviteContext() {
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    var email = String(params.get('invite_email') || '').trim().toLowerCase();
+    if (!email) return null;
+    return {
+      email: email,
+      clientName: String(params.get('invite_client_name') || '').trim(),
+      role: String(params.get('invite_role') || '').trim()
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function getAuthInviteContext() {
+  if (_authInviteContext === null) _authInviteContext = readAuthInviteContext();
+  return _authInviteContext;
+}
+
+function clearAuthInviteContext() {
+  _authInviteContext = null;
+  try {
+    var url = new URL(window.location.href);
+    url.searchParams.delete('invite_email');
+    url.searchParams.delete('invite_client_name');
+    url.searchParams.delete('invite_role');
+    window.history.replaceState({}, '', url.pathname + (url.search || '') + (url.hash || ''));
+  } catch (e) {}
+}
+
+function applyInviteContextToAuthScreen() {
+  var invite = getAuthInviteContext();
+  if (!invite) return;
+
+  mostrarCadastro();
+
+  var title = document.getElementById('auth-title');
+  var subtitle = document.getElementById('auth-subtitle');
+  var emailEl = document.getElementById('auth-email');
+
+  if (title) title.textContent = 'Primeiro acesso';
+  if (subtitle) {
+    subtitle.textContent = invite.clientName
+      ? ('Seu acesso ao cliente ' + invite.clientName + ' ja foi liberado. Crie sua senha usando este e-mail.')
+      : 'Seu acesso compartilhado ja foi liberado. Crie sua senha usando este e-mail.';
+  }
+  if (emailEl && !emailEl.value) emailEl.value = invite.email;
+  setAuthMessage('Use o mesmo e-mail do convite para concluir o primeiro acesso.');
+}
+
 function supabaseAuthReady() {
   if (window.supabaseClient && window.supabaseClient.auth) return true;
   setAuthMessage('Nao foi possivel carregar o Supabase. Recarregue a pagina com Ctrl + F5.', 'error');
@@ -236,6 +289,8 @@ function renderAuthScreen() {
     + '</section>';
 
   document.body.classList.add('auth-locked');
+  if (_authSkipInviteOnce) _authSkipInviteOnce = false;
+  else applyInviteContextToAuthScreen();
 
   var password = document.getElementById('auth-password');
   if (password) {
@@ -264,6 +319,7 @@ function mostrarCadastro() {
 }
 
 function mostrarLogin() {
+  _authSkipInviteOnce = true;
   renderAuthScreen();
 }
 
@@ -610,6 +666,7 @@ async function criarUsuario() {
 
     if (response.data.session && response.data.user) {
       authUser = response.data.user;
+      clearAuthInviteContext();
       await ensureAuthProfile({
         nome: nome,
         telefone: telefone,
@@ -629,7 +686,11 @@ async function criarUsuario() {
       return;
     }
 
-    setAuthMessage('Acesso criado. Confirme seu e-mail antes de entrar.');
+    if (getAuthInviteContext()) {
+      setAuthMessage('Acesso criado. Confirme seu e-mail antes de entrar para acessar o cliente compartilhado.');
+    } else {
+      setAuthMessage('Acesso criado. Confirme seu e-mail antes de entrar.');
+    }
   } catch (err) {
     console.error('Erro ao criar acesso:', err);
     setAuthMessage(err.message || 'Erro inesperado ao criar o acesso.', 'error');

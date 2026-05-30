@@ -3,6 +3,9 @@
 var _tfNatureza = 'receber';
 var _tfStatus = 'todos';
 var _tfBusca = '';
+var _tfPanels = {
+  novo: false
+};
 
 var COLS_TITULOS = [
   { key: 'vencimento', label: 'Vencimento', render: item => '<span style="color:var(--muted);font-size:.78rem">' + esc(formatDate(item.vencimento)) + '</span>' },
@@ -167,6 +170,22 @@ function tfClearFilters() {
   _tfStatus = 'todos';
   _tfBusca = '';
   renderFinanceiro();
+}
+
+function toggleFinanceiroPanel(key) {
+  _tfPanels[key] = !_tfPanels[key];
+  renderFinanceiro();
+}
+
+function financeiroPanel(key, title, body) {
+  var open = !!_tfPanels[key];
+  return '<div class="form-card collapsible-card financeiro-collapsible-card' + (open ? ' open' : '') + '">'
+    + '<button type="button" class="collapse-head" onclick="toggleFinanceiroPanel(\'' + key + '\')" aria-expanded="' + open + '">'
+    + '<span>' + title + '</span>'
+    + '<span class="collapse-chevron" aria-hidden="true">&#9662;</span>'
+    + '</button>'
+    + (open ? '<div class="collapse-body">' + body + '</div>' : '')
+    + '</div>';
 }
 
 function tfFormPrefix() {
@@ -544,8 +563,7 @@ function renderFinanceiro() {
         + '<button type="button" class="tipo-btn debito' + (_tfNatureza === 'pagar' ? ' active' : '') + '" onclick="tfSetNatureza(\'pagar\')">A Pagar</button>'
       + '</div>'
     + '</div>'
-    + '<div class="form-card">'
-      + '<h3>+ Novo titulo - ' + tituloAtivo + '</h3>'
+    + financeiroPanel('novo', '+ Novo titulo - ' + tituloAtivo,
       + '<div class="form-row">'
         + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem esta envolvido neste titulo"/></div>'
         + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Ex.: Mensalidade, imposto, fornecedor"/></div>'
@@ -559,7 +577,7 @@ function renderFinanceiro() {
         + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informacoes complementares deste titulo"></textarea></div>'
       + '</div>'
       + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>'
-    + '</div>'
+    )
     + '<div class="form-card">'
       + '<h3>Filtros</h3>'
       + '<div class="form-row">'

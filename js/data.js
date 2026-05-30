@@ -398,10 +398,70 @@ function saveTabOrder(keys) {
   try { localStorage.setItem(tabOrderStorageKey(), JSON.stringify(keys)); } catch (e) {}
 }
 
-function getVisibleTabs() {
+function clientTabVisibilityStorageKey(clientId) {
+  var uid = typeof currentUserId === 'function' ? currentUserId() : 'anon';
+  return 'granafy_hidden_tabs_' + (uid || 'anon') + '_' + (clientId || 'none');
+}
+
+function isTabAvailableForClient(tab, clientId) {
+  if (!tab) return false;
+  if (!tab.visible) return true;
+  if (tab.key === 'financeiro') {
+    var cliente = clientId && data && data.clients ? data.clients[clientId] : null;
+    return !!(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj');
+  }
+  try {
+    return !!tab.visible();
+  } catch (e) {
+    return true;
+  }
+}
+
+function getConfigurableTabs(clientId) {
   return getOrderedTabs().filter(function(tab) {
-    return !tab.visible || tab.visible();
+    return isTabAvailableForClient(tab, clientId);
   });
+}
+
+function loadHiddenTabsForClient(clientId) {
+  if (!clientId) return [];
+  var allowed = new Set(getConfigurableTabs(clientId).map(function(tab) { return tab.key; }));
+  try {
+    var saved = JSON.parse(localStorage.getItem(clientTabVisibilityStorageKey(clientId))) || [];
+    if (!Array.isArray(saved)) return [];
+    return saved.filter(function(key) { return allowed.has(key); });
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveHiddenTabsForClient(clientId, hiddenKeys) {
+  if (!clientId) return;
+  var allowed = new Set(getConfigurableTabs(clientId).map(function(tab) { return tab.key; }));
+  var clean = Array.isArray(hiddenKeys) ? hiddenKeys.filter(function(key) { return allowed.has(key); }) : [];
+  try {
+    localStorage.setItem(clientTabVisibilityStorageKey(clientId), JSON.stringify(clean));
+  } catch (e) {}
+}
+
+function setClientTabVisible(clientId, tabKey, shouldShow) {
+  if (!clientId || !tabKey) return;
+  var hidden = new Set(loadHiddenTabsForClient(clientId));
+  if (shouldShow) hidden.delete(tabKey);
+  else hidden.add(tabKey);
+  saveHiddenTabsForClient(clientId, Array.from(hidden));
+}
+
+function getVisibleTabs() {
+  var hidden = new Set(loadHiddenTabsForClient(activeClient));
+  var visible = getOrderedTabs().filter(function(tab) {
+    return isTabAvailableForClient(tab, activeClient) && !hidden.has(tab.key);
+  });
+  if (!visible.length && activeClient) {
+    var fallback = getConfigurableTabs(activeClient);
+    return fallback.length ? [fallback[0]] : [];
+  }
+  return visible;
 }
 
 function moveTabBefore(srcKey, dstKey) {
