@@ -107,7 +107,7 @@ function renderClientAccessSection(clientId) {
 
 function buildClientInviteLink(email, clientId, papel) {
   var cliente = data && data.clients ? data.clients[clientId] : null;
-  var base = window.location.origin + window.location.pathname;
+  var base = window.getGranafyAppUrl ? window.getGranafyAppUrl() : (window.location.origin + window.location.pathname);
   var params = new URLSearchParams();
   params.set('invite_email', String(email || '').trim().toLowerCase());
   if (cliente && cliente.name) params.set('invite_client_name', cliente.name);

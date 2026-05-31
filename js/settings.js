@@ -11,10 +11,11 @@ function openModal(section, tab) {
   var overlay = document.getElementById('modalOverlay');
   var modal = overlay ? overlay.querySelector('.modal') : null;
   if (overlay) overlay.classList.add('open');
-  if (overlay) overlay.dataset.mode = section === 'settings' ? 'settings' : 'backup';
-  if (modal) modal.classList.toggle('modal-wide', section === 'settings');
+  if (overlay) overlay.dataset.mode = (section === 'settings' || section === 'legal') ? 'settings' : 'backup';
+  if (modal) modal.classList.toggle('modal-wide', section === 'settings' || section === 'legal');
   document.addEventListener('keydown', handleMainModalEscape);
   if (section === 'settings') renderSettingsModal(tab);
+  else if (section === 'legal') renderLegalModal(tab);
   else renderBackupModal();
 }
 
@@ -60,6 +61,67 @@ function renderBackupModal() {
     + '<small>Restaura dados a partir de um arquivo JSON ja salvo, respeitando as protecoes contra duplicidade.</small>'
     + '<button class="btn-sm" style="margin-top:14px;padding:9px 18px;font-size:.83rem" onclick="document.getElementById(\'importFileInput\').click()">Selecionar arquivo</button>'
     + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
+function renderLegalModal(activeTabKey) {
+  document.getElementById('modalTitle').textContent = 'Documentos legais';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="settings-hero backup-hero">'
+    + '<div><span class="settings-eyebrow">Transparencia</span><h4>Termos e privacidade</h4><p>Leia as regras de uso do Granafy e como os dados pessoais e financeiros sao tratados dentro da plataforma.</p></div>'
+    + '</div>'
+    + '<div class="modal-tabs settings-tabs" id="legalTabs">'
+    + '<button class="modal-tab" data-ltab="terms" onclick="switchLegalTab(\'terms\')">Termos de uso</button>'
+    + '<button class="modal-tab" data-ltab="privacy" onclick="switchLegalTab(\'privacy\')">Politica de privacidade</button>'
+    + '</div>'
+    + '<div id="modal-panel-terms" class="modal-panel"></div>'
+    + '<div id="modal-panel-privacy" class="modal-panel"></div>';
+  switchLegalTab(activeTabKey === 'privacy' ? 'privacy' : 'terms');
+}
+
+function switchLegalTab(tab) {
+  document.querySelectorAll('#legalTabs .modal-tab').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.ltab === tab);
+  });
+  document.querySelectorAll('#modalBody .modal-panel').forEach(function(panel) {
+    panel.classList.remove('active');
+  });
+
+  var panel = document.getElementById('modal-panel-' + tab);
+  if (!panel) return;
+  panel.classList.add('active');
+  panel.innerHTML = tab === 'privacy' ? legalPrivacyHtml() : legalTermsHtml();
+}
+
+function legalTermsHtml() {
+  return '<div class="settings-section-card legal-doc">'
+    + '<div class="settings-card-head"><div><h5>Termos de uso do Granafy</h5><p>Ultima atualizacao: 31/05/2026</p></div></div>'
+    + '<div class="legal-doc-body">'
+    + '<h6>1. Objeto</h6><p>O Granafy e uma plataforma de organizacao financeira que ajuda a registrar lancamentos, acompanhar cartoes, dividas, extrato, financeiro PJ, relatorios e acessos compartilhados por cliente.</p>'
+    + '<h6>2. Cadastro e responsabilidade</h6><p>Quem cria ou usa uma conta deve informar dados verdadeiros, manter a senha em sigilo e responder pelas atividades feitas com o proprio login. O usuario que compartilha um cliente deve conceder acesso apenas a pessoas autorizadas.</p>'
+    + '<h6>3. Perfis e permissoes</h6><p>O sistema pode oferecer perfis como Master, Consultor, Usuario, Visualizador e Editor. Cada perfil possui limites e permissoes diferentes. O uso indevido de um perfil ou de acessos compartilhados pode levar a bloqueio ou revogacao.</p>'
+    + '<h6>4. Uso permitido</h6><p>O Granafy deve ser usado para fins legitimos de gestao financeira. Nao e permitido tentar acessar dados sem autorizacao, burlar permissoes, inserir conteudo ilicito ou comprometer a seguranca do sistema.</p>'
+    + '<h6>5. Dados e backups</h6><p>O usuario e responsavel por revisar as informacoes que cadastra, importa ou exporta. Recursos de backup e restauracao ajudam na seguranca operacional, mas nao substituem o cuidado do usuario com a revisao dos dados e o armazenamento seguro dos arquivos exportados.</p>'
+    + '<h6>6. Disponibilidade</h6><p>O Granafy pode passar por manutencoes, correcoes e melhorias. Embora exista esforco para manter a plataforma disponivel, podem ocorrer indisponibilidades temporarias, falhas de terceiros, erros de sincronizacao ou limites de servicos integrados.</p>'
+    + '<h6>7. Suspensao e encerramento</h6><p>O acesso pode ser restringido, suspenso ou encerrado em caso de fraude, abuso, violacao destes termos, exigencia legal ou risco relevante para a seguranca da plataforma e dos dados.</p>'
+    + '<h6>8. Alteracoes destes termos</h6><p>Os termos podem ser atualizados para refletir mudancas legais, tecnicas ou operacionais. O uso continuado da plataforma apos a publicacao de uma nova versao representa ciencia do texto atualizado.</p>'
+    + '</div>'
+    + '</div>';
+}
+
+function legalPrivacyHtml() {
+  return '<div class="settings-section-card legal-doc">'
+    + '<div class="settings-card-head"><div><h5>Politica de privacidade</h5><p>Ultima atualizacao: 31/05/2026</p></div></div>'
+    + '<div class="legal-doc-body">'
+    + '<h6>1. Dados tratados</h6><p>O Granafy pode tratar dados cadastrais e financeiros, como nome, e-mail, telefone, CPF ou CNPJ, empresa, clientes, contas, cartoes, dividas, titulos financeiros, descricoes de extrato e historicos de uso.</p>'
+    + '<h6>2. Finalidades</h6><p>Os dados sao usados para permitir autenticacao, controle de acesso, organizacao financeira, compartilhamento de clientes, importacao e exportacao de dados, geracao de relatorios, suporte operacional e seguranca da plataforma.</p>'
+    + '<h6>3. Bases de tratamento</h6><p>O tratamento pode ocorrer para execucao da relacao contratual, cumprimento de obrigacoes legais, protecao do credito, exercicio regular de direitos e interesses legitimos ligados a seguranca, auditoria e operacao do sistema. Quando necessario, o sistema podera solicitar consentimento especifico.</p>'
+    + '<h6>4. Compartilhamento</h6><p>Os dados podem ser processados por provedores de infraestrutura e autenticacao usados pelo Granafy, inclusive banco de dados, hospedagem, envio de e-mails e armazenamento. O acesso interno aos dados respeita perfis e permissoes da plataforma.</p>'
+    + '<h6>5. Retencao</h6><p>Os dados sao mantidos pelo tempo necessario para a operacao da conta, cumprimento de obrigacoes legais, atendimento de auditoria, defesa em processos e preservacao da integridade da base financeira, observado o principio da necessidade.</p>'
+    + '<h6>6. Direitos do titular</h6><p>O titular pode solicitar confirmacao de tratamento, acesso, correcao, atualizacao, informacao sobre compartilhamento e outras medidas previstas na LGPD, conforme a natureza do dado e a relacao existente com a plataforma e com o responsavel pela base.</p>'
+    + '<h6>7. Seguranca</h6><p>O Granafy adota controles tecnicos e organizacionais razoaveis para reduzir risco de acesso indevido, perda, alteracao ou divulgacao nao autorizada. Mesmo assim, nenhum ambiente conectado e totalmente imune a incidentes.</p>'
+    + '<h6>8. Contato</h6><p>Solicitacoes relacionadas a privacidade, correcao de dados e exercicio de direitos devem ser direcionadas ao responsavel informado pela base ou ao canal operacional definido para a conta utilizada.</p>'
     + '</div>'
     + '</div>';
 }

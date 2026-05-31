@@ -278,13 +278,14 @@ function renderAuthScreen() {
         + '<div class="form-group auth-signup-only" style="display:none"><label>Empresa ou razao social</label><input id="auth-company" type="text" autocomplete="organization" placeholder="Obrigatorio para PJ/consultor"/></div>'
         + '<div class="form-group"><label>E-mail</label><input id="auth-email" type="email" autocomplete="email" placeholder="voce@email.com"/></div>'
         + '<div class="form-group"><label>Senha</label><input id="auth-password" type="password" autocomplete="current-password" placeholder="Sua senha"/></div>'
-        + '<label class="auth-check auth-signup-only" style="display:none"><input id="auth-terms" type="checkbox"/>Confirmo que li e aceito os termos de uso e politica de privacidade.</label>'
+        + '<label class="auth-check auth-signup-only" style="display:none"><input id="auth-terms" type="checkbox"/>Confirmo que li e aceito os <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'terms\')">termos de uso</a> e a <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'privacy\')">politica de privacidade</a>.</label>'
         + '<div id="auth-message" class="auth-message"></div>'
         + '<button class="auth-primary" onclick="loginUsuario()">Entrar</button>'
         + '<button class="auth-secondary" id="auth-create-btn" onclick="mostrarCadastro()">Criar acesso</button>'
         + '<button class="auth-secondary auth-signup-only" style="display:none" onclick="criarUsuario()">Salvar cadastro</button>'
         + '<button class="auth-link auth-signup-only" style="display:none" onclick="mostrarLogin()">Voltar para entrar</button>'
         + '<button class="auth-link" onclick="enviarResetSenha()">Esqueci minha senha</button>'
+        + '<div class="auth-legal-links"><a href="#" onclick="event.preventDefault();openModal(\'legal\',\'terms\')">Termos de uso</a><span>·</span><a href="#" onclick="event.preventDefault();openModal(\'legal\',\'privacy\')">Politica de privacidade</a></div>'
       + '</div>'
     + '</section>';
 
@@ -647,7 +648,7 @@ async function criarUsuario() {
       email: email,
       password: password,
       options: {
-        emailRedirectTo: window.location.origin + window.location.pathname,
+        emailRedirectTo: (window.getGranafyAppUrl ? window.getGranafyAppUrl() : (window.location.origin + window.location.pathname)),
         data: {
           nome: nome,
           telefone: telefone,
@@ -686,11 +687,14 @@ async function criarUsuario() {
       return;
     }
 
-    if (getAuthInviteContext()) {
-      setAuthMessage('Acesso criado. Confirme seu e-mail antes de entrar para acessar o cliente compartilhado.');
-    } else {
-      setAuthMessage('Acesso criado. Confirme seu e-mail antes de entrar.');
-    }
+    mostrarLogin();
+    var emailEl = document.getElementById('auth-email');
+    if (emailEl) emailEl.value = email;
+    setAuthMessage(
+      getAuthInviteContext()
+        ? 'Acesso criado. Confirme seu e-mail e depois entre para acessar o cliente compartilhado.'
+        : 'Acesso criado. Confirme seu e-mail e depois entre.'
+    );
   } catch (err) {
     console.error('Erro ao criar acesso:', err);
     setAuthMessage(err.message || 'Erro inesperado ao criar o acesso.', 'error');
@@ -711,7 +715,7 @@ async function enviarResetSenha() {
   setAuthMessage('Enviando link...');
 
   var response = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + window.location.pathname
+    redirectTo: (window.getGranafyAppUrl ? window.getGranafyAppUrl() : (window.location.origin + window.location.pathname))
   });
 
   setAuthLoading(false);
