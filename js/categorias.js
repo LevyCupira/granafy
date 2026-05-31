@@ -35,6 +35,10 @@ var DC_FINANCEIRO = [
   'Impostos', 'Fornecedores', 'Aluguel', 'Marketing', 'Salarios', 'Outros'
 ];
 
+var DC_CENTROS_CUSTO = [
+  'Operacional', 'Comercial', 'Administrativo', 'Marketing', 'Projetos', 'Outros'
+];
+
 function normalizarNomeCategoria(nome) {
   return String(nome || '')
     .normalize('NFD')
@@ -87,10 +91,21 @@ function catsFinanceiroStorageKey(clientId) {
   return id ? ('fb_cats_financeiro__' + id) : 'fb_cats_financeiro';
 }
 
+function centrosCustoStorageKey(clientId) {
+  var id = getCategoryClientId(clientId);
+  return id ? ('fb_centros_custo__' + id) : 'fb_centros_custo';
+}
+
 function isCategoriasClienteTableMissing(error) {
   if (!error) return false;
   var msg = String((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
   return error.code === '42P01' || error.code === 'PGRST205' || (msg.includes('categorias_cliente') && (msg.includes('relation') || msg.includes('schema cache')));
+}
+
+function isCentrosCustoTableMissing(error) {
+  if (!error) return false;
+  var msg = String((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+  return error.code === '42P01' || error.code === 'PGRST205' || (msg.includes('centros_custo_cliente') && (msg.includes('relation') || msg.includes('schema cache')));
 }
 
 async function persistirCategoriasClienteNoSupabase(escopo, lista, clientId) {
@@ -245,6 +260,21 @@ function sincronizarCatsFinanceiro(lista) {
   return ordenarCategoriasCartao(Array.from(mapa.values()));
 }
 
+function sincronizarCentrosCusto(lista) {
+  var mapa = new Map();
+  var origem = Array.isArray(lista) && lista.length ? lista : DC_CENTROS_CUSTO.slice();
+
+  origem.forEach(function(cat) {
+    var nome = String(cat || '').trim();
+    if (!nome) return;
+    var chave = normalizarNomeCategoria(nome);
+    if (mapa.has(chave)) return;
+    mapa.set(chave, nome);
+  });
+
+  return ordenarCategoriasCartao(Array.from(mapa.values()));
+}
+
 function loadCatsCartao(clientId) {
   var alvo = getCategoryClientId(clientId);
   if (!alvo) return sincronizarCatsCartao(DC_CART.slice());
@@ -278,6 +308,24 @@ function loadCatsFinanceiro(clientId) {
     return lista;
   } catch (e) {
     return sincronizarCatsFinanceiro(DC_FINANCEIRO.slice());
+  }
+}
+
+function loadCentrosCusto(clientId) {
+  var alvo = getCategoryClientId(clientId);
+  if (!alvo) return sincronizarCentrosCusto(DC_CENTROS_CUSTO.slice());
+
+  try {
+    var cliente = data && data.clients ? data.clients[alvo] : null;
+    var emMemoria = cliente && Array.isArray(cliente.centrosCusto) ? cliente.centrosCusto : null;
+    if (emMemoria && emMemoria.length) return sincronizarCentrosCusto(emMemoria);
+
+    var salvo = JSON.parse(localStorage.getItem(centrosCustoStorageKey(alvo)));
+    var lista = sincronizarCentrosCusto(salvo);
+    if (cliente) cliente.centrosCusto = lista.slice();
+    return lista;
+  } catch (e) {
+    return sincronizarCentrosCusto(DC_CENTROS_CUSTO.slice());
   }
 }
 
@@ -329,6 +377,39 @@ function saveCatsFinanceiro(lista, clientId) {
   return syncPromise;
 }
 
+function saveCentrosCusto(lista, clientId) {
+  var alvo = getCategoryClientId(clientId);
+  var normalizada = sincronizarCentrosCusto(lista);
+  if (alvo && data && data.clients && data.clients[alvo]) data.clients[alvo].centrosCusto = normalizada.slice();
+  localStorage.setItem(centrosCustoStorageKey(alvo), JSON.stringify(normalizada));
+  var linhas = normalizada.map(function(nome) {
+    return Object.assign({
+      cliente_id: alvo,
+      nome: nome
+    }, getUserScopePayload());
+  });
+  var syncPromise = (async function() {
+    if (!alvo || typeof supabaseClient === 'undefined' || !supabaseClient || typeof currentUserId !== 'function' || !currentUserId()) return;
+    var deleteQuery = supabaseClient.from('centros_custo_cliente').delete().eq('cliente_id', alvo);
+    deleteQuery = typeof applyUserScope === 'function' ? applyUserScope(deleteQuery) : deleteQuery;
+    var deleteRes = await deleteQuery;
+    if (deleteRes && deleteRes.error) {
+      if (isCentrosCustoTableMissing(deleteRes.error)) return;
+      throw new Error(deleteRes.error.message || 'Erro ao limpar centros de custo.');
+    }
+    if (!linhas.length) return;
+    var insertRes = await supabaseClient.from('centros_custo_cliente').insert(linhas);
+    if (insertRes && insertRes.error) {
+      if (isCentrosCustoTableMissing(insertRes.error)) return;
+      throw new Error(insertRes.error.message || 'Erro ao salvar centros de custo.');
+    }
+  })();
+  syncPromise.catch(function(err) {
+    console.error('Nao foi possivel sincronizar centros de custo no Supabase:', err);
+  });
+  return syncPromise;
+}
+
 function nomesCC(clientId) {
   return loadCatsCC(clientId).map(function(c) { return c.nome; });
 }
@@ -339,6 +420,10 @@ function nomesCartao(clientId) {
 
 function nomesFinanceiro(clientId) {
   return loadCatsFinanceiro(clientId).slice();
+}
+
+function nomesCentrosCusto(clientId) {
+  return loadCentrosCusto(clientId).slice();
 }
 
 function tipoCat(nomeCategoria, clientId) {

@@ -567,6 +567,7 @@ function renderSettingsModal(activeTabKey) {
   var ccCount = (loadCatsCC() || []).length;
   var cartaoCount = (loadCatsCartao() || []).length;
   var financeiroCount = cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj' ? (loadCatsFinanceiro() || []).length : 0;
+  var centrosCustoCount = cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj' ? (loadCentrosCusto() || []).length : 0;
   var showTabsPanel = !!cliente;
   var showUsersTab = typeof canSeeUsersTab === 'function' ? canSeeUsersTab() : !!authUser;
   var showAuditoriaTab = typeof canSeeAuditoria === 'function' ? canSeeAuditoria() : true;
@@ -582,6 +583,7 @@ function renderSettingsModal(activeTabKey) {
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
   if (cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj') {
     tabButtons += '<button class="modal-tab settings-tab-rich" data-stab="cats_financeiro" onclick="switchSettingsTab(\'cats_financeiro\')"><span class="settings-tab-main">Financeiro</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + financeiroCount + '</span></button>';
+    tabButtons += '<button class="modal-tab settings-tab-rich" data-stab="centros_custo" onclick="switchSettingsTab(\'centros_custo\')"><span class="settings-tab-main">Centros de custo</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + centrosCustoCount + '</span></button>';
   }
   if (showTabsPanel) {
     tabButtons += '<button class="modal-tab" data-stab="visual" onclick="switchSettingsTab(\'visual\')">Abas</button>';
@@ -607,6 +609,7 @@ function renderSettingsModal(activeTabKey) {
     + '<div id="modal-panel-cats_cc" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_financeiro" class="modal-panel"></div>'
+    + '<div id="modal-panel-centros_custo" class="modal-panel"></div>'
     + '<div id="modal-panel-visual" class="modal-panel"></div>'
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
     + '<div id="modal-panel-auditoria" class="modal-panel"></div>';
@@ -615,6 +618,7 @@ function renderSettingsModal(activeTabKey) {
   if (firstTab === 'usuarios' && !showUsersTab) firstTab = 'cats_cc';
   if (firstTab === 'visual' && !showTabsPanel) firstTab = 'cats_cc';
   if (firstTab === 'cats_financeiro' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
+  if (firstTab === 'centros_custo' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
   switchSettingsTab(firstTab);
 }
 
@@ -634,6 +638,7 @@ function switchSettingsTab(tab) {
   if (tab === 'cats_cc') renderCatsPanel('cc');
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
   if (tab === 'cats_financeiro') renderCatsPanel('financeiro');
+  if (tab === 'centros_custo') renderCatsPanel('centro_custo');
   if (tab === 'visual') renderClientTabsPanel();
   if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
   if (tab === 'auditoria' && (typeof canSeeAuditoria !== 'function' || canSeeAuditoria())) renderAuditoriaPanel();
@@ -843,14 +848,14 @@ async function solicitarAlteracaoPerfil() {
 }
 
 function renderCatsPanel(tipo) {
-  var panelSuffix = tipo === 'cc' ? 'cc' : (tipo === 'cartao' ? 'cartao' : 'financeiro');
+  var panelSuffix = tipo === 'cc' ? 'cc' : (tipo === 'cartao' ? 'cartao' : (tipo === 'financeiro' ? 'financeiro' : 'centros_custo'));
   if (!activeClient || !data.clients || !data.clients[activeClient]) {
     document.getElementById('modal-panel-cats_' + panelSuffix).innerHTML =
       '<p style="color:var(--muted);font-size:.83rem">Selecione um cliente para personalizar as categorias dele.</p>';
     return;
   }
 
-  var cats = tipo === 'cc' ? loadCatsCC() : (tipo === 'cartao' ? loadCatsCartao() : loadCatsFinanceiro());
+  var cats = tipo === 'cc' ? loadCatsCC() : (tipo === 'cartao' ? loadCatsCartao() : (tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto()));
   var pid = 'modal-panel-cats_' + panelSuffix;
   var TIPOS_DRE = { receita: 'Receita', fixa: 'Fixa', variavel: 'Variavel', transferencia: 'Transferencia' };
   var clienteNome = (data.clients[activeClient] && data.clients[activeClient].name) || 'cliente atual';
@@ -889,16 +894,18 @@ function renderCatsPanel(tipo) {
     ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
     : (tipo === 'cartao'
       ? 'Categorias dos lancamentos do <strong style="color:var(--text)">Cartao de Credito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variavel no DRE.'
-      : 'Categorias do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Use essas opcoes em contas a receber e contas a pagar.');
+      : (tipo === 'financeiro'
+        ? 'Categorias do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Use essas opcoes em contas a receber e contas a pagar.'
+        : 'Centros de custo do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Organize extrato e titulos por area de responsabilidade.'));
   var clienteTipo = data.clients[activeClient] && data.clients[activeClient].tipoCliente ? clientTypeLabel(data.clients[activeClient].tipoCliente) : 'Cliente';
   var totalCats = cats.length;
 
   document.getElementById(pid).innerHTML =
     '<div class="settings-section-card">'
-    + '<div class="settings-card-head"><div><h5>' + (tipo === 'cc' ? 'Categorias da conta corrente' : (tipo === 'cartao' ? 'Categorias do cartao' : 'Categorias do financeiro')) + '</h5><p>' + desc + '</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + totalCats + ' categorias</span></div></div>'
+    + '<div class="settings-card-head"><div><h5>' + (tipo === 'cc' ? 'Categorias da conta corrente' : (tipo === 'cartao' ? 'Categorias do cartao' : (tipo === 'financeiro' ? 'Categorias do financeiro' : 'Centros de custo'))) + '</h5><p>' + desc + '</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + totalCats + ' ' + esc(tipo === 'centro_custo' ? 'centros' : 'categorias') + '</span></div></div>'
     + '<div class="settings-cat-grid" id="tagList-' + tipo + '">' + tagHtml + '</div>'
     + '<div class="tag-input-row settings-tag-input-row">'
-    + '<input type="text" id="newCatInput-' + tipo + '" placeholder="Nova categoria..." onkeydown="if(event.key===\'Enter\')addCategory(\'' + tipo + '\')"/>'
+    + '<input type="text" id="newCatInput-' + tipo + '" placeholder="' + esc(tipo === 'centro_custo' ? 'Novo centro de custo...' : 'Nova categoria...') + '" onkeydown="if(event.key===\'Enter\')addCategory(\'' + tipo + '\')"/>'
     + '<button onclick="addCategory(\'' + tipo + '\')">Adicionar</button>'
     + '</div>'
     + '<div class="settings-card-footer">'
@@ -932,6 +939,12 @@ function refreshCategoryConsumers(tipo) {
 
   if (tipo === 'financeiro' && activeTab === 'financeiro' && typeof renderFinanceiro === 'function') {
     renderFinanceiro();
+    return;
+  }
+
+  if (tipo === 'centro_custo') {
+    if (activeTab === 'financeiro' && typeof renderFinanceiro === 'function') renderFinanceiro();
+    if (activeTab === 'extrato' && typeof renderExtrato === 'function') renderExtrato();
   }
 }
 
@@ -951,10 +964,11 @@ function addCategory(tipo) {
     carts.push(val);
     saveCatsCartao(carts);
   } else {
-    var fins = loadCatsFinanceiro();
-    if (fins.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
-    fins.push(val);
-    saveCatsFinanceiro(fins);
+    var lista = tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto();
+    if (lista.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert((tipo === 'centro_custo' ? 'Centro de custo' : 'Categoria') + ' ja existe.');
+    lista.push(val);
+    if (tipo === 'financeiro') saveCatsFinanceiro(lista);
+    else saveCentrosCusto(lista);
   }
 
   if (inp) inp.value = '';
@@ -973,9 +987,10 @@ function deleteCategory(tipo, i) {
     carts.splice(i, 1);
     saveCatsCartao(carts);
   } else {
-    var fins = loadCatsFinanceiro();
-    fins.splice(i, 1);
-    saveCatsFinanceiro(fins);
+    var lista = tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto();
+    lista.splice(i, 1);
+    if (tipo === 'financeiro') saveCatsFinanceiro(lista);
+    else saveCentrosCusto(lista);
   }
   renderCatsPanel(tipo);
   refreshCategoryConsumers(tipo);
@@ -997,7 +1012,7 @@ function syncSidebarThemeToggle() {
 }
 
 function openEditCategoryModal(tipo, i) {
-  var cats = tipo === 'cc' ? loadCatsCC() : (tipo === 'cartao' ? loadCatsCartao() : loadCatsFinanceiro());
+  var cats = tipo === 'cc' ? loadCatsCC() : (tipo === 'cartao' ? loadCatsCartao() : (tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto()));
   var cat = cats[i];
   if (!cat) return;
   if (tipo === 'cc' && cat.fixa) return;
@@ -1014,7 +1029,7 @@ function openEditCategoryModal(tipo, i) {
       : '')
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
-    + '<button class="btn-sm red" type="button" onclick="renderSettingsModal(\'' + (tipo === 'cc' ? 'cats_cc' : (tipo === 'cartao' ? 'cats_cartao' : 'cats_financeiro')) + '\')">Cancelar</button>'
+    + '<button class="btn-sm red" type="button" onclick="renderSettingsModal(\'' + (tipo === 'cc' ? 'cats_cc' : (tipo === 'cartao' ? 'cats_cartao' : (tipo === 'financeiro' ? 'cats_financeiro' : 'centros_custo'))) + '\')">Cancelar</button>'
     + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveCategoryEdit(\'' + tipo + '\',' + i + ')">Salvar alteracoes</button>'
     + '</div>';
 }
@@ -1091,20 +1106,27 @@ async function saveCategoryEdit(tipo, i) {
     return;
   }
 
-  var fins = loadCatsFinanceiro();
-  if (!fins[i]) return;
-  if (fins.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
-  fins[i] = nome;
-  await Promise.resolve(saveCatsFinanceiro(fins));
-  renderSettingsModal('cats_financeiro');
-  refreshCategoryConsumers('financeiro');
+  var lista = tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto();
+  if (!lista[i]) return;
+  if (lista.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert((tipo === 'centro_custo' ? 'Centro de custo' : 'Categoria') + ' ja existe.');
+  lista[i] = nome;
+  if (tipo === 'financeiro') {
+    await Promise.resolve(saveCatsFinanceiro(lista));
+    renderSettingsModal('cats_financeiro');
+    refreshCategoryConsumers('financeiro');
+    return;
+  }
+  await Promise.resolve(saveCentrosCusto(lista));
+  renderSettingsModal('centros_custo');
+  refreshCategoryConsumers('centro_custo');
 }
 
 async function resetCategories(tipo) {
   if (!(await appConfirm('Restaurar categorias padrao?', { title: 'Restaurar categorias', confirmText: 'Restaurar' }))) return;
   if (tipo === 'cc') await Promise.resolve(saveCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); })));
   else if (tipo === 'cartao') await Promise.resolve(saveCatsCartao(DC_CART.slice()));
-  else await Promise.resolve(saveCatsFinanceiro(DC_FINANCEIRO.slice()));
+  else if (tipo === 'financeiro') await Promise.resolve(saveCatsFinanceiro(DC_FINANCEIRO.slice()));
+  else await Promise.resolve(saveCentrosCusto(DC_CENTROS_CUSTO.slice()));
   renderCatsPanel(tipo);
   refreshCategoryConsumers(tipo);
 }

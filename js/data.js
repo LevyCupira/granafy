@@ -75,6 +75,22 @@ async function loadData() {
     return res;
   }
 
+  async function carregarCentrosCustoComEscopo() {
+    var query = supabaseClient.from('centros_custo_cliente').select('*');
+    var res = await query.order('nome', { ascending: true });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('centros_custo_cliente')) {
+      console.warn('Tabela centros_custo_cliente ainda nao existe no Supabase. Rode a migracao 20260531_centros_custo_cliente.sql.');
+      return { data: [], error: null };
+    }
+
+    return res;
+  }
+
   async function carregarRelacionamentosComEscopo() {
     var query = supabaseClient.from('relacionamentos_cliente').select('*');
     var res = await query.order('nome', { ascending: true });
@@ -163,6 +179,11 @@ async function loadData() {
     console.warn('Nao foi possivel carregar categorias personalizadas:', categoriasRes.error);
   }
   const categoriasRows = categoriasRes.data || [];
+  const centrosCustoRes = await carregarCentrosCustoComEscopo();
+  if (centrosCustoRes.error) {
+    console.warn('Nao foi possivel carregar centros de custo:', centrosCustoRes.error);
+  }
+  const centrosCustoRows = centrosCustoRes.data || [];
   const relacionamentosRes = await carregarRelacionamentosComEscopo();
   if (relacionamentosRes.error) {
     console.warn('Nao foi possivel carregar relacionamentos personalizados:', relacionamentosRes.error);
@@ -200,6 +221,8 @@ async function loadData() {
   const catsCCPorCliente = {};
   const catsCartaoPorCliente = {};
   const catsFinanceiroPorCliente = {};
+  const centrosCustoPorCliente = {};
+  const centrosCustoMetaPorCliente = {};
   (categoriasRows || []).forEach(cat => {
     if (!cat || !cat.cliente_id || !cat.nome) return;
     if (cat.escopo === 'cc') {
@@ -238,6 +261,18 @@ async function loadData() {
     });
   });
 
+  (centrosCustoRows || []).forEach(item => {
+    if (!item || !item.cliente_id || !item.nome) return;
+    if (!centrosCustoPorCliente[item.cliente_id]) centrosCustoPorCliente[item.cliente_id] = [];
+    if (!centrosCustoMetaPorCliente[item.cliente_id]) centrosCustoMetaPorCliente[item.cliente_id] = [];
+    centrosCustoPorCliente[item.cliente_id].push(item.nome);
+    centrosCustoMetaPorCliente[item.cliente_id].push({
+      id: item.id,
+      nome: item.nome,
+      userId: item.user_id || null
+    });
+  });
+
   const dividasPorCliente = {};
   (dividasRows || []).forEach(d => {
     if (!dividasPorCliente[d.cliente_id]) dividasPorCliente[d.cliente_id] = [];
@@ -269,6 +304,7 @@ async function loadData() {
       tipo: l.tipo || '',
       valor: Number(l.valor || 0),
       contaId: l.conta_id || null,
+      centroCustoId: l.centro_custo_id || null,
       relacionamentoId: l.relacionamento_id || null,
       observacao: l.observacao || ''
     });
@@ -319,6 +355,7 @@ async function loadData() {
       pessoaNome: t.pessoa_nome || '',
       descricao: t.descricao || '',
       categoria: t.categoria || '',
+      centroCustoId: t.centro_custo_id || null,
       vencimento: t.vencimento || null,
       valorTotal: Number(t.valor_total || 0),
       observacao: t.observacao || '',
@@ -366,6 +403,8 @@ async function loadData() {
       acessos: acessosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],
+      centrosCustoMeta: centrosCustoMetaPorCliente[c.id] || [],
+      centrosCusto: centrosCustoPorCliente[c.id] ? sincronizarCentrosCusto(centrosCustoPorCliente[c.id]) : loadCentrosCusto(c.id),
       catsCC: catsCCPorCliente[c.id] ? sincronizarCatsCC(catsCCPorCliente[c.id]) : loadCatsCC(c.id),
       catsCartao: catsCartaoPorCliente[c.id] ? sincronizarCatsCartao(catsCartaoPorCliente[c.id]) : loadCatsCartao(c.id),
       catsFinanceiro: catsFinanceiroPorCliente[c.id] ? sincronizarCatsFinanceiro(catsFinanceiroPorCliente[c.id]) : loadCatsFinanceiro(c.id)
