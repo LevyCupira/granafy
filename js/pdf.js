@@ -33,10 +33,6 @@ function exportPDF() {
     ? periodosFiltro.map(formatPeriodoLabel).join(', ')
     : 'Periodo selecionado';
 
-  var isAbatimento = function(l) {
-    return typeof isAbatimentoDespesaResumo === 'function' && isAbatimentoDespesaResumo(l);
-  };
-
   doc.setFillColor(30, 35, 54);
   doc.rect(0, 0, W, 28, 'F');
   doc.setFont('helvetica', 'bold');
@@ -60,6 +56,13 @@ function exportPDF() {
   var consolidado = typeof consolidarTransacoesAnaliticas === 'function'
     ? consolidarTransacoesAnaliticas(todas)
     : null;
+  var abatimentosResumo = new Map(
+    (consolidado && Array.isArray(consolidado.analiticas) ? consolidado.analiticas : [])
+      .map(function(l) { return [l._resumoKey, !!l.ehAbatimentoResumo]; })
+  );
+  var isAbatimento = function(l) {
+    return !!abatimentosResumo.get(l && l._resumoKey);
+  };
   var cartaoFiltrado = periodosFiltro.length
     ? (c.cartao || []).filter(function(it) { return periodoSet.has((it.data || '').slice(0, 7)); })
     : (c.cartao || []);

@@ -10,7 +10,7 @@ function getTransacoes(clienteId) {
     ? filtrarExtratoResumoDuplicados(extratoBase)
     : extratoBase;
 
-  extrato.forEach(function(l) {
+  extrato.forEach(function(l, idx) {
     result.push({
       data: l.data,
       desc: l.desc,
@@ -18,11 +18,12 @@ function getTransacoes(clienteId) {
       valor: Number(l.valor),
       tipo: l.tipo,
       fonte: 'Conta Corrente',
-      ehMovConta: typeof isCategoriaMovContas === 'function' && isCategoriaMovContas(l.cat)
+      ehMovConta: typeof isCategoriaMovContas === 'function' && isCategoriaMovContas(l.cat),
+      _resumoKey: 'ex:' + idx + ':' + String(l.id || '')
     });
   });
 
-  (c.cartao || []).filter(function(l) { return l.tipo !== 'estorno'; }).forEach(function(l) {
+  (c.cartao || []).filter(function(l) { return l.tipo !== 'estorno'; }).forEach(function(l, idx) {
     var cc = (c.cartoes || []).find(function(x) { return x.id === l.cartaoId; });
     var fonte = cc ? 'Cartao ' + cc.nome : 'Cartao de Credito';
     result.push({
@@ -32,7 +33,8 @@ function getTransacoes(clienteId) {
       valor: Number(l.valor),
       tipo: 'debito',
       fonte: fonte,
-      ehMovConta: false
+      ehMovConta: false,
+      _resumoKey: 'cc:' + idx + ':' + String(l.id || '')
     });
   });
 
@@ -70,14 +72,55 @@ function filtrarExtratoResumoDuplicados(lancamentos) {
 function consolidarTransacoesAnaliticas(transacoes) {
   var movContas = (transacoes || []).filter(function(l) { return l.ehMovConta; });
   var analiticas = (transacoes || []).filter(function(l) { return !l.ehMovConta; });
+  var debitosPorCategoria = new Map();
+  var analiticasClassificadas = analiticas.map(function(l) {
+    return Object.assign({}, l, {
+      resumoClasse: typeof tipoCat === 'function' ? tipoCat(l.cat) : 'variavel',
+      ehAbatimentoResumo: false
+    });
+  });
   var receitasMap = new Map();
   var despesasMap = new Map();
 
-  analiticas.forEach(function(l) {
-    var cat = l.cat || 'Outros';
-    var classe = typeof tipoCat === 'function' ? tipoCat(cat) : 'variavel';
+  function normalizarDescricaoResumo(desc) {
+    return String(desc || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+\d+\/\d+\s*$/, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
 
-    if (classe === 'receita') {
+  analiticasClassificadas.forEach(function(l) {
+    if (l.tipo !== 'debito') return;
+    var cat = l.cat || 'Outros';
+    var bucket = debitosPorCategoria.get(cat) || [];
+    bucket.push({
+      desc: normalizarDescricaoResumo(l.desc),
+      valor: Number(l.valor || 0)
+    });
+    debitosPorCategoria.set(cat, bucket);
+  });
+
+  analiticasClassificadas.forEach(function(l) {
+    var cat = l.cat || 'Outros';
+    var classe = l.resumoClasse;
+
+    if (l.tipo === 'credito' && classe !== 'receita') {
+      var descNorm = normalizarDescricaoResumo(l.desc);
+      var valorAbs = Math.abs(Number(l.valor || 0));
+      var debitos = debitosPorCategoria.get(cat) || [];
+      l.ehAbatimentoResumo = debitos.some(function(item) {
+        if (!item.valor) return false;
+        var mesmaDescricao = descNorm && item.desc && descNorm === item.desc;
+        var mesmoValor = Math.abs(Number(item.valor || 0) - valorAbs) < 0.005;
+        return mesmaDescricao || mesmoValor;
+      });
+    }
+
+    if (classe === 'receita' || (l.tipo === 'credito' && !l.ehAbatimentoResumo)) {
       receitasMap.set(cat, (receitasMap.get(cat) || 0) + (l.tipo === 'credito' ? Number(l.valor || 0) : -Number(l.valor || 0)));
       return;
     }
@@ -97,7 +140,7 @@ function consolidarTransacoesAnaliticas(transacoes) {
 
   return {
     movContas: movContas,
-    analiticas: analiticas,
+    analiticas: analiticasClassificadas,
     receitas: receitas,
     despesas: despesas,
     totalReceitas: receitas.reduce(function(s, entry) { return s + entry.valor; }, 0),
@@ -106,9 +149,7 @@ function consolidarTransacoesAnaliticas(transacoes) {
 }
 
 function isAbatimentoDespesaResumo(l) {
-  if (!l || l.ehMovConta) return false;
-  if (l.tipo !== 'credito') return false;
-  return typeof tipoCat === 'function' && tipoCat(l.cat) !== 'receita';
+  return !!(l && l.ehAbatimentoResumo);
 }
 
 function formatPeriodoLabel(m) {
@@ -194,10 +235,11 @@ function renderResumo() {
       + '<span class="cat-val val-neg">' + fmt(val) + '</span></div>';
   }).join('') || '<p style="color:var(--muted);font-size:.82rem;padding:6px 0">Nenhuma despesa.</p>';
 
-  var tabela = filtered.length === 0
+  var transacoesTabela = movContas.concat(consolidado.analiticas);
+  var tabela = transacoesTabela.length === 0
     ? '<div class="empty-state" style="padding:26px"><div class="icon">&#128202;</div>Nenhum lancamento no periodo.</div>'
     : '<table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>'
-      + filtered.slice().sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); }).map(function(l) {
+      + transacoesTabela.slice().sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); }).map(function(l) {
           var abatimento = isAbatimentoDespesaResumo(l);
           var tipoLabel = abatimento ? 'Abatimento' : (l.tipo === 'credito' ? 'Receita' : 'Despesa');
           var tipoColor = abatimento ? 'var(--warning)' : (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)');
