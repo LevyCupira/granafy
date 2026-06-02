@@ -74,10 +74,12 @@ function renderLegalModal(activeTabKey) {
     + '<div class="modal-tabs settings-tabs" id="legalTabs">'
     + '<button class="modal-tab" data-ltab="terms" onclick="switchLegalTab(\'terms\')">Termos de uso</button>'
     + '<button class="modal-tab" data-ltab="privacy" onclick="switchLegalTab(\'privacy\')">Politica de privacidade</button>'
+    + '<button class="modal-tab" data-ltab="lgpd" onclick="switchLegalTab(\'lgpd\')">LGPD</button>'
     + '</div>'
     + '<div id="modal-panel-terms" class="modal-panel"></div>'
-    + '<div id="modal-panel-privacy" class="modal-panel"></div>';
-  switchLegalTab(activeTabKey === 'privacy' ? 'privacy' : 'terms');
+    + '<div id="modal-panel-privacy" class="modal-panel"></div>'
+    + '<div id="modal-panel-lgpd" class="modal-panel"></div>';
+  switchLegalTab(activeTabKey === 'privacy' || activeTabKey === 'lgpd' ? activeTabKey : 'terms');
 }
 
 function switchLegalTab(tab) {
@@ -91,7 +93,9 @@ function switchLegalTab(tab) {
   var panel = document.getElementById('modal-panel-' + tab);
   if (!panel) return;
   panel.classList.add('active');
-  panel.innerHTML = tab === 'privacy' ? legalPrivacyHtml() : legalTermsHtml();
+  if (tab === 'privacy') panel.innerHTML = legalPrivacyHtml();
+  else if (tab === 'lgpd') panel.innerHTML = legalLgpdHtml();
+  else panel.innerHTML = legalTermsHtml();
 }
 
 function legalTermsHtml() {
@@ -121,7 +125,21 @@ function legalPrivacyHtml() {
     + '<h6>5. Retencao</h6><p>Os dados sao mantidos pelo tempo necessario para a operacao da conta, cumprimento de obrigacoes legais, atendimento de auditoria, defesa em processos e preservacao da integridade da base financeira, observado o principio da necessidade.</p>'
     + '<h6>6. Direitos do titular</h6><p>O titular pode solicitar confirmacao de tratamento, acesso, correcao, atualizacao, informacao sobre compartilhamento e outras medidas previstas na LGPD, conforme a natureza do dado e a relacao existente com a plataforma e com o responsavel pela base.</p>'
     + '<h6>7. Seguranca</h6><p>O Granafy adota controles tecnicos e organizacionais razoaveis para reduzir risco de acesso indevido, perda, alteracao ou divulgacao nao autorizada. Mesmo assim, nenhum ambiente conectado e totalmente imune a incidentes.</p>'
-    + '<h6>8. Contato</h6><p>Solicitacoes relacionadas a privacidade, correcao de dados e exercicio de direitos devem ser direcionadas ao responsavel informado pela base ou ao canal operacional definido para a conta utilizada.</p>'
+    + '<h6>8. Controlador, operador e suboperadores</h6><p>Em regra, o cliente dono da base atua como controlador dos dados da propria operacao financeira. O Granafy atua como operador para viabilizar autenticacao, armazenamento, compartilhamento controlado, relatorios e trilhas operacionais. Servicos de infraestrutura e autenticacao utilizados pela plataforma podem atuar como suboperadores.</p>'
+    + '<h6>9. Contato</h6><p>Solicitacoes relacionadas a privacidade, correcao de dados e exercicio de direitos devem ser direcionadas ao responsavel informado pela base ou ao canal operacional definido para a conta utilizada. O uso produtivo da plataforma deve manter um canal claro para esse atendimento.</p>'
+    + '</div>'
+    + '</div>';
+}
+
+function legalLgpdHtml() {
+  return '<div class="settings-section-card legal-doc">'
+    + '<div class="settings-card-head"><div><h5>Programa LGPD do Granafy</h5><p>Base inicial de governanca e conformidade do produto.</p></div></div>'
+    + '<div class="legal-doc-body">'
+    + '<h6>1. O que ja existe</h6><p>O produto ja conta com aceite de termos, politica de privacidade, perfis de acesso, compartilhamento por cliente, segregacao entre clientes, trilhas operacionais e documentacao inicial de LGPD no repositorio.</p>'
+    + '<h6>2. O que ainda precisa ser fechado</h6><p>As proximas etapas sao formalizar canal de atendimento ao titular, politica de retencao, procedimento de exportacao/correcao/exclusao, inventario de operadores e rito de incidente.</p>'
+    + '<h6>3. Referencias oficiais usadas</h6><p>Esta fase foi estruturada com base na LGPD, nos guias da ANPD sobre agentes de tratamento, direitos do titular, seguranca da informacao para pequeno porte e regulamentos aplicaveis.</p>'
+    + '<h6>4. Documentos do projeto</h6><ul><li><code>docs/lgpd-plano-granafy.md</code></li><li><code>docs/lgpd-registro-tratamento.md</code></li><li><code>docs/lgpd-incidentes-e-direitos.md</code></li></ul>'
+    + '<h6>5. Recomendacao operacional</h6><p>Antes de operar em escala maior, a base deve definir responsavel por privacidade, revisar acessos compartilhados, validar backups, mapear retencao e treinar quem concede acesso a clientes e terceiros.</p>'
     + '</div>'
     + '</div>';
 }
@@ -571,11 +589,13 @@ function renderSettingsModal(activeTabKey) {
   var showTabsPanel = !!cliente;
   var showUsersTab = typeof canSeeUsersTab === 'function' ? canSeeUsersTab() : !!authUser;
   var showAuditoriaTab = typeof canSeeAuditoria === 'function' ? canSeeAuditoria() : true;
+  var showLgpdTab = !!authUser;
   var isMaster = typeof isAdminUser === 'function' && isAdminUser();
   var usersTabLabel = isMaster ? 'Usuarios' : 'Minha conta';
   var heroParts = ['Personalize as categorias deste cliente'];
   if (showTabsPanel) heroParts.push('organize as abas usadas no dia a dia');
   if (showUsersTab) heroParts.push(isMaster ? 'gerencie perfis' : 'acompanhe seu perfil');
+  if (showLgpdTab) heroParts.push('acompanhe a trilha de LGPD');
   if (showAuditoriaTab) heroParts.push('revise a auditoria');
   var heroText = heroParts.join(', ') + ' sem misturar dados com os outros clientes da base.';
   var tabButtons = ''
@@ -591,6 +611,9 @@ function renderSettingsModal(activeTabKey) {
 
   if (showUsersTab) {
     tabButtons += '<button class="modal-tab" data-stab="usuarios" onclick="switchSettingsTab(\'usuarios\')">' + usersTabLabel + '</button>';
+  }
+  if (showLgpdTab) {
+    tabButtons += '<button class="modal-tab" data-stab="lgpd" onclick="switchSettingsTab(\'lgpd\')">LGPD</button>';
   }
 
   if (showAuditoriaTab) {
@@ -612,10 +635,12 @@ function renderSettingsModal(activeTabKey) {
     + '<div id="modal-panel-centros_custo" class="modal-panel"></div>'
     + '<div id="modal-panel-visual" class="modal-panel"></div>'
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
+    + '<div id="modal-panel-lgpd" class="modal-panel"></div>'
     + '<div id="modal-panel-auditoria" class="modal-panel"></div>';
   var firstTab = activeTabKey || 'cats_cc';
   if (firstTab === 'auditoria' && !showAuditoriaTab) firstTab = showUsersTab ? 'usuarios' : 'cats_cc';
   if (firstTab === 'usuarios' && !showUsersTab) firstTab = 'cats_cc';
+  if (firstTab === 'lgpd' && !showLgpdTab) firstTab = 'cats_cc';
   if (firstTab === 'visual' && !showTabsPanel) firstTab = 'cats_cc';
   if (firstTab === 'cats_financeiro' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
   if (firstTab === 'centros_custo' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
@@ -641,7 +666,28 @@ function switchSettingsTab(tab) {
   if (tab === 'centros_custo') renderCatsPanel('centro_custo');
   if (tab === 'visual') renderClientTabsPanel();
   if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
+  if (tab === 'lgpd') renderLgpdPanel();
   if (tab === 'auditoria' && (typeof canSeeAuditoria !== 'function' || canSeeAuditoria())) renderAuditoriaPanel();
+}
+
+function renderLgpdPanel() {
+  var panel = document.getElementById('modal-panel-lgpd');
+  if (!panel) return;
+  var cliente = activeClient && data.clients ? data.clients[activeClient] : null;
+  var clienteNome = cliente ? cliente.name : 'Nenhum cliente selecionado';
+  var clienteTipo = cliente && cliente.tipoCliente ? clientTypeLabel(cliente.tipoCliente) : 'Cliente';
+  panel.innerHTML =
+    '<div class="settings-section-card">'
+    + '<div class="settings-card-head"><div><h5>LGPD do ambiente</h5><p>Base inicial de governanca para o Granafy e para a operacao deste cliente.</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + esc(clienteNome) + '</span></div></div>'
+    + '<div class="settings-card-grid backup-card-grid">'
+      + '<div class="settings-action-card"><span class="settings-action-title">Ja coberto</span><small>Termos e politica de privacidade, aceite no cadastro, perfis de acesso, segregacao por cliente, compartilhamento controlado e trilhas operacionais.</small></div>'
+      + '<div class="settings-action-card"><span class="settings-action-title">Pendente priorizado</span><small>Canal do titular, retencao e descarte, exportacao/correcao/exclusao, registro formal de incidente e revisao periodica de acessos.</small></div>'
+    + '</div>'
+    + '<div class="settings-card-grid backup-card-grid" style="margin-top:16px">'
+      + '<div class="settings-action-card"><span class="settings-action-title">Documentos internos</span><small><code>docs/lgpd-plano-granafy.md</code><br><code>docs/lgpd-registro-tratamento.md</code><br><code>docs/lgpd-incidentes-e-direitos.md</code></small></div>'
+      + '<div class="settings-action-card"><span class="settings-action-title">Referencias oficiais</span><small><a href=\"https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/L13709.htm\" target=\"_blank\" rel=\"noopener\">LGPD - Lei 13.709/2018</a><br><a href=\"https://www.gov.br/anpd/pt-br/assuntos/titular-de-dados-1/direitos-dos-titulares\" target=\"_blank\" rel=\"noopener\">ANPD - Direitos do titular</a><br><a href=\"https://www.gov.br/anpd/pt-br/documentos-e-publicacoes/guia-agentes-de-tratamento-e-encarregado.pdf\" target=\"_blank\" rel=\"noopener\">ANPD - Agentes de tratamento</a></small></div>'
+    + '</div>'
+    + '</div>';
 }
 
 function renderClientTabsPanel() {
