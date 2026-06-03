@@ -7,6 +7,7 @@ var _exFiltroMes = getPreviousMonthKey();
 var _exFiltroConta = '';
 var _exFiltroRelacionamento = '';
 var _exFiltroConciliacao = 'todos';
+var _exFiltroEstorno = 'todos';
 var _exFiltroBusca = '';
 var _exSelecaoLote = false;
 var _exSelecionados = new Set();
@@ -117,6 +118,90 @@ function extratoTemRateio(lanc) {
   return extratoRateiosValidos(lanc).length > 0;
 }
 
+function extratoStatusEstornoValor(lanc) {
+  var status = String((lanc && lanc.estornoStatus) || 'normal').toLowerCase().trim();
+  if (status !== 'pendente_estorno' && status !== 'estornado') return 'normal';
+  return status;
+}
+
+function extratoLancamentoOrigemDoEstorno(cliente, lancamentoId) {
+  if (!cliente || !lancamentoId) return null;
+  return (cliente.extrato || []).find(function(item) {
+    return item && item.estornoLancamentoId === lancamentoId;
+  }) || null;
+}
+
+function extratoLancamentoEhEstornoVinculado(cliente, lancamentoId) {
+  return !!extratoLancamentoOrigemDoEstorno(cliente, lancamentoId);
+}
+
+function extratoClasseEstornoLinha(cliente, lanc) {
+  if (extratoLancamentoEhEstornoVinculado(cliente, lanc && lanc.id)) return 'row-estorno-vinculado';
+  var status = extratoStatusEstornoValor(lanc);
+  if (status === 'pendente_estorno') return 'row-estorno-pendente';
+  if (status === 'estornado') return 'row-estorno-concluido';
+  return '';
+}
+
+function extratoResumoEstorno(cliente, lanc) {
+  var origem = extratoLancamentoOrigemDoEstorno(cliente, lanc && lanc.id);
+  if (origem) {
+    return '<span class="badge badge-estorno-vinculado">Lancamento de estorno</span> de ' + esc(origem.desc || origem.descOriginal || '-') + ' ' + fmt(origem.valor || 0);
+  }
+
+  var status = extratoStatusEstornoValor(lanc);
+  if (status === 'pendente_estorno') {
+    return '<span class="badge badge-estorno-pendente">Pendente de estorno</span>'
+      + (lanc && lanc.estornoObservacao ? ' ' + esc(lanc.estornoObservacao) : '');
+  }
+
+  if (status === 'estornado') {
+    var destino = lanc && lanc.estornoLancamentoId ? (cliente.extrato || []).find(function(item) { return item.id === lanc.estornoLancamentoId; }) : null;
+    var texto = '<span class="badge badge-estorno-concluido">Ja estornado</span>';
+    if (lanc && lanc.estornoData) texto += ' em ' + esc(formatDate(lanc.estornoData));
+    if (destino) texto += ' · vinculado a ' + esc(destino.desc || destino.descOriginal || '-') + ' ' + fmt(destino.valor || 0);
+    if (lanc && lanc.estornoObservacao) texto += ' · ' + esc(lanc.estornoObservacao);
+    return texto;
+  }
+
+  return '';
+}
+
+function extratoLancamentosElegiveisEstorno(cliente, lanc) {
+  if (!cliente || !lanc) return [];
+  var tipoEsperado = lanc.tipo === 'credito' ? 'debito' : 'credito';
+  var usadoPorOutro = {};
+  (cliente.extrato || []).forEach(function(item) {
+    if (item && item.estornoLancamentoId && item.id !== lanc.id) usadoPorOutro[item.estornoLancamentoId] = item.id;
+  });
+
+  return (cliente.extrato || []).filter(function(item) {
+    if (!item || !item.id || item.id === lanc.id) return false;
+    if (item.tipo !== tipoEsperado) return false;
+    if (usadoPorOutro[item.id] && item.id !== lanc.estornoLancamentoId) return false;
+    return true;
+  }).sort(function(a, b) {
+    var matchA = Math.abs(Number(a.valor || 0) - Number(lanc.valor || 0)) < 0.005 ? 0 : 1;
+    var matchB = Math.abs(Number(b.valor || 0) - Number(lanc.valor || 0)) < 0.005 ? 0 : 1;
+    if (matchA !== matchB) return matchA - matchB;
+    if ((b.data || '') !== (a.data || '')) return String(b.data || '').localeCompare(String(a.data || ''));
+    return String(a.desc || a.descOriginal || '').localeCompare(String(b.desc || b.descOriginal || ''), 'pt-BR');
+  });
+}
+
+function extratoEstornoOptionsHtml(cliente, lanc, selecionadoId) {
+  var itens = extratoLancamentosElegiveisEstorno(cliente, lanc);
+  if (!itens.length) return '<option value="">Nenhum lancamento elegivel</option>';
+  return '<option value="">Selecione o estorno no extrato</option>' + itens.map(function(item) {
+    return '<option value="' + esc(item.id) + '" data-data="' + esc(item.data || '') + '"' + (item.id === selecionadoId ? ' selected' : '') + '>'
+      + esc(formatDate(item.data))
+      + ' · ' + esc(item.desc || item.descOriginal || '-')
+      + ' · ' + esc(item.tipo === 'credito' ? 'Credito' : 'Debito')
+      + ' · ' + esc(fmt(item.valor || 0))
+      + '</option>';
+  }).join('');
+}
+
 function resumoRateioExtrato(lanc) {
   var rateios = extratoRateiosValidos(lanc);
   if (!rateios.length) return '';
@@ -225,8 +310,167 @@ async function salvarRateioExtrato(i) {
   renderExtrato();
 }
 
+function syncExtratoEstornoData() {
+  var select = document.getElementById('ex-estorno-lancamento');
+  var dataInput = document.getElementById('ex-estorno-data');
+  if (!select || !dataInput) return;
+  var option = select.options[select.selectedIndex];
+  if (option && option.dataset && option.dataset.data) {
+    dataInput.value = option.dataset.data;
+  }
+}
+
+function atualizarCamposExtratoEstornoModal() {
+  var status = ((document.getElementById('ex-estorno-status') || {}).value || 'normal');
+  var blocos = document.querySelectorAll('[data-estorno-status-block]');
+  blocos.forEach(function(bloco) {
+    bloco.style.display = bloco.getAttribute('data-estorno-status-block') === status ? '' : 'none';
+  });
+}
+
+function openExtratoEstornoModal(i) {
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var origem = extratoLancamentoOrigemDoEstorno(c, lanc.id);
+  if (origem) {
+    document.getElementById('modalTitle').textContent = 'Lancamento de estorno';
+    document.getElementById('modalBody').innerHTML =
+      '<div class="settings-section-card">'
+        + '<div class="settings-card-head"><div><h5>Este lancamento ja foi usado como estorno</h5><p>Ele esta vinculado a um pagamento ou recebimento marcado para devolucao.</p></div></div>'
+        + '<div class="settings-card-badges"><span class="settings-card-badge">Estorno vinculado</span><span class="settings-card-badge subtle">' + esc(formatDate(lanc.data)) + '</span><span class="settings-card-badge subtle">' + esc(fmt(lanc.valor || 0)) + '</span></div>'
+        + '<div class="settings-note-box">Origem: <strong>' + esc(origem.desc || origem.descOriginal || '-') + '</strong>' + (origem.estornoData ? ' · marcado em ' + esc(formatDate(origem.estornoData)) : '') + '</div>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
+        + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
+      + '</div>';
+    document.getElementById('modalOverlay').classList.add('open');
+    document.addEventListener('keydown', handleMainModalEscape);
+    return;
+  }
+
+  var statusAtual = extratoStatusEstornoValor(lanc);
+  var selectHtml = extratoEstornoOptionsHtml(c, lanc, lanc.estornoLancamentoId || '');
+  var dataEstorno = lanc.estornoData || '';
+
+  document.getElementById('modalTitle').textContent = 'Controle de devolucao';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="settings-section-card" style="margin-bottom:16px">'
+      + '<div class="settings-card-head"><div><h5>Pagamento ou recebimento</h5><p>Marque este lancamento como pendente de estorno ou vincule o lancamento que efetivou a devolucao no extrato.</p></div></div>'
+      + '<div class="settings-card-badges">'
+        + '<span class="settings-card-badge subtle">' + esc(formatDate(lanc.data)) + '</span>'
+        + '<span class="settings-card-badge subtle">' + esc(lanc.tipo === 'credito' ? 'Credito' : 'Debito') + '</span>'
+        + '<span class="settings-card-badge">' + esc(fmt(lanc.valor || 0)) + '</span>'
+      + '</div>'
+      + '<div class="settings-note-box" style="margin-top:14px">' + esc(lanc.descOriginal || lanc.desc || '-') + '</div>'
+    + '</div>'
+    + '<div class="settings-section-card">'
+      + '<div class="form-row">'
+        + '<div class="form-group" style="max-width:220px"><label>Status da devolucao</label><select id="ex-estorno-status" onchange="atualizarCamposExtratoEstornoModal()"><option value="normal"' + (statusAtual === 'normal' ? ' selected' : '') + '>Sem devolucao</option><option value="pendente_estorno"' + (statusAtual === 'pendente_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornado"' + (statusAtual === 'estornado' ? ' selected' : '') + '>Ja estornado</option></select></div>'
+      + '</div>'
+      + '<div data-estorno-status-block="pendente_estorno" style="display:none">'
+        + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-estorno-obs-pendente" value="' + esc(statusAtual === 'pendente_estorno' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: valor recebido em duplicidade, cliente cancelou."/></div></div>'
+      + '</div>'
+      + '<div data-estorno-status-block="estornado" style="display:none">'
+        + '<div class="form-row">'
+          + '<div class="form-group"><label>Lancamento do estorno no extrato</label><select id="ex-estorno-lancamento" onchange="syncExtratoEstornoData()">' + selectHtml + '</select></div>'
+        + '</div>'
+        + '<div class="form-row">'
+          + '<div class="form-group" style="max-width:180px"><label>Data da devolucao</label><input type="date" id="ex-estorno-data" value="' + esc(dataEstorno) + '"/></div>'
+          + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-estorno-obs-concluido" value="' + esc(statusAtual === 'estornado' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: estorno realizado no banco."/></div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
+        + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
+        + '<button class="btn-add" type="button" style="margin-top:0" onclick="salvarExtratoEstorno(' + i + ')">Salvar devolucao</button>'
+      + '</div>'
+    + '</div>';
+
+  document.getElementById('modalOverlay').classList.add('open');
+  document.addEventListener('keydown', handleMainModalEscape);
+  atualizarCamposExtratoEstornoModal();
+  if (statusAtual === 'estornado') syncExtratoEstornoData();
+}
+
+async function salvarExtratoEstorno(i) {
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var status = ((document.getElementById('ex-estorno-status') || {}).value || 'normal');
+  var payload = {
+    status_estorno: 'normal',
+    estorno_lancamento_id: null,
+    estorno_data: null,
+    estorno_observacao: null
+  };
+
+  if (status === 'pendente_estorno') {
+    payload.status_estorno = 'pendente_estorno';
+    payload.estorno_observacao = (((document.getElementById('ex-estorno-obs-pendente') || {}).value) || '').trim() || null;
+  }
+
+  if (status === 'estornado') {
+    var lancamentoEstornoId = (((document.getElementById('ex-estorno-lancamento') || {}).value) || '').trim();
+    var dataEstorno = ((document.getElementById('ex-estorno-data') || {}).value || '').trim();
+    var observacaoEstorno = (((document.getElementById('ex-estorno-obs-concluido') || {}).value) || '').trim();
+
+    if (!lancamentoEstornoId) {
+      await appAlert('Selecione o lancamento do extrato que efetivou o estorno.');
+      return;
+    }
+
+    var lancamentoEstorno = (c.extrato || []).find(function(item) { return item.id === lancamentoEstornoId; });
+    if (!lancamentoEstorno) {
+      await appAlert('Lancamento de estorno nao encontrado.');
+      return;
+    }
+
+    var origemExistente = extratoLancamentoOrigemDoEstorno(c, lancamentoEstornoId);
+    if (origemExistente && origemExistente.id !== lanc.id) {
+      await appAlert('Esse lancamento ja esta vinculado como estorno de outro registro.');
+      return;
+    }
+
+    if (lancamentoEstorno.tipo === lanc.tipo) {
+      await appAlert('O lancamento vinculado ao estorno precisa ter tipo oposto ao original.');
+      return;
+    }
+
+    payload.status_estorno = 'estornado';
+    payload.estorno_lancamento_id = lancamentoEstornoId;
+    payload.estorno_data = dataEstorno || lancamentoEstorno.data || null;
+    payload.estorno_observacao = observacaoEstorno || null;
+  }
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('lancamentos')
+      .update(payload)
+      .eq('id', lanc.id)
+      .select()
+      .single()
+  );
+
+  if (response.error) {
+    console.error(response.error);
+    await appAlert('Nao foi possivel salvar a devolucao. Rode a migracao sql/20260602_status_devolucao_extrato.sql no Supabase.');
+    return;
+  }
+
+  lanc.estornoStatus = response.data.status_estorno || 'normal';
+  lanc.estornoLancamentoId = response.data.estorno_lancamento_id || null;
+  lanc.estornoData = response.data.estorno_data || null;
+  lanc.estornoObservacao = response.data.estorno_observacao || '';
+
+  closeModal();
+  renderExtrato();
+}
+
 function aplicarAjustesVisuaisExtrato(area, lncs) {
   if (!area) return;
+  var cliente = data.clients[activeClient];
 
   area.querySelectorAll('.val-pos').forEach(function(el) {
     el.textContent = String(el.textContent || '').replace(/^\+\s*/, '');
@@ -249,6 +493,16 @@ function aplicarAjustesVisuaisExtrato(area, lncs) {
       btn.textContent = 'RT';
       btn.addEventListener('click', function() { openExtratoRateioModal(realIdx); });
       actions.insertBefore(btn, actions.firstChild);
+    }
+
+    if (clienteAtivoEhPJ() && !actions.querySelector('button[title="Devolucao"]')) {
+      var refundBtn = document.createElement('button');
+      refundBtn.className = 'btn-icon';
+      refundBtn.type = 'button';
+      refundBtn.title = 'Devolucao';
+      refundBtn.textContent = 'DV';
+      refundBtn.addEventListener('click', function() { openExtratoEstornoModal(realIdx); });
+      actions.insertBefore(refundBtn, actions.firstChild);
     }
 
     if (extratoTemRateio(lanc)) {
@@ -957,6 +1211,7 @@ function aplicarFiltrosExtrato() {
   var relacionamento = document.getElementById('ex-filtro-relacionamento');
   var busca = document.getElementById('ex-filtro-busca');
   var conciliacao = document.getElementById('ex-filtro-conciliacao');
+  var estorno = document.getElementById('ex-filtro-estorno');
 
   _exFiltroTipo = tipo ? tipo.value : 'todos';
   _exFiltroCat = cat ? cat.value : '';
@@ -964,6 +1219,7 @@ function aplicarFiltrosExtrato() {
   _exFiltroConta = conta ? conta.value : '';
   _exFiltroRelacionamento = clienteAtivoEhPJ() && relacionamento ? relacionamento.value : '';
   _exFiltroConciliacao = clienteAtivoEhPJ() && conciliacao ? conciliacao.value : 'todos';
+  _exFiltroEstorno = clienteAtivoEhPJ() && estorno ? estorno.value : 'todos';
   _exFiltroBusca = busca ? busca.value.trim().toLowerCase() : '';
 
   renderExtrato();
@@ -976,6 +1232,7 @@ function limparFiltrosExtrato() {
   _exFiltroConta = '';
   _exFiltroRelacionamento = '';
   _exFiltroConciliacao = 'todos';
+  _exFiltroEstorno = 'todos';
   _exFiltroBusca = '';
   renderExtrato();
 }
@@ -1385,8 +1642,9 @@ function renderExtrato() {
   var meses = [...new Set(lncs.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort(compararCategoriaNome);
   var filtradosBrutos = lncs.filter(l => {
-    var texto = ((l.desc || '') + ' ' + (l.cat || '') + ' ' + (centroCustoAtivo ? nomeCentroCustoPorId(c, l.centroCustoId) : '') + ' ' + (relacionamentoAtivo ? nomeRelacionamentoPorId(c, l.relacionamentoId) : '') + ' ' + (l.observacao || '')).toLowerCase();
+    var texto = ((l.desc || '') + ' ' + (l.cat || '') + ' ' + (centroCustoAtivo ? nomeCentroCustoPorId(c, l.centroCustoId) : '') + ' ' + (relacionamentoAtivo ? nomeRelacionamentoPorId(c, l.relacionamentoId) : '') + ' ' + (l.observacao || '') + ' ' + (l.estornoObservacao || '')).toLowerCase();
     var temConciliacao = valorConciliadoDoLancamento(l) > 0;
+    var statusEstorno = extratoStatusEstornoValor(l);
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
     if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
     if (_exFiltroMes && !(l.data || '').startsWith(_exFiltroMes)) return false;
@@ -1394,6 +1652,8 @@ function renderExtrato() {
     if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
     if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !temConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && temConciliacao) return false;
+    if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
+    if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado') return false;
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
   });
@@ -1502,6 +1762,7 @@ function renderExtrato() {
     + '<div class="form-group" style="max-width:150px"><label>Periodo</label><select id="ex-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
     + (financeiroPJAtivo ? '<div class="form-group" style="max-width:180px"><label>Conciliacao</label><select id="ex-filtro-conciliacao"><option value="todos"' + (_exFiltroConciliacao === 'todos' ? ' selected' : '') + '>Todos</option><option value="conciliados"' + (_exFiltroConciliacao === 'conciliados' ? ' selected' : '') + '>Conciliados</option><option value="nao_conciliados"' + (_exFiltroConciliacao === 'nao_conciliados' ? ' selected' : '') + '>Nao conciliados</option></select></div>' : '')
+    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:190px"><label>Devolucao</label><select id="ex-filtro-estorno"><option value="todos"' + (_exFiltroEstorno === 'todos' ? ' selected' : '') + '>Todos</option><option value="pendentes_estorno"' + (_exFiltroEstorno === 'pendentes_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornados"' + (_exFiltroEstorno === 'estornados' ? ' selected' : '') + '>Ja estornados</option></select></div>' : '')
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
@@ -1614,7 +1875,10 @@ function renderExtrato() {
       if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
       var concResumo = resumoConciliacaoLancamento(l);
       if (concResumo) detalhes.push(concResumo);
-      html += '<tr class="row-' + l.tipo + '">'
+      var resumoEstorno = extratoResumoEstorno(c, l);
+      if (resumoEstorno) detalhes.push(resumoEstorno);
+      var classeEstorno = extratoClasseEstornoLinha(c, l);
+      html += '<tr class="row-' + l.tipo + (classeEstorno ? ' ' + classeEstorno : '') + '">'
         + (_exSelecaoLote ? '<td><input type="checkbox" onchange="toggleLinhaSelecaoExtrato(\'' + esc(l.id) + '\')"' + (_exSelecionados.has(l.id) ? ' checked' : '') + '/></td>' : '')
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
         + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
@@ -2017,6 +2281,27 @@ async function deleteExtrato(i) {
 
   if (!lanc) return;
 
+  var origensEstorno = (c.extrato || []).filter(function(item) {
+    return item && item.estornoLancamentoId === lanc.id;
+  });
+  if (origensEstorno.length) {
+    const { error: estornoError } = await applyUserScope(
+      supabaseClient
+        .from('lancamentos')
+        .update({
+          status_estorno: 'pendente_estorno',
+          estorno_lancamento_id: null,
+          estorno_data: null
+        })
+        .in('id', origensEstorno.map(function(item) { return item.id; }))
+    );
+    if (estornoError) {
+      console.error(estornoError);
+      alert('Nao foi possivel atualizar os lancamentos pendentes de estorno antes de excluir.');
+      return;
+    }
+  }
+
   if (typeof tfBaixasPorLancamentoId === 'function') {
     var baixasFinanceiras = tfBaixasPorLancamentoId(lanc.id);
     for (var bi = 0; bi < baixasFinanceiras.length; bi++) {
@@ -2079,6 +2364,7 @@ async function saveExtratoEditModal(i) {
   var novoTipo = document.getElementById('ex-edit-tipo').value === 'credito' ? 'credito' : 'debito';
   var novoValor = parseMoney(document.getElementById('ex-edit-valor'));
   var novaObservacao = document.getElementById('ex-edit-obs').value.trim();
+  var origemEstorno = extratoLancamentoOrigemDoEstorno(c, lanc.id);
 
   if (!novaDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
 
@@ -2088,6 +2374,12 @@ async function saveExtratoEditModal(i) {
   }
   if (valorConciliado > 0 && Number(novoValor || 0) < valorConciliado) {
     return alert('O novo valor nao pode ser menor que o valor ja conciliado no Financeiro.');
+  }
+  if (origemEstorno && novoTipo !== (lanc.tipo || 'credito')) {
+    return alert('Esse lancamento esta vinculado como estorno de outro registro. Desfaca o vinculo antes de mudar o tipo.');
+  }
+  if (origemEstorno && Math.abs(Number(novoValor || 0) - Number(lanc.valor || 0)) >= 0.005) {
+    return alert('Esse lancamento esta vinculado como estorno de outro registro. Desfaca o vinculo antes de alterar o valor.');
   }
 
   const { error } = await applyUserScope(

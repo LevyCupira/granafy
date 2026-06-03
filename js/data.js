@@ -333,7 +333,11 @@ async function loadData() {
       centroCustoId: l.centro_custo_id || null,
       rateios: normalizarRateiosCategorias(l.rateio_categorias || l.rateios || []),
       relacionamentoId: l.relacionamento_id || null,
-      observacao: l.observacao || ''
+      observacao: l.observacao || '',
+      estornoStatus: l.status_estorno || 'normal',
+      estornoLancamentoId: l.estorno_lancamento_id || null,
+      estornoData: l.estorno_data || null,
+      estornoObservacao: l.estorno_observacao || ''
     });
   });
 
