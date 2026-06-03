@@ -12,7 +12,6 @@ var COLS_TITULOS = [
   { key: 'pessoa', label: 'Pessoa', render: item => '<strong>' + esc(item.pessoaNome || '-') + '</strong>' },
   { key: 'descricao', label: 'Descricao', render: item => esc(item.descricao || '-') + (item.observacao ? '<div class="installment-note">' + esc(item.observacao) + '</div>' : '') },
   { key: 'categoria', label: 'Categoria', render: item => '<span class="badge badge-cat">' + esc(item.categoria || 'Sem categoria') + '</span>' },
-  { key: 'centroCusto', label: 'Centro de custo', render: item => '<span class="badge badge-soft">' + esc(item.centroCusto || tfNomeCentroCustoById(item.centroCustoId) || 'Sem centro') + '</span>' },
   { key: 'status', label: 'Status', render: item => '<span class="tf-status-badge ' + esc(tfStatusOf(item)) + '">' + esc(tfStatusLabel(tfStatusOf(item))) + '</span>' },
   { key: 'total', label: 'Total', render: item => '<span class="val ' + (_tfNatureza === 'receber' ? 'val-pos' : 'val-neg') + '">' + (_tfNatureza === 'receber' ? fmt(item.valorTotal || 0) : ('- ' + fmt(item.valorTotal || 0)) ) + '</span>' },
   { key: 'baixado', label: 'Baixado', render: item => '<span style="color:var(--accent3);font-weight:700">' + fmt(tfTotalBaixado(item)) + '</span>' },
@@ -131,7 +130,7 @@ function tfFilteredItems() {
     if (item.natureza !== _tfNatureza) return false;
     if (_tfStatus !== 'todos' && tfStatusOf(item) !== _tfStatus) return false;
     if (_tfBusca) {
-      var hay = tfNormalizeText([item.pessoaNome, item.descricao, item.categoria, item.centroCusto || tfNomeCentroCustoById(item.centroCustoId), item.observacao].join(' '));
+      var hay = tfNormalizeText([item.pessoaNome, item.descricao, item.categoria, item.observacao].join(' '));
       if (hay.indexOf(tfNormalizeText(_tfBusca)) === -1) return false;
     }
     return true;
@@ -387,7 +386,6 @@ function tfOpenTituloModal(id) {
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>Categoria (<a href="#" onclick="openModal(\'settings\',\'cats_financeiro\');return false;">+ gerir</a>)</label><select id="tf-edit-categoria">' + tfCategoriasOptionsHtml(item.categoria || '') + '</select></div>'
-      + '<div class="form-group"><label>Centro de custo (<a href="#" onclick="openModal(\'settings\',\'centros_custo\');return false;">+ gerir</a>)</label><select id="tf-edit-centro-custo">' + tfCentrosCustoOptionsHtml(item.centroCustoId || '') + '</select></div>'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="tf-edit-vencimento" class="flex-date-input" value="' + esc(item.vencimento ? formatDate(item.vencimento) : '') + '" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
       + '<div class="form-group" style="max-width:170px"><label>Valor total</label><input type="text" id="tf-edit-valor" class="money-input" value="' + esc((Number(item.valorTotal || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
     + '</div>'
@@ -602,7 +600,6 @@ function renderFinanceiro() {
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group"><label>Categoria (<a href="#" onclick="openModal(\'settings\',\'cats_financeiro\');return false;">+ gerir</a>)</label><select id="' + tfFormPrefix() + '-categoria">' + tfCategoriasOptionsHtml('') + '</select></div>'
-        + '<div class="form-group"><label>Centro de custo (<a href="#" onclick="openModal(\'settings\',\'centros_custo\');return false;">+ gerir</a>)</label><select id="' + tfFormPrefix() + '-centro-custo">' + tfCentrosCustoOptionsHtml('') + '</select></div>'
         + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="' + tfFormPrefix() + '-valor" class="money-input" value="0,00"/></div>'
       + '</div>'

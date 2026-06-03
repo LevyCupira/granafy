@@ -497,6 +497,7 @@ async function importarExtratoCliente(clienteId, lancamentos, mapaRelacionamento
       descricao: l.desc || l.descricao || null,
       descricao_original: l.descOriginal || l.descricao_original || l.desc || l.descricao || null,
       categoria: l.cat || l.categoria || null,
+      rateio_categorias: typeof normalizarRateiosCategorias === 'function' ? normalizarRateiosCategorias(l.rateio_categorias || l.rateios || []) : [],
       tipo: l.tipo || null,
       valor: Number(l.valor || 0),
       relacionamento_id: relacionamentoId,
@@ -585,7 +586,6 @@ function renderSettingsModal(activeTabKey) {
   var ccCount = (loadCatsCC() || []).length;
   var cartaoCount = (loadCatsCartao() || []).length;
   var financeiroCount = cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj' ? (loadCatsFinanceiro() || []).length : 0;
-  var centrosCustoCount = cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj' ? (loadCentrosCusto() || []).length : 0;
   var showTabsPanel = !!cliente;
   var showUsersTab = typeof canSeeUsersTab === 'function' ? canSeeUsersTab() : !!authUser;
   var showAuditoriaTab = typeof canSeeAuditoria === 'function' ? canSeeAuditoria() : true;
@@ -603,7 +603,6 @@ function renderSettingsModal(activeTabKey) {
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
   if (cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj') {
     tabButtons += '<button class="modal-tab settings-tab-rich" data-stab="cats_financeiro" onclick="switchSettingsTab(\'cats_financeiro\')"><span class="settings-tab-main">Financeiro</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + financeiroCount + '</span></button>';
-    tabButtons += '<button class="modal-tab settings-tab-rich" data-stab="centros_custo" onclick="switchSettingsTab(\'centros_custo\')"><span class="settings-tab-main">Centros de custo</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + centrosCustoCount + '</span></button>';
   }
   if (showTabsPanel) {
     tabButtons += '<button class="modal-tab" data-stab="visual" onclick="switchSettingsTab(\'visual\')">Abas</button>';
@@ -632,7 +631,6 @@ function renderSettingsModal(activeTabKey) {
     + '<div id="modal-panel-cats_cc" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_financeiro" class="modal-panel"></div>'
-    + '<div id="modal-panel-centros_custo" class="modal-panel"></div>'
     + '<div id="modal-panel-visual" class="modal-panel"></div>'
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
     + '<div id="modal-panel-lgpd" class="modal-panel"></div>'
@@ -643,7 +641,6 @@ function renderSettingsModal(activeTabKey) {
   if (firstTab === 'lgpd' && !showLgpdTab) firstTab = 'cats_cc';
   if (firstTab === 'visual' && !showTabsPanel) firstTab = 'cats_cc';
   if (firstTab === 'cats_financeiro' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
-  if (firstTab === 'centros_custo' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
   switchSettingsTab(firstTab);
 }
 
@@ -663,7 +660,6 @@ function switchSettingsTab(tab) {
   if (tab === 'cats_cc') renderCatsPanel('cc');
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
   if (tab === 'cats_financeiro') renderCatsPanel('financeiro');
-  if (tab === 'centros_custo') renderCatsPanel('centro_custo');
   if (tab === 'visual') renderClientTabsPanel();
   if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
   if (tab === 'lgpd') renderLgpdPanel();

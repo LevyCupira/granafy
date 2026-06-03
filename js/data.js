@@ -16,6 +16,32 @@ var TAB_DEFS = [
   { key: 'graficos', label: 'Gráficos', contentId: 'graficos-content', render: () => renderGraficos() }
 ];
 
+function normalizarRateiosCategorias(rateios) {
+  var origem = rateios;
+  if (typeof origem === 'string') {
+    try { origem = JSON.parse(origem); } catch (e) { origem = []; }
+  }
+  if (!Array.isArray(origem)) return [];
+  return origem.map(function(item) {
+    return {
+      categoria: String((item && (item.categoria || item.cat)) || '').trim(),
+      valor: Math.abs(Number(item && item.valor || 0))
+    };
+  }).filter(function(item) {
+    return item.categoria && item.valor > 0;
+  });
+}
+
+function lancamentoTemRateioCategorias(lanc) {
+  return normalizarRateiosCategorias(lanc && lanc.rateios).length > 0;
+}
+
+function totalRateioCategorias(lanc) {
+  return normalizarRateiosCategorias(lanc && lanc.rateios).reduce(function(sum, item) {
+    return sum + Number(item.valor || 0);
+  }, 0);
+}
+
 function isActiveClientPJ() {
   var cliente = activeClient && data && data.clients ? data.clients[activeClient] : null;
   return !!(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj');
@@ -305,6 +331,7 @@ async function loadData() {
       valor: Number(l.valor || 0),
       contaId: l.conta_id || null,
       centroCustoId: l.centro_custo_id || null,
+      rateios: normalizarRateiosCategorias(l.rateio_categorias || l.rateios || []),
       relacionamentoId: l.relacionamento_id || null,
       observacao: l.observacao || ''
     });

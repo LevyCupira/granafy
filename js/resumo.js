@@ -11,6 +11,23 @@ function getTransacoes(clienteId) {
     : extratoBase;
 
   extrato.forEach(function(l, idx) {
+    var rateios = typeof normalizarRateiosCategorias === 'function' ? normalizarRateiosCategorias(l.rateios) : [];
+    if (rateios.length) {
+      rateios.forEach(function(item, rIdx) {
+        result.push({
+          data: l.data,
+          desc: l.desc,
+          cat: item.categoria,
+          valor: Number(item.valor),
+          tipo: l.tipo,
+          fonte: 'Conta Corrente',
+          ehMovConta: typeof isCategoriaMovContas === 'function' && isCategoriaMovContas(item.categoria),
+          _resumoKey: 'ex:' + idx + ':' + String(l.id || '') + ':r:' + rIdx
+        });
+      });
+      return;
+    }
+
     result.push({
       data: l.data,
       desc: l.desc,

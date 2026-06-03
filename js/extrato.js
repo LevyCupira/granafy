@@ -93,7 +93,177 @@ function extratoRelacionamentoAtivo() {
 }
 
 function extratoCentroCustoAtivo() {
-  return clienteAtivoEhPJ();
+  return false;
+}
+
+function extratoCategoriasOptionsHtml(categoriaAtual, incluirVazio) {
+  var atual = String(categoriaAtual || '').trim();
+  var categorias = typeof nomesCC === 'function' ? nomesCC().slice() : [];
+  if (atual && !categorias.some(function(nome) { return normalizarNomeCategoria(nome) === normalizarNomeCategoria(atual); })) {
+    categorias.push(atual);
+  }
+  categorias = categorias.sort(compararCategoriaNome);
+  var inicio = incluirVazio === false ? '' : '<option value="">Selecione</option>';
+  return inicio + categorias.map(function(nome) {
+    return '<option value="' + esc(nome) + '"' + (normalizarNomeCategoria(nome) === normalizarNomeCategoria(atual) ? ' selected' : '') + '>' + esc(nome) + '</option>';
+  }).join('');
+}
+
+function extratoRateiosValidos(lanc) {
+  return typeof normalizarRateiosCategorias === 'function' ? normalizarRateiosCategorias(lanc && lanc.rateios) : [];
+}
+
+function extratoTemRateio(lanc) {
+  return extratoRateiosValidos(lanc).length > 0;
+}
+
+function resumoRateioExtrato(lanc) {
+  var rateios = extratoRateiosValidos(lanc);
+  if (!rateios.length) return '';
+  return 'Rateio: ' + rateios.map(function(item) {
+    return item.categoria + ' ' + fmt(item.valor);
+  }).join(' · ');
+}
+
+function openExtratoRateioModal(i) {
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  document.getElementById('modalTitle').textContent = 'Rateio por categoria';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="settings-section-card">'
+      + '<div class="settings-card-head"><div><h5>' + esc(lanc.desc || 'Lancamento') + '</h5><p>Distribua o valor total desse lancamento entre as categorias do Extrato.</p></div>'
+      + '<div class="settings-card-badges"><span class="settings-card-badge subtle">Tipo ' + esc(lanc.tipo === 'credito' ? 'Credito' : 'Debito') + '</span><span class="settings-card-badge">' + fmt(lanc.valor || 0) + '</span></div></div>'
+      + '<div id="ex-rateio-rows"></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" type="button" onclick="adicionarLinhaRateioExtrato()">+ Linha de rateio</button><button class="btn-sm red" type="button" onclick="limparRateioExtrato()">Limpar rateio</button></div>'
+      + '<div id="ex-rateio-resumo" style="margin-top:12px;color:var(--muted);font-size:.85rem"></div>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
+      + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
+      + '<button class="btn-add" type="button" style="margin-top:0" onclick="salvarRateioExtrato(' + i + ')">Salvar rateio</button>'
+    + '</div>';
+
+  document.getElementById('modalOverlay').classList.add('open');
+  document.addEventListener('keydown', handleMainModalEscape);
+  document.getElementById('modalBody').dataset.rateioValor = String(Number(lanc.valor || 0));
+
+  var rateios = extratoRateiosValidos(lanc);
+  if (!rateios.length) adicionarLinhaRateioExtrato(lanc.cat || 'Outros', Number(lanc.valor || 0));
+  else rateios.forEach(function(item) { adicionarLinhaRateioExtrato(item.categoria, item.valor); });
+  atualizarResumoRateioExtrato(lanc.valor || 0);
+}
+
+function adicionarLinhaRateioExtrato(categoria, valor) {
+  var host = document.getElementById('ex-rateio-rows');
+  if (!host) return;
+  var row = document.createElement('div');
+  row.className = 'form-row ex-rateio-row';
+  row.innerHTML =
+    '<div class="form-group"><label>Categoria</label><select class="ex-rateio-cat">' + extratoCategoriasOptionsHtml(categoria || '', false) + '</select></div>'
+    + '<div class="form-group" style="max-width:180px"><label>Valor</label><input type="text" class="money-input ex-rateio-valor" value="' + esc(Number(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+    + '<div class="form-group" style="max-width:110px;align-self:flex-end"><button class="btn-sm red" type="button">Remover</button></div>';
+  host.appendChild(row);
+  initMoneyInputs(row);
+  row.querySelector('.ex-rateio-cat').addEventListener('change', atualizarResumoRateioExtrato);
+  row.querySelector('.ex-rateio-valor').addEventListener('input', atualizarResumoRateioExtrato);
+  row.querySelector('button').addEventListener('click', function() { row.remove(); atualizarResumoRateioExtrato(); });
+}
+
+function coletarRateioExtratoModal() {
+  return Array.from(document.querySelectorAll('.ex-rateio-row')).map(function(row) {
+    return {
+      categoria: ((row.querySelector('.ex-rateio-cat') || {}).value || '').trim(),
+      valor: parseMoney(row.querySelector('.ex-rateio-valor'))
+    };
+  }).filter(function(item) { return item.categoria && Number(item.valor || 0) > 0; });
+}
+
+function atualizarResumoRateioExtrato(valorOriginal) {
+  var info = document.getElementById('ex-rateio-resumo');
+  if (!info) return;
+  var rows = coletarRateioExtratoModal();
+  var total = rows.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
+  var modalBody = document.getElementById('modalBody');
+  var base = Number(typeof valorOriginal !== 'undefined' ? valorOriginal : ((modalBody && modalBody.dataset && modalBody.dataset.rateioValor) || 0));
+  var diff = Math.abs(total - base);
+  info.innerHTML = 'Rateado: <strong>' + fmt(total) + '</strong> · Total do lancamento: <strong>' + fmt(base) + '</strong>'
+    + (diff < 0.005 ? ' <span style="color:var(--success)">· Conferido</span>' : ' <span style="color:var(--danger)">· Diferenca ' + fmt(diff) + '</span>');
+}
+
+function limparRateioExtrato() {
+  var host = document.getElementById('ex-rateio-rows');
+  if (!host) return;
+  host.innerHTML = '';
+  atualizarResumoRateioExtrato();
+}
+
+async function salvarRateioExtrato(i) {
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+  var rows = coletarRateioExtratoModal();
+  if (!rows.length) {
+    var ok = await appConfirm('Nenhum rateio foi informado. Deseja limpar o rateio desse lancamento?', { title: 'Limpar rateio', confirmText: 'Limpar' });
+    if (!ok) return;
+  }
+  var total = rows.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
+  if (rows.length && Math.abs(total - Number(lanc.valor || 0)) >= 0.005) {
+    await appAlert('O total do rateio deve ser igual ao valor do lancamento.');
+    return;
+  }
+  var response = await applyUserScope(
+    supabaseClient.from('lancamentos').update({ rateio_categorias: rows }).eq('id', lanc.id)
+  ).select().single();
+  if (response.error) {
+    console.error(response.error);
+    await appAlert('Nao foi possivel salvar o rateio. Rode a migracao sql/20260602_rateio_categorias_extrato.sql no Supabase.');
+    return;
+  }
+  lanc.rateios = extratoRateiosValidos({ rateios: response.data.rateio_categorias || rows });
+  closeModal();
+  renderExtrato();
+}
+
+function aplicarAjustesVisuaisExtrato(area, lncs) {
+  if (!area) return;
+
+  area.querySelectorAll('.val-pos').forEach(function(el) {
+    el.textContent = String(el.textContent || '').replace(/^\+\s*/, '');
+  });
+
+  area.querySelectorAll('.row-actions').forEach(function(actions) {
+    var editBtn = actions.querySelector('button[onclick*="editExtrato("]');
+    if (!editBtn) return;
+    var match = String(editBtn.getAttribute('onclick') || '').match(/editExtrato\((\d+)\)/);
+    if (!match) return;
+    var realIdx = Number(match[1]);
+    var lanc = lncs[realIdx];
+    if (!lanc) return;
+
+    if (!actions.querySelector('button[title="Rateio"]')) {
+      var btn = document.createElement('button');
+      btn.className = 'btn-icon';
+      btn.type = 'button';
+      btn.title = 'Rateio';
+      btn.textContent = 'RT';
+      btn.addEventListener('click', function() { openExtratoRateioModal(realIdx); });
+      actions.insertBefore(btn, actions.firstChild);
+    }
+
+    if (extratoTemRateio(lanc)) {
+      var descCell = actions.parentElement && actions.parentElement.previousElementSibling && actions.parentElement.previousElementSibling.previousElementSibling && actions.parentElement.previousElementSibling.previousElementSibling.previousElementSibling;
+      if (descCell && !descCell.querySelector('.ex-rateio-note')) {
+        var note = document.createElement('div');
+        note.className = 'ex-rateio-note';
+        note.style.color = 'var(--muted)';
+        note.style.fontSize = '.72rem';
+        note.style.marginTop = '3px';
+        note.textContent = resumoRateioExtrato(lanc);
+        descCell.appendChild(note);
+      }
+    }
+  });
 }
 
 function centrosCustoClienteAtivo() {
@@ -1463,6 +1633,7 @@ function renderExtrato() {
   }
 
   area.innerHTML = html;
+  aplicarAjustesVisuaisExtrato(area, lncs);
 
   var dataInput = document.getElementById('ex-data');
   if (dataInput) dataInput.value = new Date().toISOString().slice(0, 10);

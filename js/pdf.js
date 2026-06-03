@@ -66,9 +66,7 @@ function exportPDF() {
   var cartaoFiltrado = periodosFiltro.length
     ? (c.cartao || []).filter(function(it) { return periodoSet.has((it.data || '').slice(0, 7)); })
     : (c.cartao || []);
-  var extratoFiltrado = periodosFiltro.length
-    ? (c.extrato || []).filter(function(l) { return periodoSet.has((l.data || '').slice(0, 7)); })
-    : (c.extrato || []);
+  var extratoFiltrado = todas.filter(function(l) { return l.fonte === 'Conta Corrente'; });
 
   var tR = consolidado
     ? consolidado.totalReceitas
