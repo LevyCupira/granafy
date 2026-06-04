@@ -210,6 +210,38 @@ function resumoRateioExtrato(lanc) {
   }).join(' · ');
 }
 
+function extratoCategoriaBadgeHtml(lanc) {
+  if (extratoTemRateio(lanc)) {
+    return '<span class="badge badge-rateio">Rateado</span>';
+  }
+  return '<span class="badge badge-cat">' + esc((lanc && lanc.cat) || '-') + '</span>';
+}
+
+function extratoResumoSaldoDiaHtml(dataDia, itens, colspan, saldoAnterior) {
+  var creditos = itens.filter(function(item) { return item.tipo === 'credito'; }).reduce(function(soma, item) {
+    return soma + Number(item.valor || 0);
+  }, 0);
+  var debitos = itens.filter(function(item) { return item.tipo === 'debito'; }).reduce(function(soma, item) {
+    return soma + Number(item.valor || 0);
+  }, 0);
+  var saldoMovimentoDia = creditos - debitos;
+  var saldoAcumulado = Number(saldoAnterior || 0) + saldoMovimentoDia;
+  return {
+    html: '<tr class="row-day-balance">'
+      + '<td colspan="' + colspan + '">'
+      + '<div class="day-balance-row">'
+      + '<strong>Total ' + esc(formatDate(dataDia)) + '</strong>'
+      + '<span>Creditos ' + fmt(creditos) + '</span>'
+      + '<span>Debitos ' + fmt(debitos) + '</span>'
+      + '<span>Movimento ' + fmt(saldoMovimentoDia) + '</span>'
+      + '<span class="' + (saldoAcumulado >= 0 ? 'green' : 'red') + '">Saldo acumulado ' + fmt(saldoAcumulado) + '</span>'
+      + '</div>'
+      + '</td>'
+      + '</tr>',
+    saldoAcumulado: saldoAcumulado
+  };
+}
+
 function openExtratoRateioModal(i) {
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
@@ -728,10 +760,31 @@ function nomeContaCliente(conta) {
   return tipo + ' ' + banco + (dados ? ' ' + dados : '');
 }
 
+function resumirNumeroConta(numero) {
+  var texto = String(numero || '').trim();
+  if (!texto) return '';
+  if (texto.length <= 6) return texto;
+  return '...' + texto.slice(-6);
+}
+
+function nomeContaClienteCompacta(conta) {
+  if (!conta) return 'Nao informada';
+  var tipo = String(conta.tipo || '').toLowerCase() === 'poupanca' ? 'CP' : 'CC';
+  var banco = String(conta.banco || 'Banco').trim();
+  var numero = resumirNumeroConta(conta.numero || '');
+  return tipo + ' ' + banco + (numero ? ' · ' + numero : '');
+}
+
 function nomeContaPorId(cliente, contaId) {
   if (!cliente || !contaId) return 'Nao informada';
   var conta = (cliente.contas || []).find(item => item.id === contaId);
   return nomeContaCliente(conta);
+}
+
+function nomeContaCompactaPorId(cliente, contaId) {
+  if (!cliente || !contaId) return 'Nao informada';
+  var conta = (cliente.contas || []).find(item => item.id === contaId);
+  return nomeContaClienteCompacta(conta);
 }
 
 function contasOptionsCliente(contaIdAtual) {
@@ -1823,11 +1876,11 @@ function renderExtrato() {
         html += '<tr class="row-' + l.tipo + '">'
           + '<td><input type="radio" name="dup-' + gi + '" onchange="setManterDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\',\'' + encodeURIComponent(l.id) + '\')" ' + checked + '/></td>'
           + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
-          + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
+          + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaCompactaPorId(c, l.contaId)) + '</td>'
           + (centroCustoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeCentroCustoPorId(c, l.centroCustoId)) + '</td>' : '')
           + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
           + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
-          + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
+          + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
           + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
           + '<td><div class="row-actions">'
           + (financeiroPJAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
@@ -1849,13 +1902,12 @@ function renderExtrato() {
       html += '<tr class="row-' + l.tipo + '">'
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
         + '<td>' + esc(l.desc || '') + '</td>'
-        + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
+        + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
         + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
         + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
         + '<td><div class="row-actions"><button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
         + '</tr>';
     });
-
     html += '</tbody></table>';
   }
 
@@ -1867,8 +1919,29 @@ function renderExtrato() {
     html += loteToolbarHtml;
     html += '<table class="data-table">';
     html += '<thead><tr>' + (_exSelecaoLote ? '<th style="width:42px">Sel.</th>' : '') + '<th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
+    var colspanTabela = 6 + (_exSelecaoLote ? 1 : 0) + (centroCustoAtivo ? 1 : 0) + (relacionamentoAtivo ? 1 : 0);
+    var filtradosOrdenados = [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+    var gruposDia = [];
+    filtradosOrdenados.forEach(function(item) {
+      var chaveDia = item.data || '';
+      var ultimoGrupo = gruposDia[gruposDia.length - 1];
+      if (!ultimoGrupo || ultimoGrupo.data !== chaveDia) {
+        gruposDia.push({ data: chaveDia, itens: [item] });
+      } else {
+        ultimoGrupo.itens.push(item);
+      }
+    });
 
-    [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
+    var fechamentoPorDia = {};
+    var saldoAcumuladoExtrato = 0;
+    [...gruposDia].reverse().forEach(function(grupoDia) {
+      var fechamentoDiaAsc = extratoResumoSaldoDiaHtml(grupoDia.data, grupoDia.itens, colspanTabela, saldoAcumuladoExtrato);
+      saldoAcumuladoExtrato = fechamentoDiaAsc.saldoAcumulado;
+      fechamentoPorDia[grupoDia.data || ''] = fechamentoDiaAsc;
+    });
+
+    gruposDia.forEach(function(grupoDia) {
+      grupoDia.itens.forEach(function(l) {
       var realIdx = lncs.indexOf(l);
       var detalhes = [];
       if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
@@ -1881,16 +1954,19 @@ function renderExtrato() {
       html += '<tr class="row-' + l.tipo + (classeEstorno ? ' ' + classeEstorno : '') + '">'
         + (_exSelecaoLote ? '<td><input type="checkbox" onchange="toggleLinhaSelecaoExtrato(\'' + esc(l.id) + '\')"' + (_exSelecionados.has(l.id) ? ' checked' : '') + '/></td>' : '')
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
-        + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaPorId(c, l.contaId)) + '</td>'
+        + '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeContaCompactaPorId(c, l.contaId)) + '</td>'
         + (centroCustoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeCentroCustoPorId(c, l.centroCustoId)) + '</td>' : '')
         + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
         + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
-        + '<td><span class="badge badge-cat">' + esc(l.cat || '-') + '</span></td>'
+        + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
         + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
         + '<td><div class="row-actions">'
         + (financeiroPJAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
         + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
         + '</tr>';
+      });
+      var fechamentoDia = fechamentoPorDia[grupoDia.data || ''] || extratoResumoSaldoDiaHtml(grupoDia.data, grupoDia.itens, colspanTabela, 0);
+      html += fechamentoDia.html;
     });
 
     html += '</tbody></table>';
@@ -2245,6 +2321,10 @@ async function conciliarExtratoLancamento(i) {
   });
 
   closeModal();
+  if (_exFiltroConciliacao === 'nao_conciliados') {
+    _exFiltroConciliacao = 'todos';
+  }
+  await loadData();
   renderExtrato();
 }
 
@@ -2270,8 +2350,14 @@ async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extrato
     if (titulo) titulo.baixas = (titulo.baixas || []).filter(function(baixa) { return baixa.id !== baixaId; });
   }
 
-  openExtratoConciliacaoModal(extratoIdx);
+  if (_exFiltroConciliacao === 'conciliados') {
+    _exFiltroConciliacao = 'todos';
+  }
+  await loadData();
   renderExtrato();
+  var cAtual = data.clients[activeClient];
+  var novoIdx = cAtual && cAtual.extrato ? cAtual.extrato.findIndex(function(item) { return item.id === lancamentoId; }) : -1;
+  if (novoIdx >= 0) openExtratoConciliacaoModal(novoIdx);
 }
 
 async function deleteExtrato(i) {

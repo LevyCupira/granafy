@@ -264,6 +264,9 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .data-table td{padding:10px 12px;font-size:.84rem;border-bottom:1px solid var(--border)}
 .data-table tr:last-child td{border-bottom:none}
 .data-table tr:hover td{background:rgba(128,128,128,.04)}
+.row-day-balance td{background:rgba(91,140,255,.06)!important;border-top:1px dashed rgba(91,140,255,.22)}
+.day-balance-row{display:flex;align-items:center;justify-content:flex-end;gap:18px;flex-wrap:wrap;font-size:.76rem;color:var(--muted)}
+.day-balance-row strong{margin-right:auto;color:var(--text);font-size:.78rem}
 .btn-delete{background:none;border:none;color:var(--danger);cursor:pointer;font-size:.8rem;padding:2px 4px;border-radius:4px;transition:background var(--tr)}
 .btn-delete:hover{background:rgba(255,107,107,.12)}
 .data-table th[draggable]{cursor:grab;user-select:none}
@@ -289,6 +292,7 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .badge-org{background:rgba(62,207,176,.15);color:var(--accent3)}
 .badge-card{background:rgba(255,198,107,.15);color:var(--warning)}
 .badge-estorno{background:rgba(62,207,176,.12);color:var(--success);border:1px solid rgba(62,207,176,.3)}
+.badge-rateio{background:rgba(255,198,107,.14);color:var(--warning);border:1px solid rgba(255,198,107,.28)}
 .badge-estorno-pendente{background:rgba(255,198,107,.14);color:var(--warning);border:1px solid rgba(255,198,107,.28)}
 .badge-estorno-concluido{background:rgba(62,207,176,.12);color:var(--success);border:1px solid rgba(62,207,176,.3)}
 .badge-estorno-vinculado{background:rgba(91,140,255,.14);color:var(--accent);border:1px solid rgba(91,140,255,.28)}
