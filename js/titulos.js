@@ -186,17 +186,17 @@ function tfTituloAtivoLabel() {
 
 function tfExportRows() {
   return tfFilteredItems().map(function(item) {
-    return [
-      formatDate(item.vencimento),
-      item.pessoaNome || '',
-      item.descricao || '',
-      item.categoria || 'Sem categoria',
-      tfStatusLabel(tfStatusOf(item)),
-      Number(item.valorTotal || 0),
-      tfTotalBaixado(item),
-      tfSaldo(item),
-      item.observacao || ''
-    ];
+    return {
+      Vencimento: formatDate(item.vencimento),
+      Pessoa: item.pessoaNome || '',
+      Descricao: item.descricao || '',
+      Categoria: item.categoria || 'Sem categoria',
+      Status: tfStatusLabel(tfStatusOf(item)),
+      Total: Number(item.valorTotal || 0),
+      Baixado: tfTotalBaixado(item),
+      Saldo: tfSaldo(item),
+      Observacao: item.observacao || ''
+    };
   });
 }
 
@@ -215,9 +215,9 @@ function tfExportXlsx() {
   ];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-    ['Vencimento', 'Pessoa', 'Descricao', 'Categoria', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']
-  ].concat(rows)), _tfNatureza === 'pagar' ? 'A Pagar' : 'A Receber');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, {
+    header: ['Vencimento', 'Pessoa', 'Descricao', 'Categoria', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']
+  }), _tfNatureza === 'pagar' ? 'A Pagar' : 'A Receber');
   XLSX.writeFile(
     wb,
     'granafy_financeiro_' + (_tfNatureza === 'pagar' ? 'pagar' : 'receber') + '_'
@@ -253,8 +253,8 @@ function tfExportPDF() {
     head: [['Vencimento', 'Pessoa', 'Descricao', 'Categoria', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']],
     body: rows.map(function(row) {
       return [
-        row[0], row[1], row[2], row[3], row[4],
-        fmt(row[5]), fmt(row[6]), fmt(row[7]), row[8]
+        row.Vencimento, row.Pessoa, row.Descricao, row.Categoria, row.Status,
+        fmt(row.Total), fmt(row.Baixado), fmt(row.Saldo), row.Observacao
       ];
     }),
     styles: { fontSize: 8, cellPadding: 2.2 },

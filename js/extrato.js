@@ -275,19 +275,22 @@ function exportExtratoXlsx() {
     .slice()
     .sort(function(a, b) { return String(b.data || '').localeCompare(String(a.data || '')); })
     .map(function(l) {
+      var conta = (contasClienteAtivo() || []).find(function(item) { return item.id === l.contaId; });
       return [
-        formatDate(l.data),
-        nomeContaCliente((contasClienteAtivo() || []).find(function(conta) { return conta.id === l.contaId; }) || null),
-        l.desc || '',
-        l.cat || '',
-        l.tipo === 'credito' ? 'Credito' : 'Debito',
-        Number(l.valor || 0),
-        resumoConciliacaoLancamento(l),
-        extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, ''),
-        resumoRateioExtrato(l).replace(/^Rateio:\s*/, ''),
-        l.observacao || ''
+        {
+          Data: formatDate(l.data),
+          Conta: nomeContaCliente(conta || null),
+          Descricao: l.desc || '',
+          Categoria: extratoTemRateio(l) ? 'Rateado' : (l.cat || ''),
+          Tipo: l.tipo === 'credito' ? 'Credito' : 'Debito',
+          Valor: Number(l.valor || 0),
+          Conciliacao: resumoConciliacaoLancamento(l),
+          Devolucao: extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, ''),
+          Rateio: resumoRateioExtrato(l).replace(/^Rateio:\s*/, ''),
+          Observacao: l.observacao || ''
+        }
       ];
-    });
+    }).map(function(item) { return item[0]; });
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
     ['Cliente', cliente.name || ''],
@@ -298,9 +301,9 @@ function exportExtratoXlsx() {
     ['Busca', _exFiltroBusca || ''],
     ['Gerado em', new Date().toLocaleString('pt-BR')]
   ]), 'Resumo');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-    ['Data', 'Conta', 'Descricao', 'Categoria', 'Tipo', 'Valor', 'Conciliacao', 'Devolucao', 'Rateio', 'Observacao']
-  ].concat(rows)), 'Extrato');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, {
+    header: ['Data', 'Conta', 'Descricao', 'Categoria', 'Tipo', 'Valor', 'Conciliacao', 'Devolucao', 'Rateio', 'Observacao']
+  }), 'Extrato');
   XLSX.writeFile(
     wb,
     'granafy_extrato_' + String(cliente.name || 'cliente').toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.xlsx'
