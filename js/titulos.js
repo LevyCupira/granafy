@@ -2,6 +2,7 @@
 
 var _tfNatureza = 'receber';
 var _tfStatus = 'todos';
+var _tfDescricao = '';
 var _tfBusca = '';
 var _tfPanels = {
   novo: false
@@ -129,8 +130,12 @@ function tfFilteredItems() {
   return tfSortItems(tfTitulosCliente().filter(function(item) {
     if (item.natureza !== _tfNatureza) return false;
     if (_tfStatus !== 'todos' && tfStatusOf(item) !== _tfStatus) return false;
+    if (_tfDescricao) {
+      var descricao = tfNormalizeText(item.descricao || '');
+      if (descricao.indexOf(tfNormalizeText(_tfDescricao)) === -1) return false;
+    }
     if (_tfBusca) {
-      var hay = tfNormalizeText([item.pessoaNome, item.descricao, item.categoria, item.observacao].join(' '));
+      var hay = tfNormalizeText([item.pessoaNome, item.categoria, item.observacao].join(' '));
       if (hay.indexOf(tfNormalizeText(_tfBusca)) === -1) return false;
     }
     return true;
@@ -160,14 +165,17 @@ function tfSetNatureza(natureza) {
 
 function tfApplyFilters() {
   var statusEl = document.getElementById('tf-filtro-status');
+  var descricaoEl = document.getElementById('tf-filtro-descricao');
   var buscaEl = document.getElementById('tf-filtro-busca');
   _tfStatus = statusEl ? statusEl.value : 'todos';
+  _tfDescricao = descricaoEl ? descricaoEl.value.trim() : '';
   _tfBusca = buscaEl ? buscaEl.value.trim() : '';
   renderFinanceiro();
 }
 
 function tfClearFilters() {
   _tfStatus = 'todos';
+  _tfDescricao = '';
   _tfBusca = '';
   renderFinanceiro();
 }
@@ -608,14 +616,15 @@ function renderFinanceiro() {
       + '</div>'
       + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>'
     )
-    + '<div class="form-card">'
-      + '<h3>Filtros</h3>'
-      + '<div class="form-row">'
-        + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
-        + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao ou categoria" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-card">'
+        + '<h3>Filtros</h3>'
+        + '<div class="form-row">'
+          + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
+          + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Filtrar pela descricao do titulo" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, categoria ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button></div>'
       + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button></div>'
-    + '</div>'
     + '<p class="section-title">' + tituloAtivo + '</p>'
     + areaHtml;
 
