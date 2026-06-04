@@ -180,6 +180,96 @@ function tfClearFilters() {
   renderFinanceiro();
 }
 
+function tfTituloAtivoLabel() {
+  return _tfNatureza === 'pagar' ? 'Contas a pagar' : 'Contas a receber';
+}
+
+function tfExportRows() {
+  return tfFilteredItems().map(function(item) {
+    return [
+      formatDate(item.vencimento),
+      item.pessoaNome || '',
+      item.descricao || '',
+      item.categoria || 'Sem categoria',
+      tfStatusLabel(tfStatusOf(item)),
+      Number(item.valorTotal || 0),
+      tfTotalBaixado(item),
+      tfSaldo(item),
+      item.observacao || ''
+    ];
+  });
+}
+
+function tfExportXlsx() {
+  if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente.');
+  var rows = tfExportRows();
+  if (!rows.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  var cliente = tfClienteAtivo();
+  var resumo = [
+    ['Cliente', cliente.name || ''],
+    ['Tela', tfTituloAtivoLabel()],
+    ['Status', _tfStatus || 'todos'],
+    ['Descricao', _tfDescricao || ''],
+    ['Busca', _tfBusca || ''],
+    ['Gerado em', new Date().toLocaleString('pt-BR')]
+  ];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Vencimento', 'Pessoa', 'Descricao', 'Categoria', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']
+  ].concat(rows)), _tfNatureza === 'pagar' ? 'A Pagar' : 'A Receber');
+  XLSX.writeFile(
+    wb,
+    'granafy_financeiro_' + (_tfNatureza === 'pagar' ? 'pagar' : 'receber') + '_'
+      + String(cliente.name || 'cliente').toLowerCase().replace(/\s+/g, '_')
+      + '_' + new Date().toISOString().slice(0, 10) + '.xlsx'
+  );
+}
+
+function tfExportPDF() {
+  var jsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDF) return alert('Biblioteca PDF nao carregada.');
+  if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente.');
+  var rows = tfExportRows();
+  if (!rows.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  var cliente = tfClienteAtivo();
+  var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  var hoje = new Date().toLocaleString('pt-BR');
+  doc.setFillColor(30, 35, 54);
+  doc.rect(0, 0, 297, 24, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(255, 255, 255);
+  doc.text('Granafy', 14, 11);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.text(tfTituloAtivoLabel() + ' - ' + (cliente.name || ''), 14, 19);
+  doc.text('Gerado em ' + hoje, 283, 19, { align: 'right' });
+  doc.setFontSize(9);
+  doc.setTextColor(90, 96, 122);
+  doc.text('Status: ' + (_tfStatus || 'todos') + ' | Descricao: ' + (_tfDescricao || '-') + ' | Busca: ' + (_tfBusca || '-'), 14, 31);
+  doc.autoTable({
+    startY: 36,
+    head: [['Vencimento', 'Pessoa', 'Descricao', 'Categoria', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']],
+    body: rows.map(function(row) {
+      return [
+        row[0], row[1], row[2], row[3], row[4],
+        fmt(row[5]), fmt(row[6]), fmt(row[7]), row[8]
+      ];
+    }),
+    styles: { fontSize: 8, cellPadding: 2.2 },
+    headStyles: { fillColor: [91, 140, 255], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 246, 250] },
+    columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } },
+    margin: { left: 14, right: 14 }
+  });
+  doc.save(
+    'granafy_financeiro_' + (_tfNatureza === 'pagar' ? 'pagar' : 'receber') + '_'
+    + String(cliente.name || 'cliente').toLowerCase().replace(/\s+/g, '_')
+    + '_' + new Date().toISOString().slice(0, 10) + '.pdf'
+  );
+}
+
 function toggleFinanceiroPanel(key) {
   _tfPanels[key] = !_tfPanels[key];
   renderFinanceiro();
@@ -571,7 +661,7 @@ function renderFinanceiro() {
   }
 
   var resumo = tfSummaryValues();
-  var tituloAtivo = _tfNatureza === 'pagar' ? 'Contas a pagar' : 'Contas a receber';
+  var tituloAtivo = tfTituloAtivoLabel();
   var pessoaLabel = _tfNatureza === 'pagar' ? 'Favorecido / fornecedor' : 'Cliente pagador';
   var btnLabel = _tfNatureza === 'pagar' ? 'Cadastrar conta a pagar' : 'Cadastrar conta a receber';
   var itens = tfFilteredItems();
@@ -623,7 +713,7 @@ function renderFinanceiro() {
           + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Filtrar pela descricao do titulo" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
           + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, categoria ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
         + '</div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">Exportar PDF</button><button class="btn-sm" onclick="tfExportXlsx()">Exportar XLSX</button></div>'
       + '</div>'
     + '<p class="section-title">' + tituloAtivo + '</p>'
     + areaHtml;

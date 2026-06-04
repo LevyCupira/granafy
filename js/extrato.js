@@ -242,6 +242,129 @@ function extratoResumoSaldoDiaHtml(dataDia, itens, colspan, saldoAnterior) {
   };
 }
 
+function extratoLancamentosFiltrados(cliente) {
+  if (!cliente) return [];
+  var financeiroPJAtivo = clienteAtivoEhPJ();
+  var relacionamentoAtivo = extratoRelacionamentoAtivo();
+  var centroCustoAtivo = extratoCentroCustoAtivo();
+  var lncs = cliente.extrato || [];
+  return lncs.filter(function(l) {
+    var texto = ((l.desc || '') + ' ' + (l.cat || '') + ' ' + (centroCustoAtivo ? nomeCentroCustoPorId(cliente, l.centroCustoId) : '') + ' ' + (relacionamentoAtivo ? nomeRelacionamentoPorId(cliente, l.relacionamentoId) : '') + ' ' + (l.observacao || '') + ' ' + (l.estornoObservacao || '')).toLowerCase();
+    var temConciliacao = valorConciliadoDoLancamento(l) > 0;
+    var statusEstorno = extratoStatusEstornoValor(l);
+    if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
+    if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
+    if (_exFiltroMes && !(l.data || '').startsWith(_exFiltroMes)) return false;
+    if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
+    if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
+    if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !temConciliacao) return false;
+    if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && temConciliacao) return false;
+    if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
+    if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado') return false;
+    if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
+    return true;
+  });
+}
+
+function exportExtratoXlsx() {
+  if (!activeClient) return alert('Selecione um cliente.');
+  var cliente = data.clients[activeClient];
+  var filtrados = extratoLancamentosFiltrados(cliente);
+  if (!filtrados.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  var rows = filtrados
+    .slice()
+    .sort(function(a, b) { return String(b.data || '').localeCompare(String(a.data || '')); })
+    .map(function(l) {
+      return [
+        formatDate(l.data),
+        nomeContaCliente((contasClienteAtivo() || []).find(function(conta) { return conta.id === l.contaId; }) || null),
+        l.desc || '',
+        l.cat || '',
+        l.tipo === 'credito' ? 'Credito' : 'Debito',
+        Number(l.valor || 0),
+        resumoConciliacaoLancamento(l),
+        extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, ''),
+        resumoRateioExtrato(l).replace(/^Rateio:\s*/, ''),
+        l.observacao || ''
+      ];
+    });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Cliente', cliente.name || ''],
+    ['Tipo', _exFiltroTipo || 'todos'],
+    ['Categoria', _exFiltroCat || 'todas'],
+    ['Periodo', _exFiltroMes || 'todos'],
+    ['Conta', _exFiltroConta || 'todas'],
+    ['Busca', _exFiltroBusca || ''],
+    ['Gerado em', new Date().toLocaleString('pt-BR')]
+  ]), 'Resumo');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Data', 'Conta', 'Descricao', 'Categoria', 'Tipo', 'Valor', 'Conciliacao', 'Devolucao', 'Rateio', 'Observacao']
+  ].concat(rows)), 'Extrato');
+  XLSX.writeFile(
+    wb,
+    'granafy_extrato_' + String(cliente.name || 'cliente').toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.xlsx'
+  );
+}
+
+function exportExtratoPDF() {
+  var jsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDF) return alert('Biblioteca PDF nao carregada.');
+  if (!activeClient) return alert('Selecione um cliente.');
+  var cliente = data.clients[activeClient];
+  var filtrados = extratoLancamentosFiltrados(cliente);
+  if (!filtrados.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  var hoje = new Date().toLocaleString('pt-BR');
+  doc.setFillColor(30, 35, 54);
+  doc.rect(0, 0, 297, 24, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(255, 255, 255);
+  doc.text('Granafy', 14, 11);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Extrato - ' + (cliente.name || ''), 14, 19);
+  doc.text('Gerado em ' + hoje, 283, 19, { align: 'right' });
+  doc.setFontSize(9);
+  doc.setTextColor(90, 96, 122);
+  doc.text('Filtros: tipo ' + (_exFiltroTipo || 'todos') + ' | categoria ' + (_exFiltroCat || 'todas') + ' | periodo ' + (_exFiltroMes || 'todos') + ' | busca ' + (_exFiltroBusca || '-'), 14, 31);
+  doc.autoTable({
+    startY: 36,
+    head: [['Data', 'Conta', 'Descricao', 'Categoria', 'Tipo', 'Valor', 'Conciliacao/Rateio']],
+    body: filtrados
+      .slice()
+      .sort(function(a, b) { return String(b.data || '').localeCompare(String(a.data || '')); })
+      .map(function(l) {
+        var conta = (contasClienteAtivo() || []).find(function(item) { return item.id === l.contaId; });
+        var detalhes = [];
+        var conc = resumoConciliacaoLancamento(l);
+        var rateio = resumoRateioExtrato(l);
+        var estorno = extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, '');
+        if (conc) detalhes.push(conc);
+        if (rateio) detalhes.push(rateio);
+        if (estorno) detalhes.push(estorno);
+        return [
+          formatDate(l.data),
+          nomeContaCliente(conta || null),
+          l.desc || '',
+          extratoTemRateio(l) ? 'Rateado' : (l.cat || '-'),
+          l.tipo === 'credito' ? 'Credito' : 'Debito',
+          (l.tipo === 'credito' ? fmt(l.valor || 0) : ('- ' + fmt(l.valor || 0))),
+          detalhes.join(' | ')
+        ];
+      }),
+    styles: { fontSize: 8, cellPadding: 2.2 },
+    headStyles: { fillColor: [91, 140, 255], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 246, 250] },
+    columnStyles: { 5: { halign: 'right' } },
+    margin: { left: 14, right: 14 }
+  });
+  doc.save(
+    'granafy_extrato_' + String(cliente.name || 'cliente').toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf'
+  );
+}
+
 function openExtratoRateioModal(i) {
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
@@ -1694,22 +1817,7 @@ function renderExtrato() {
   }));
   var meses = [...new Set(lncs.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort(compararCategoriaNome);
-  var filtradosBrutos = lncs.filter(l => {
-    var texto = ((l.desc || '') + ' ' + (l.cat || '') + ' ' + (centroCustoAtivo ? nomeCentroCustoPorId(c, l.centroCustoId) : '') + ' ' + (relacionamentoAtivo ? nomeRelacionamentoPorId(c, l.relacionamentoId) : '') + ' ' + (l.observacao || '') + ' ' + (l.estornoObservacao || '')).toLowerCase();
-    var temConciliacao = valorConciliadoDoLancamento(l) > 0;
-    var statusEstorno = extratoStatusEstornoValor(l);
-    if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
-    if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
-    if (_exFiltroMes && !(l.data || '').startsWith(_exFiltroMes)) return false;
-    if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
-    if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
-    if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !temConciliacao) return false;
-    if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && temConciliacao) return false;
-    if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
-    if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado') return false;
-    if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
-    return true;
-  });
+  var filtradosBrutos = extratoLancamentosFiltrados(c);
   var gruposDuplicados = agruparDuplicadosExtrato(filtradosBrutos).filter(grupoDuplicadoPendenteExtrato);
   var qtdDuplicadosPendentes = gruposDuplicados.reduce((total, grupo) => total + Math.max(grupo.linhas.length - 1, 0), 0);
   var filtrados = filtradosBrutos;
@@ -1819,7 +1927,7 @@ function renderExtrato() {
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>';
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button><button class="btn-sm" onclick="exportExtratoPDF()">Exportar PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">Exportar XLSX</button></div>';
   var idsFiltrados = filtrados.map(function(l) { return l.id; }).filter(Boolean);
   var selecionadosVisiveis = idsFiltrados.filter(function(id) { return _exSelecionados.has(id); }).length;
   var idsFiltradosJs = idsFiltrados.map(function(id) {
