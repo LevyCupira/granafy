@@ -146,16 +146,28 @@ function tfSummaryValues() {
   var items = tfTitulosCliente();
   var receber = 0;
   var pagar = 0;
+  var recebido = 0;
+  var pago = 0;
   var vencidos = 0;
 
   items.forEach(function(item) {
     var saldo = tfSaldo(item);
+    var baixado = tfTotalBaixado(item);
     if (item.natureza === 'receber') receber += saldo;
     if (item.natureza === 'pagar') pagar += saldo;
+    if (item.natureza === 'receber') recebido += baixado;
+    if (item.natureza === 'pagar') pago += baixado;
     if (tfIsOverdue(item)) vencidos++;
   });
 
-  return { receber: receber, pagar: pagar, vencidos: vencidos, total: items.length };
+  return {
+    receber: receber,
+    pagar: pagar,
+    recebido: recebido,
+    pago: pago,
+    vencidos: vencidos,
+    total: items.length
+  };
 }
 
 function tfSetNatureza(natureza) {
@@ -679,7 +691,9 @@ function renderFinanceiro() {
   root.innerHTML =
     '<div class="summary-grid">'
       + '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
       + '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
     + '</div>'
