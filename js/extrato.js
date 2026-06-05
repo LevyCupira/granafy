@@ -119,9 +119,14 @@ function extratoPeriodoDisplayValue() {
   return parts.length === 2 ? parts[1] + '/' + parts[0] : _exFiltroPeriodoValor;
 }
 
-function extratoValorBate(valorLancamento) {
+function extratoValorComparavel(lanc) {
+  var valor = Number((lanc && lanc.valor) || 0);
+  return lanc && lanc.tipo === 'debito' ? -valor : valor;
+}
+
+function extratoValorBate(lanc) {
   if (_exFiltroValorModo === 'todos' || !_exFiltroValor) return true;
-  var comparado = Math.abs(Number(valorLancamento || 0));
+  var comparado = extratoValorComparavel(lanc);
   if (_exFiltroValorModo === 'acima') return comparado >= Number(_exFiltroValor || 0);
   if (_exFiltroValorModo === 'abaixo') return comparado <= Number(_exFiltroValor || 0);
   return comparado === Number(_exFiltroValor || 0);
@@ -355,7 +360,7 @@ function extratoLancamentosFiltrados(cliente) {
     if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && !pendenteConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado' && !ehLancamentoDeEstorno) return false;
-    if (!extratoValorBate(l.valor || 0)) return false;
+    if (!extratoValorBate(l)) return false;
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
   });
