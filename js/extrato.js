@@ -345,6 +345,7 @@ function extratoLancamentosFiltrados(cliente) {
     var pendenteConciliacao = extratoPendenteConciliacao(cliente, l);
     var resolvidoConciliacao = extratoResolvidoConciliacao(cliente, l);
     var statusEstorno = extratoStatusEstornoValor(l);
+    var ehLancamentoDeEstorno = extratoLancamentoEhEstornoVinculado(cliente, l.id);
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
     if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
     if (!extratoPeriodoBate(l.data || '')) return false;
@@ -353,7 +354,7 @@ function extratoLancamentosFiltrados(cliente) {
     if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !resolvidoConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && !pendenteConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
-    if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado') return false;
+    if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado' && !ehLancamentoDeEstorno) return false;
     if (!extratoValorBate(l.valor || 0)) return false;
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
