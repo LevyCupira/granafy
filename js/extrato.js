@@ -3,11 +3,14 @@
 var _exTipo = 'credito';
 var _exFiltroTipo = 'todos';
 var _exFiltroCat = '';
-var _exFiltroMes = getPreviousMonthKey();
+var _exFiltroPeriodoModo = 'mes';
+var _exFiltroPeriodoValor = getPreviousMonthKey();
 var _exFiltroConta = '';
 var _exFiltroRelacionamento = '';
 var _exFiltroConciliacao = 'todos';
 var _exFiltroEstorno = 'todos';
+var _exFiltroValorModo = 'todos';
+var _exFiltroValor = 0;
 var _exFiltroBusca = '';
 var _exSelecaoLote = false;
 var _exSelecionados = new Set();
@@ -60,6 +63,77 @@ function lerValorImportadoExtrato(rawVal) {
 
 function inferirTipoImportadoExtrato(valor) {
   return Number(valor || 0) < 0 ? 'debito' : 'credito';
+}
+
+function normalizePeriodoFiltroExtrato(rawValue, modo) {
+  var texto = String(rawValue || '').trim();
+  if (!texto) return '';
+  if (modo === 'dia') {
+    return normalizeFlexibleDateInput(texto);
+  }
+  if (modo === 'mes') {
+    if (/^\d{4}-\d{2}$/.test(texto)) return texto;
+    var compact = texto.replace(/\D/g, '');
+    if (compact.length === 6) {
+      var mesCompacto = compact.slice(0, 2);
+      var anoCompacto = compact.slice(2, 6);
+      if (Number(mesCompacto) >= 1 && Number(mesCompacto) <= 12) return anoCompacto + '-' + mesCompacto;
+    }
+    var matchMes = texto.match(/^(\d{1,2})[\/\-](\d{4})$/);
+    if (matchMes) {
+      var mes = String(matchMes[1]).padStart(2, '0');
+      if (Number(mes) >= 1 && Number(mes) <= 12) return matchMes[2] + '-' + mes;
+    }
+    if (/^\d{1,2}$/.test(texto)) {
+      var mesAtual = String(texto).padStart(2, '0');
+      if (Number(mesAtual) >= 1 && Number(mesAtual) <= 12) return String(new Date().getFullYear()) + '-' + mesAtual;
+    }
+    return '';
+  }
+  if (modo === 'ano') {
+    var ano = texto.replace(/\D/g, '');
+    return ano.length === 4 ? ano : '';
+  }
+  return '';
+}
+
+function extratoPeriodoBate(dataIso) {
+  if (!_exFiltroPeriodoValor) return true;
+  var data = String(dataIso || '');
+  if (_exFiltroPeriodoModo === 'dia') return data === _exFiltroPeriodoValor;
+  if (_exFiltroPeriodoModo === 'ano') return data.slice(0, 4) === _exFiltroPeriodoValor;
+  return data.slice(0, 7) === _exFiltroPeriodoValor;
+}
+
+function extratoPeriodoPlaceholder() {
+  if (_exFiltroPeriodoModo === 'dia') return 'dd/mm/aaaa';
+  if (_exFiltroPeriodoModo === 'ano') return 'aaaa';
+  return 'mm/aaaa';
+}
+
+function extratoPeriodoDisplayValue() {
+  if (!_exFiltroPeriodoValor) return '';
+  if (_exFiltroPeriodoModo === 'dia') return formatDate(_exFiltroPeriodoValor);
+  if (_exFiltroPeriodoModo === 'ano') return _exFiltroPeriodoValor;
+  var parts = String(_exFiltroPeriodoValor).split('-');
+  return parts.length === 2 ? parts[1] + '/' + parts[0] : _exFiltroPeriodoValor;
+}
+
+function extratoValorBate(valorLancamento) {
+  if (_exFiltroValorModo === 'todos' || !_exFiltroValor) return true;
+  var comparado = Math.abs(Number(valorLancamento || 0));
+  if (_exFiltroValorModo === 'acima') return comparado >= Number(_exFiltroValor || 0);
+  if (_exFiltroValorModo === 'abaixo') return comparado <= Number(_exFiltroValor || 0);
+  return comparado === Number(_exFiltroValor || 0);
+}
+
+function atualizarPlaceholdersFiltrosExtrato() {
+  var periodoInput = document.getElementById('ex-filtro-periodo');
+  var periodoModo = document.getElementById('ex-filtro-periodo-modo');
+  if (periodoInput && periodoModo) {
+    var modo = periodoModo.value || 'mes';
+    periodoInput.placeholder = modo === 'dia' ? 'dd/mm/aaaa' : (modo === 'ano' ? 'aaaa' : 'mm/aaaa');
+  }
 }
 
 function extratoImportGuideHtml() {
@@ -254,13 +328,14 @@ function extratoLancamentosFiltrados(cliente) {
     var statusEstorno = extratoStatusEstornoValor(l);
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
     if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
-    if (_exFiltroMes && !(l.data || '').startsWith(_exFiltroMes)) return false;
+    if (!extratoPeriodoBate(l.data || '')) return false;
     if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
     if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
     if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !temConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && temConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado') return false;
+    if (!extratoValorBate(l.valor || 0)) return false;
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
   });
@@ -296,8 +371,9 @@ function exportExtratoXlsx() {
     ['Cliente', cliente.name || ''],
     ['Tipo', _exFiltroTipo || 'todos'],
     ['Categoria', _exFiltroCat || 'todas'],
-    ['Periodo', _exFiltroMes || 'todos'],
+    ['Periodo', (_exFiltroPeriodoValor ? (_exFiltroPeriodoModo + ': ' + extratoPeriodoDisplayValue()) : 'todos')],
     ['Conta', _exFiltroConta || 'todas'],
+    ['Valor', (_exFiltroValorModo === 'todos' || !_exFiltroValor) ? 'todos' : (_exFiltroValorModo + ': ' + fmt(_exFiltroValor))],
     ['Busca', _exFiltroBusca || ''],
     ['Gerado em', new Date().toLocaleString('pt-BR')]
   ]), 'Resumo');
@@ -331,7 +407,7 @@ function exportExtratoPDF() {
   doc.text('Gerado em ' + hoje, 283, 19, { align: 'right' });
   doc.setFontSize(9);
   doc.setTextColor(90, 96, 122);
-  doc.text('Filtros: tipo ' + (_exFiltroTipo || 'todos') + ' | categoria ' + (_exFiltroCat || 'todas') + ' | periodo ' + (_exFiltroMes || 'todos') + ' | busca ' + (_exFiltroBusca || '-'), 14, 31);
+  doc.text('Filtros: tipo ' + (_exFiltroTipo || 'todos') + ' | categoria ' + (_exFiltroCat || 'todas') + ' | periodo ' + (_exFiltroPeriodoValor ? (_exFiltroPeriodoModo + ' ' + extratoPeriodoDisplayValue()) : 'todos') + ' | valor ' + ((_exFiltroValorModo === 'todos' || !_exFiltroValor) ? 'todos' : (_exFiltroValorModo + ' ' + fmt(_exFiltroValor))) + ' | busca ' + (_exFiltroBusca || '-'), 14, 31);
   doc.autoTable({
     startY: 36,
     head: [['Data', 'Conta', 'Descricao', 'Categoria', 'Tipo', 'Valor', 'Conciliacao/Rateio']],
@@ -1385,20 +1461,26 @@ function setTipoExtrato(t) {
 function aplicarFiltrosExtrato() {
   var tipo = document.getElementById('ex-filtro-tipo');
   var cat = document.getElementById('ex-filtro-cat');
-  var mes = document.getElementById('ex-filtro-mes');
+  var periodoModo = document.getElementById('ex-filtro-periodo-modo');
+  var periodo = document.getElementById('ex-filtro-periodo');
   var conta = document.getElementById('ex-filtro-conta');
   var relacionamento = document.getElementById('ex-filtro-relacionamento');
   var busca = document.getElementById('ex-filtro-busca');
   var conciliacao = document.getElementById('ex-filtro-conciliacao');
   var estorno = document.getElementById('ex-filtro-estorno');
+  var valorModo = document.getElementById('ex-filtro-valor-modo');
+  var valor = document.getElementById('ex-filtro-valor');
 
   _exFiltroTipo = tipo ? tipo.value : 'todos';
   _exFiltroCat = cat ? cat.value : '';
-  _exFiltroMes = mes ? mes.value : '';
+  _exFiltroPeriodoModo = periodoModo ? periodoModo.value : 'mes';
+  _exFiltroPeriodoValor = periodo ? normalizePeriodoFiltroExtrato(periodo.value, _exFiltroPeriodoModo) : '';
   _exFiltroConta = conta ? conta.value : '';
   _exFiltroRelacionamento = clienteAtivoEhPJ() && relacionamento ? relacionamento.value : '';
   _exFiltroConciliacao = clienteAtivoEhPJ() && conciliacao ? conciliacao.value : 'todos';
   _exFiltroEstorno = clienteAtivoEhPJ() && estorno ? estorno.value : 'todos';
+  _exFiltroValorModo = valorModo ? valorModo.value : 'todos';
+  _exFiltroValor = valor ? parseMoney(valor) : 0;
   _exFiltroBusca = busca ? busca.value.trim().toLowerCase() : '';
 
   renderExtrato();
@@ -1407,11 +1489,14 @@ function aplicarFiltrosExtrato() {
 function limparFiltrosExtrato() {
   _exFiltroTipo = 'todos';
   _exFiltroCat = '';
-  _exFiltroMes = '';
+  _exFiltroPeriodoModo = 'mes';
+  _exFiltroPeriodoValor = '';
   _exFiltroConta = '';
   _exFiltroRelacionamento = '';
   _exFiltroConciliacao = 'todos';
   _exFiltroEstorno = 'todos';
+  _exFiltroValorModo = 'todos';
+  _exFiltroValor = 0;
   _exFiltroBusca = '';
   renderExtrato();
 }
@@ -1818,7 +1903,6 @@ function renderExtrato() {
   _exSelecionados = new Set(Array.from(_exSelecionados).filter(function(id) {
     return lncs.some(function(l) { return l.id === id; });
   }));
-  var meses = [...new Set(lncs.map(l => (l.data || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort(compararCategoriaNome);
   var filtradosBrutos = extratoLancamentosFiltrados(c);
   var gruposDuplicados = agruparDuplicadosExtrato(filtradosBrutos).filter(grupoDuplicadoPendenteExtrato);
@@ -1870,14 +1954,6 @@ function renderExtrato() {
       esc(nomeRelacionamento(rel)) +
       '</option>';
   }).join('');
-  var mesesFiltro = meses.slice();
-  if (_exFiltroMes && !mesesFiltro.includes(_exFiltroMes)) mesesFiltro.unshift(_exFiltroMes);
-
-  var filtroMesOpts = mesesFiltro.map(m => {
-    var parts = m.split('-');
-    return '<option value="' + m + '"' + (_exFiltroMes === m ? ' selected' : '') + '>' + parts[1] + '/' + parts[0] + '</option>';
-  }).join('');
-
   var contasPanelBody =
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + contasResumoHtml + '</div>'
@@ -1923,10 +1999,13 @@ function renderExtrato() {
     '<div class="form-row">'
     + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="credito"' + (_exFiltroTipo === 'credito' ? ' selected' : '') + '>Credito</option><option value="debito"' + (_exFiltroTipo === 'debito' ? ' selected' : '') + '>Debito</option></select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
-    + '<div class="form-group" style="max-width:150px"><label>Periodo</label><select id="ex-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:120px"><label>Periodo</label><select id="ex-filtro-periodo-modo" onchange="atualizarPlaceholdersFiltrosExtrato()"><option value="dia"' + (_exFiltroPeriodoModo === 'dia' ? ' selected' : '') + '>Dia</option><option value="mes"' + (_exFiltroPeriodoModo === 'mes' ? ' selected' : '') + '>Mes</option><option value="ano"' + (_exFiltroPeriodoModo === 'ano' ? ' selected' : '') + '>Ano</option></select></div>'
+    + '<div class="form-group" style="max-width:170px"><label>Referencia</label><input type="text" id="ex-filtro-periodo" class="' + (_exFiltroPeriodoModo === 'dia' ? 'flex-date-input' : '') + '" value="' + esc(extratoPeriodoDisplayValue()) + '" placeholder="' + esc(extratoPeriodoPlaceholder()) + '" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
     + (financeiroPJAtivo ? '<div class="form-group" style="max-width:180px"><label>Conciliacao</label><select id="ex-filtro-conciliacao"><option value="todos"' + (_exFiltroConciliacao === 'todos' ? ' selected' : '') + '>Todos</option><option value="conciliados"' + (_exFiltroConciliacao === 'conciliados' ? ' selected' : '') + '>Conciliados</option><option value="nao_conciliados"' + (_exFiltroConciliacao === 'nao_conciliados' ? ' selected' : '') + '>Nao conciliados</option></select></div>' : '')
     + (financeiroPJAtivo ? '<div class="form-group" style="max-width:190px"><label>Devolucao</label><select id="ex-filtro-estorno"><option value="todos"' + (_exFiltroEstorno === 'todos' ? ' selected' : '') + '>Todos</option><option value="pendentes_estorno"' + (_exFiltroEstorno === 'pendentes_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornados"' + (_exFiltroEstorno === 'estornados' ? ' selected' : '') + '>Ja estornados</option></select></div>' : '')
+    + '<div class="form-group" style="max-width:120px"><label>Valor</label><select id="ex-filtro-valor-modo"><option value="todos"' + (_exFiltroValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="acima"' + (_exFiltroValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_exFiltroValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option><option value="igual"' + (_exFiltroValorModo === 'igual' ? ' selected' : '') + '>Igual a</option></select></div>'
+    + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-filtro-valor" class="money-input" value="' + esc(Number(_exFiltroValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
@@ -2085,6 +2164,7 @@ function renderExtrato() {
 
   area.innerHTML = html;
   aplicarAjustesVisuaisExtrato(area, lncs);
+  atualizarPlaceholdersFiltrosExtrato();
 
   var dataInput = document.getElementById('ex-data');
   if (dataInput) dataInput.value = new Date().toISOString().slice(0, 10);
