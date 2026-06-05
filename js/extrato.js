@@ -316,6 +316,24 @@ function extratoResumoSaldoDiaHtml(dataDia, itens, colspan, saldoAnterior) {
   };
 }
 
+function extratoIgnoraConciliacao(lanc) {
+  var descricao = String((lanc && (lanc.desc || lanc.descOriginal)) || '').trim().toLowerCase();
+  return descricao === 'saldo inicial';
+}
+
+function extratoPendenteConciliacao(cliente, lanc) {
+  if (!lanc) return false;
+  if (extratoIgnoraConciliacao(lanc)) return false;
+  if (valorConciliadoDoLancamento(lanc) > 0) return false;
+  if (extratoStatusEstornoValor(lanc) === 'estornado') return false;
+  if (extratoLancamentoEhEstornoVinculado(cliente, lanc.id)) return false;
+  return true;
+}
+
+function extratoResolvidoConciliacao(cliente, lanc) {
+  return !!lanc && !extratoPendenteConciliacao(cliente, lanc);
+}
+
 function extratoLancamentosFiltrados(cliente) {
   if (!cliente) return [];
   var financeiroPJAtivo = clienteAtivoEhPJ();
@@ -324,15 +342,16 @@ function extratoLancamentosFiltrados(cliente) {
   var lncs = cliente.extrato || [];
   return lncs.filter(function(l) {
     var texto = ((l.desc || '') + ' ' + (l.cat || '') + ' ' + (centroCustoAtivo ? nomeCentroCustoPorId(cliente, l.centroCustoId) : '') + ' ' + (relacionamentoAtivo ? nomeRelacionamentoPorId(cliente, l.relacionamentoId) : '') + ' ' + (l.observacao || '') + ' ' + (l.estornoObservacao || '')).toLowerCase();
-    var temConciliacao = valorConciliadoDoLancamento(l) > 0;
+    var pendenteConciliacao = extratoPendenteConciliacao(cliente, l);
+    var resolvidoConciliacao = extratoResolvidoConciliacao(cliente, l);
     var statusEstorno = extratoStatusEstornoValor(l);
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
     if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
     if (!extratoPeriodoBate(l.data || '')) return false;
     if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
     if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
-    if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !temConciliacao) return false;
-    if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && temConciliacao) return false;
+    if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !resolvidoConciliacao) return false;
+    if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && !pendenteConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado') return false;
     if (!extratoValorBate(l.valor || 0)) return false;
@@ -2073,7 +2092,7 @@ function renderExtrato() {
           + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
           + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
           + '<td><div class="row-actions">'
-          + (financeiroPJAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
+          + (financeiroPJAtivo && !extratoIgnoraConciliacao(l) ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
           + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
           + '</tr>';
       });
@@ -2151,7 +2170,7 @@ function renderExtrato() {
         + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
         + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
         + '<td><div class="row-actions">'
-        + (financeiroPJAtivo ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
+        + (financeiroPJAtivo && !extratoIgnoraConciliacao(l) ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
         + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
         + '</tr>';
       });
