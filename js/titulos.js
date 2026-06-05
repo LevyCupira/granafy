@@ -690,10 +690,11 @@ function renderFinanceiro() {
 
   root.innerHTML =
     '<div class="summary-grid">'
-      + '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>'
+      + (_tfNatureza === 'receber'
+        ? '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
+        : '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
     + '</div>'
