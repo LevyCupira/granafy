@@ -265,13 +265,12 @@ function exportPDF() {
       .sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); })
       .slice(0, 50)
       .map(function(l) {
-        var abatimento = isAbatimento(l);
         return [
           l.data ? l.data.split('-').reverse().join('/') : '-',
-          abatimento ? String(l.desc || '') + ' (abatimento de despesa)' : l.desc,
+          l.desc,
           l.cat || '-',
-          abatimento ? 'Abatimento' : (l.tipo === 'credito' ? 'Receita' : 'Despesa'),
-          abatimento ? fmtPos(l.valor) : (l.tipo === 'credito' ? fmtPos(l.valor) : fmtNeg(l.valor))
+          l.tipo === 'credito' ? 'Receita' : 'Despesa',
+          l.tipo === 'credito' ? fmtPos(l.valor) : fmtNeg(l.valor)
         ];
       });
 
