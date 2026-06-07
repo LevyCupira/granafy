@@ -240,6 +240,7 @@ async function loadData() {
       banco: conta.banco || '',
       agencia: conta.agencia || '',
       numero: conta.numero || '',
+      saldoInicial: Number(conta.saldo_inicial || 0),
       userId: conta.user_id || null
     });
   });

@@ -297,10 +297,11 @@ function extratoCategoriaBadgeHtml(lanc) {
 }
 
 function extratoResumoSaldoDiaHtml(dataDia, itens, colspan, saldoAnterior) {
-  var creditos = itens.filter(function(item) { return item.tipo === 'credito'; }).reduce(function(soma, item) {
+  var itensValidos = itens.filter(function(item) { return !extratoLancamentoEhSaldoInicial(item); });
+  var creditos = itensValidos.filter(function(item) { return item.tipo === 'credito'; }).reduce(function(soma, item) {
     return soma + Number(item.valor || 0);
   }, 0);
-  var debitos = itens.filter(function(item) { return item.tipo === 'debito'; }).reduce(function(soma, item) {
+  var debitos = itensValidos.filter(function(item) { return item.tipo === 'debito'; }).reduce(function(soma, item) {
     return soma + Number(item.valor || 0);
   }, 0);
   var saldoMovimentoDia = creditos - debitos;
@@ -321,9 +322,25 @@ function extratoResumoSaldoDiaHtml(dataDia, itens, colspan, saldoAnterior) {
   };
 }
 
-function extratoIgnoraConciliacao(lanc) {
+function extratoLancamentoEhSaldoInicial(lanc) {
   var descricao = String((lanc && (lanc.desc || lanc.descOriginal)) || '').trim().toLowerCase();
   return descricao === 'saldo inicial';
+}
+
+function extratoIgnoraConciliacao(lanc) {
+  return extratoLancamentoEhSaldoInicial(lanc);
+}
+
+function extratoSaldoInicialBase(cliente) {
+  if (!cliente) return 0;
+  var contas = Array.isArray(cliente.contas) ? cliente.contas : [];
+  if (_exFiltroConta) {
+    var contaSelecionada = contas.find(function(conta) { return conta.id === _exFiltroConta; });
+    return Number((contaSelecionada && contaSelecionada.saldoInicial) || 0);
+  }
+  return contas.reduce(function(total, conta) {
+    return total + Number((conta && conta.saldoInicial) || 0);
+  }, 0);
 }
 
 function extratoPendenteConciliacao(cliente, lanc) {
@@ -1002,6 +1019,26 @@ function nomeContaClienteCompacta(conta) {
   return tipo + ' ' + banco + (numero ? ' · ' + numero : '');
 }
 
+function nomeContaCliente(conta) {
+  if (!conta) return 'Nao informada';
+  var tipoConta = String(conta.tipo || '').toLowerCase();
+  if (tipoConta === 'caixa') return 'CX ' + (conta.banco || 'Caixa');
+  var tipo = tipoConta === 'poupanca' ? 'CP' : 'CC';
+  var banco = conta.banco || 'Banco';
+  var dados = [conta.agencia, conta.numero].filter(Boolean).join('/');
+  return tipo + ' ' + banco + (dados ? ' ' + dados : '');
+}
+
+function nomeContaClienteCompacta(conta) {
+  if (!conta) return 'Nao informada';
+  var tipoConta = String(conta.tipo || '').toLowerCase();
+  if (tipoConta === 'caixa') return 'CX ' + String(conta.banco || 'Caixa').trim();
+  var tipo = tipoConta === 'poupanca' ? 'CP' : 'CC';
+  var banco = String(conta.banco || 'Banco').trim();
+  var numero = resumirNumeroConta(conta.numero || '');
+  return tipo + ' ' + banco + (numero ? ' · ' + numero : '');
+}
+
 function nomeContaPorId(cliente, contaId) {
   if (!cliente || !contaId) return 'Nao informada';
   var conta = (cliente.contas || []).find(item => item.id === contaId);
@@ -1086,6 +1123,15 @@ function isMissingCentroCustoSchemaError(error) {
     || msg.includes('schema cache');
 }
 
+function isMissingSaldoInicialSchemaError(error) {
+  if (!error) return false;
+  var msg = String((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+  return error.code === '42703' || error.code === '42P01' || error.code === 'PGRST204' || error.code === 'PGRST205'
+    || msg.includes('saldo_inicial')
+    || msg.includes('contas_tipo_check')
+    || msg.includes('schema cache');
+}
+
 var BANCOS_COMUNS = [
   'Banco do Brasil',
   'Bradesco',
@@ -1142,7 +1188,8 @@ async function cadastrarContaCliente() {
     tipo: conta.tipo,
     banco: conta.banco,
     agencia: conta.agencia || null,
-    numero: conta.numero || null
+    numero: conta.numero || null,
+    saldo_inicial: Number(conta.saldoInicial || 0)
   };
 
   const { error } = await supabaseClient
@@ -1151,8 +1198,8 @@ async function cadastrarContaCliente() {
 
   if (error) {
     console.error('Erro ao cadastrar conta:', error);
-    if (isMissingContaSchemaError(error)) {
-      alert('A tabela de contas ainda nao existe no Supabase. Rode o arquivo sql/20260419_contas_clientes.sql no SQL Editor.');
+    if (isMissingContaSchemaError(error) || isMissingSaldoInicialSchemaError(error)) {
+      alert('A estrutura de contas ainda nao esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
       return;
     }
     alert('Nao foi possivel cadastrar a conta: ' + (error.message || 'erro desconhecido'));
@@ -1179,15 +1226,16 @@ async function editarContaCliente(contaId) {
         tipo: dados.tipo,
         banco: dados.banco,
         agencia: dados.agencia || null,
-        numero: dados.numero || null
+        numero: dados.numero || null,
+        saldo_inicial: Number(dados.saldoInicial || 0)
       })
       .eq('id', conta.id)
   );
 
   if (error) {
     console.error('Erro ao editar conta:', error);
-    if (isMissingContaSchemaError(error)) {
-      alert('A tabela de contas ainda nao existe no Supabase. Rode o arquivo sql/20260419_contas_clientes.sql no SQL Editor.');
+    if (isMissingContaSchemaError(error) || isMissingSaldoInicialSchemaError(error)) {
+      alert('A estrutura de contas ainda nao esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
       return;
     }
     alert('Nao foi possivel editar a conta: ' + (error.message || 'erro desconhecido'));
@@ -1384,45 +1432,59 @@ function abrirFormularioContaCliente(conta) {
     var actionsEl = document.getElementById('appDialogActions');
     var tipoAtual = (conta && conta.tipo) || 'corrente';
     var bancoAtual = (conta && conta.banco) || '';
-    var bancoConhecido = BANCOS_COMUNS.includes(bancoAtual) ? bancoAtual : (bancoAtual ? 'Outro' : 'Banco do Brasil');
+    var saldoAtual = Number((conta && conta.saldoInicial) || 0);
+    var ehCaixa = tipoAtual === 'caixa';
+    var bancoConhecido = ehCaixa ? 'Outro' : (BANCOS_COMUNS.includes(bancoAtual) ? bancoAtual : (bancoAtual ? 'Outro' : 'Banco do Brasil'));
 
     overlay.classList.add('account-dialog-overlay');
     titleEl.textContent = conta ? 'Editar conta' : 'Cadastrar conta';
     messageEl.innerHTML =
       '<div class="account-form">' +
       '<div class="account-type-row" role="group" aria-label="Tipo de conta">' +
-      '<button type="button" class="account-type-btn' + (tipoAtual !== 'poupanca' ? ' active' : '') + '" data-type="corrente">Conta corrente</button>' +
+      '<button type="button" class="account-type-btn' + (tipoAtual === 'corrente' ? ' active' : '') + '" data-type="corrente">Conta corrente</button>' +
       '<button type="button" class="account-type-btn' + (tipoAtual === 'poupanca' ? ' active' : '') + '" data-type="poupanca">Poupanca</button>' +
+      '<button type="button" class="account-type-btn' + (tipoAtual === 'caixa' ? ' active' : '') + '" data-type="caixa">Caixa / especie</button>' +
       '</div>' +
-      '<div class="form-row">' +
+      '<div class="form-row" id="contaBancoRow">' +
       '<div class="form-group"><label>Banco</label><select id="contaBanco">' +
       BANCOS_COMUNS.map(banco => '<option value="' + esc(banco) + '"' + (bancoConhecido === banco ? ' selected' : '') + '>' + esc(banco) + '</option>').join('') +
       '</select></div>' +
-      '<div class="form-group account-other-bank" id="contaOutroWrap"><label>Nome do banco</label><input type="text" id="contaBancoOutro" value="' + esc(bancoConhecido === 'Outro' ? bancoAtual : '') + '" placeholder="Digite o banco"/></div>' +
+      '<div class="form-group account-other-bank" id="contaOutroWrap"><label id="contaOutroLabel">Nome do banco</label><input type="text" id="contaBancoOutro" value="' + esc(bancoConhecido === 'Outro' ? bancoAtual : '') + '" placeholder="Digite o banco"/></div>' +
       '</div>' +
-      '<div class="form-row">' +
+      '<div class="form-row" id="contaNumerosRow">' +
       '<div class="form-group"><label>Agencia</label><input type="text" id="contaAgencia" value="' + esc((conta && conta.agencia) || '') + '" inputmode="numeric" placeholder="Ex: 1234"/></div>' +
       '<div class="form-group"><label>Conta</label><input type="text" id="contaNumero" value="' + esc((conta && conta.numero) || '') + '" inputmode="numeric" placeholder="Ex: 000123-4"/></div>' +
       '</div>' +
+      '<div class="form-row"><div class="form-group" style="max-width:180px"><label>Saldo inicial (R$)</label><input type="text" id="contaSaldoInicial" class="money-input" value="' + esc(saldoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" inputmode="numeric" placeholder="0,00"/></div></div>' +
       '<div class="account-form-error" id="contaFormError"></div>' +
       '</div>';
     actionsEl.innerHTML =
       '<button class="app-dialog-btn ghost" type="button" id="contaCancelar">Cancelar</button>' +
       '<button class="app-dialog-btn primary" type="button" id="contaSalvar">' + (conta ? 'Salvar' : 'Cadastrar') + '</button>';
 
-    var tipoSelecionado = tipoAtual === 'poupanca' ? 'poupanca' : 'corrente';
+    var tipoSelecionado = ['corrente', 'poupanca', 'caixa'].includes(tipoAtual) ? tipoAtual : 'corrente';
     var bancoSelect = document.getElementById('contaBanco');
+    var bancoRow = document.getElementById('contaBancoRow');
     var outroWrap = document.getElementById('contaOutroWrap');
+    var outroLabel = document.getElementById('contaOutroLabel');
     var outroInput = document.getElementById('contaBancoOutro');
+    var numerosRow = document.getElementById('contaNumerosRow');
     var agenciaInput = document.getElementById('contaAgencia');
     var numeroInput = document.getElementById('contaNumero');
+    var saldoInput = document.getElementById('contaSaldoInicial');
     var errorEl = document.getElementById('contaFormError');
     var cancelar = document.getElementById('contaCancelar');
     var salvar = document.getElementById('contaSalvar');
     var typeBtns = Array.from(messageEl.querySelectorAll('.account-type-btn'));
 
     function syncOutro() {
-      outroWrap.style.display = bancoSelect.value === 'Outro' ? 'flex' : 'none';
+      var isCaixa = tipoSelecionado === 'caixa';
+      bancoRow.style.display = 'flex';
+      outroWrap.style.display = (isCaixa || bancoSelect.value === 'Outro') ? 'flex' : 'none';
+      numerosRow.style.display = isCaixa ? 'none' : 'flex';
+      outroLabel.textContent = isCaixa ? 'Nome do caixa' : 'Nome do banco';
+      outroInput.placeholder = isCaixa ? 'Ex: Caixa do evento' : 'Digite o banco';
+      if (isCaixa) bancoSelect.value = 'Outro';
     }
 
     function close(value) {
@@ -1440,31 +1502,36 @@ function abrirFormularioContaCliente(conta) {
       btn.addEventListener('click', function() {
         tipoSelecionado = btn.dataset.type;
         typeBtns.forEach(item => item.classList.toggle('active', item === btn));
+        syncOutro();
       });
     });
 
     bancoSelect.addEventListener('change', syncOutro);
     cancelar.addEventListener('click', () => close(null));
     salvar.addEventListener('click', function() {
-      var banco = bancoSelect.value === 'Outro' ? outroInput.value.trim() : bancoSelect.value;
+      var banco = tipoSelecionado === 'caixa'
+        ? outroInput.value.trim()
+        : (bancoSelect.value === 'Outro' ? outroInput.value.trim() : bancoSelect.value);
       if (!banco) {
-        errorEl.textContent = 'Informe o banco da conta.';
-        if (bancoSelect.value === 'Outro') outroInput.focus();
+        errorEl.textContent = tipoSelecionado === 'caixa' ? 'Informe o nome do caixa.' : 'Informe o banco da conta.';
+        if (tipoSelecionado === 'caixa' || bancoSelect.value === 'Outro') outroInput.focus();
         return;
       }
 
       close({
         tipo: tipoSelecionado,
         banco: banco,
-        agencia: agenciaInput.value.trim(),
-        numero: numeroInput.value.trim()
+        agencia: tipoSelecionado === 'caixa' ? '' : agenciaInput.value.trim(),
+        numero: tipoSelecionado === 'caixa' ? '' : numeroInput.value.trim(),
+        saldoInicial: parseMoney(saldoInput)
       });
     });
     document.addEventListener('keydown', onKey);
 
     syncOutro();
+    initMoneyInputs(messageEl);
     overlay.classList.add('open');
-    setTimeout(() => bancoSelect.focus(), 0);
+    setTimeout(() => (tipoSelecionado === 'caixa' ? outroInput : bancoSelect).focus(), 0);
   });
 }
 
@@ -1933,16 +2000,18 @@ function renderExtrato() {
   var gruposDuplicados = agruparDuplicadosExtrato(filtradosBrutos).filter(grupoDuplicadoPendenteExtrato);
   var qtdDuplicadosPendentes = gruposDuplicados.reduce((total, grupo) => total + Math.max(grupo.linhas.length - 1, 0), 0);
   var filtrados = filtradosBrutos;
+  var filtradosFinanceiros = filtrados.filter(function(l) { return !extratoLancamentoEhSaldoInicial(l); });
+  var saldoInicialBase = extratoSaldoInicialBase(c);
 
-  var totalCredito = filtrados
+  var totalCredito = filtradosFinanceiros
     .filter(l => l.tipo === 'credito')
     .reduce((s, l) => s + Number(l.valor), 0);
 
-  var totalDebito = filtrados
+  var totalDebito = filtradosFinanceiros
     .filter(l => l.tipo === 'debito')
     .reduce((s, l) => s + Number(l.valor), 0);
 
-  var saldo = totalCredito - totalDebito;
+  var saldo = saldoInicialBase + totalCredito - totalDebito;
   var catOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var catLoteOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var filtroCatOpts = catsLanc.map(cat => '<option value="' + esc(cat) + '"' + (_exFiltroCat === cat ? ' selected' : '') + '>' + esc(cat) + '</option>').join('');
@@ -1951,7 +2020,8 @@ function renderExtrato() {
   var contasResumoHtml = contas.length
     ? contas.map(conta =>
       '<span class="account-pill">'
-      + '<span>' + esc(nomeContaCliente(conta)) + '</span>'
+      + '<span>' + esc(nomeContaCliente(conta))
+      + '<small style="display:block;color:var(--muted);font-size:.72rem">Saldo inicial ' + esc(fmt(Number(conta.saldoInicial || 0))) + '</small></span>'
       + '<button class="btn-icon" onclick="editarContaCliente(\'' + esc(conta.id) + '\')" title="Editar conta">&#9998;</button>'
       + '</span>'
     ).join(' ')
@@ -2055,9 +2125,10 @@ function renderExtrato() {
   var html =
     '<div class="summary-grid">'
     + '<div class="summary-card"><div class="s-label">Saldo</div><div class="s-val ' + (saldo >= 0 ? 'green' : 'red') + '">' + fmt(saldo) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Saldo inicial</div><div class="s-val blue">' + fmt(saldoInicialBase) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Creditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Debitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + filtrados.length + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + filtradosFinanceiros.length + '</div></div>'
     + '</div>'
     + '<div class="extrato-panels-grid">'
     + extratoPanel('contas', 'Contas do cliente', contasPanelBody)
@@ -2148,7 +2219,7 @@ function renderExtrato() {
     });
 
     var fechamentoPorDia = {};
-    var saldoAcumuladoExtrato = 0;
+    var saldoAcumuladoExtrato = saldoInicialBase;
     [...gruposDia].reverse().forEach(function(grupoDia) {
       var fechamentoDiaAsc = extratoResumoSaldoDiaHtml(grupoDia.data, grupoDia.itens, colspanTabela, saldoAcumuladoExtrato);
       saldoAcumuladoExtrato = fechamentoDiaAsc.saldoAcumulado;
@@ -2404,6 +2475,121 @@ function extratoConciliacaoOptionsHtml(natureza, selecionadoId) {
   }).join('');
 }
 
+function extratoTextoNormalizadoConciliacao(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extratoTokensConciliacao(value) {
+  return extratoTextoNormalizadoConciliacao(value)
+    .split(' ')
+    .filter(function(token) { return token && token.length >= 3; });
+}
+
+function extratoPontuarTituloConciliacao(lanc, titulo, restante) {
+  if (!titulo) return { score: 0, motivos: [] };
+
+  var score = 0;
+  var motivos = [];
+  var saldoTitulo = Number(typeof tfSaldo === 'function' ? tfSaldo(titulo) : 0);
+  var valorLanc = Number(restante || 0);
+  var textoBanco = extratoTextoNormalizadoConciliacao((lanc && (lanc.descOriginal || lanc.desc)) || '');
+  var pessoaTitulo = extratoTextoNormalizadoConciliacao(titulo.pessoaNome || '');
+  var descricaoTitulo = extratoTextoNormalizadoConciliacao(titulo.descricao || '');
+
+  if (saldoTitulo > 0 && valorLanc > 0) {
+    if (Math.abs(saldoTitulo - valorLanc) < 0.005) {
+      score += 50;
+      motivos.push('saldo igual');
+    } else if (saldoTitulo >= valorLanc) {
+      score += 20;
+      motivos.push('saldo cobre o valor');
+    } else {
+      score += 8;
+      motivos.push('saldo parcial');
+    }
+  }
+
+  var tokensPessoa = extratoTokensConciliacao(titulo.pessoaNome || '');
+  var tokensDescricao = extratoTokensConciliacao(titulo.descricao || '');
+  var todosTokens = tokensPessoa.concat(tokensDescricao);
+  var matches = todosTokens.filter(function(token) {
+    return textoBanco.indexOf(token) !== -1;
+  });
+
+  if (pessoaTitulo && textoBanco.indexOf(pessoaTitulo) !== -1) {
+    score += 35;
+    motivos.push('nome exato');
+  } else if (matches.length) {
+    score += Math.min(30, matches.length * 10);
+    motivos.push('texto parecido');
+  }
+
+  if (descricaoTitulo && textoBanco.indexOf(descricaoTitulo) !== -1) {
+    score += 18;
+    motivos.push('descricao exata');
+  }
+
+  if (tfStatusOf(titulo) === 'atrasado') {
+    score += 6;
+    motivos.push('titulo vencido');
+  }
+
+  return { score: score, motivos: motivos };
+}
+
+function extratoSugestoesConciliacao(lanc, natureza, restante) {
+  if (typeof tfTitulosDisponiveisParaNatureza !== 'function') return [];
+  return tfTitulosDisponiveisParaNatureza(natureza)
+    .map(function(titulo) {
+      var resultado = extratoPontuarTituloConciliacao(lanc, titulo, restante);
+      return {
+        id: titulo.id,
+        pessoaNome: titulo.pessoaNome || '-',
+        descricao: titulo.descricao || '-',
+        saldo: Number(typeof tfSaldo === 'function' ? tfSaldo(titulo) : 0),
+        score: resultado.score,
+        motivos: resultado.motivos
+      };
+    })
+    .filter(function(item) { return item.score > 0; })
+    .sort(function(a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.saldo !== a.saldo) return b.saldo - a.saldo;
+      return String(a.pessoaNome || '').localeCompare(String(b.pessoaNome || ''), 'pt-BR');
+    })
+    .slice(0, 3);
+}
+
+function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
+  if (!sugestoes.length) return '';
+  return '<div class="settings-section-card" style="margin-bottom:16px">'
+    + '<div class="settings-card-head"><div><h5>Sugestoes de conciliacao</h5><p>O Granafy analisou valor, nome e descricao para sugerir os titulos mais provaveis.</p></div></div>'
+    + '<div class="summary-grid pending-grid">'
+    + sugestoes.map(function(item) {
+      return '<div class="summary-card pending-card">'
+        + '<div class="s-label">' + esc(item.pessoaNome) + '</div>'
+        + '<div class="pending-meta">' + esc(item.descricao) + '</div>'
+        + '<div class="pending-meta">Saldo ' + fmt(item.saldo) + ' · ' + esc(item.motivos.join(' · ')) + '</div>'
+        + '<button class="btn-sm" type="button" onclick="extratoSelecionarSugestaoConciliacao(\'' + esc(item.id) + '\',' + Number(restante || 0) + ')">Usar sugestao</button>'
+      + '</div>';
+    }).join('')
+    + '</div>'
+  + '</div>';
+}
+
+function extratoSelecionarSugestaoConciliacao(tituloId, restante) {
+  var select = document.getElementById('ex-conciliar-titulo');
+  if (!select) return;
+  select.value = tituloId || '';
+  syncExtratoConciliacaoValor(restante);
+}
+
 function syncExtratoConciliacaoValor(lancamentoValor) {
   var select = document.getElementById('ex-conciliar-titulo');
   var valorInput = document.getElementById('ex-conciliar-valor');
@@ -2432,6 +2618,8 @@ function openExtratoConciliacaoModal(i) {
   var acaoLabel = natureza === 'receber' ? 'Conciliar recebimento' : 'Conciliar pagamento';
   var conciliado = valorConciliadoDoLancamento(lanc);
   var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var sugestoes = extratoSugestoesConciliacao(lanc, natureza, restante);
+  var tituloSugeridoId = sugestoes.length ? sugestoes[0].id : '';
   var baixas = baixasFinanceirasDoLancamento(lanc);
   var baixasHtml = baixas.length
     ? baixas.map(function(item) {
@@ -2461,11 +2649,12 @@ function openExtratoConciliacaoModal(i) {
       + '<div class="form-row"><div class="form-group"><label>Descricao do banco</label><input type="text" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div></div>'
       + (extratoRelacionamentoAtivo() && lanc.relacionamentoId ? '<div class="form-row"><div class="form-group"><label>Relacionado a</label><input type="text" value="' + esc(nomeRelacionamentoPorId(c, lanc.relacionamentoId)) + '" readonly/></div></div>' : '')
     + '</div>'
+    + extratoSugestoesConciliacaoHtml(sugestoes, restante)
     + '<div class="settings-section-card">'
       + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Voce pode vincular este lancamento a mais de um titulo, desde que o total conciliado nao ultrapasse o valor do banco.</p></div></div>'
       + baixasHtml
       + '<div class="form-row" style="margin-top:16px">'
-        + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, '') + '</select></div>'
+        + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
