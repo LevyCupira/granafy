@@ -11,7 +11,7 @@ var _tfPanels = {
 var COLS_TITULOS = [
   { key: 'vencimento', label: 'Vencimento', render: item => '<span style="color:var(--muted);font-size:.78rem">' + esc(formatDate(item.vencimento)) + '</span>' },
   { key: 'pessoa', label: 'Pessoa', render: item => '<strong>' + esc(item.pessoaNome || '-') + '</strong>' },
-  { key: 'descricao', label: 'Descricao', render: item => esc(item.descricao || '-') + (item.observacao ? '<div class="installment-note">' + esc(item.observacao) + '</div>' : '') },
+  { key: 'descricao', label: 'Descrição', render: item => esc(item.descricao || '-') + (tfDescribeRecorrencia(item) ? '<div class="installment-note">' + esc(tfDescribeRecorrencia(item)) + '</div>' : '') + (item.observacao ? '<div class="installment-note">' + esc(item.observacao) + '</div>' : '') },
   { key: 'status', label: 'Status', render: item => '<span class="tf-status-badge ' + esc(tfStatusOf(item)) + '">' + esc(tfStatusLabel(tfStatusOf(item))) + '</span>' },
   { key: 'total', label: 'Total', render: item => '<span class="val ' + (_tfNatureza === 'receber' ? 'val-pos' : 'val-neg') + '">' + (_tfNatureza === 'receber' ? fmt(item.valorTotal || 0) : ('- ' + fmt(item.valorTotal || 0)) ) + '</span>' },
   { key: 'baixado', label: 'Baixado', render: item => '<span style="color:var(--accent3);font-weight:700">' + fmt(tfTotalBaixado(item)) + '</span>' },
@@ -174,6 +174,10 @@ function tfCurrentMonthKey() {
   return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 }
 
+function tfReferenciaMes(dataIso) {
+  return String(dataIso || '').slice(0, 7);
+}
+
 function tfMonthLabel(key) {
   var parts = String(key || '').split('-');
   if (parts.length !== 2) return key || '-';
@@ -205,8 +209,18 @@ function tfResumoExecutivo() {
   var devolucoesPendentes = extratoOperacional.filter(function(lanc) {
     return typeof extratoStatusEstornoValor === 'function' && extratoStatusEstornoValor(lanc) === 'pendente_estorno';
   });
+  var estornosConcluidos = extratoOperacional.filter(function(lanc) {
+    return typeof extratoStatusEstornoValor === 'function' && extratoStatusEstornoValor(lanc) === 'estornado';
+  });
   var devolucoesPendentesValor = devolucoesPendentes.reduce(function(total, lanc) {
     return total + Math.abs(Number(lanc.valor || 0));
+  }, 0);
+  var estornosConcluidosValor = estornosConcluidos.reduce(function(total, lanc) {
+    return total + Math.abs(Number(lanc.valor || 0));
+  }, 0);
+  var vencidosReceber = titulos.filter(function(item) { return item.natureza === 'receber' && tfIsOverdue(item) && tfSaldo(item) > 0; });
+  var inadimplenciaValor = vencidosReceber.reduce(function(total, item) {
+    return total + tfSaldo(item);
   }, 0);
   var elegiveisMes = extratoMes.filter(function(lanc) {
     return typeof extratoIgnoraConciliacao === 'function' ? !extratoIgnoraConciliacao(lanc) : true;
@@ -236,6 +250,10 @@ function tfResumoExecutivo() {
     extratoConciliadosMes: conciliadosMes.length,
     devolucoesPendentesCount: devolucoesPendentes.length,
     devolucoesPendentesValor: devolucoesPendentesValor,
+    estornosConcluidosCount: estornosConcluidos.length,
+    estornosConcluidosValor: estornosConcluidosValor,
+    inadimplenciaTitulos: vencidosReceber.length,
+    inadimplenciaValor: inadimplenciaValor,
     previsaoLiquida: resumo.receber - resumo.pagar,
     topReceber: receberAbertos,
     topPagar: pagarAbertos
@@ -376,6 +394,7 @@ function tfExportRows() {
       Total: Number(item.valorTotal || 0),
       Baixado: tfTotalBaixado(item),
       Saldo: tfSaldo(item),
+      Recorrencia: tfDescribeRecorrencia(item),
       Observacao: item.observacao || ''
     };
   });
@@ -384,7 +403,7 @@ function tfExportRows() {
 function tfExportXlsx() {
   if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente.');
   var rows = tfExportRows();
-  if (!rows.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  if (!rows.length) return alert('Não há dados para exportar com os filtros atuais.');
   var cliente = tfClienteAtivo();
   var resumo = [
     ['Cliente', cliente.name || ''],
@@ -397,7 +416,7 @@ function tfExportXlsx() {
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, {
-    header: ['Vencimento', 'Pessoa', 'Descricao', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']
+    header: ['Vencimento', 'Pessoa', 'Descricao', 'Status', 'Total', 'Baixado', 'Saldo', 'Recorrencia', 'Observacao']
   }), _tfNatureza === 'pagar' ? 'A Pagar' : 'A Receber');
   XLSX.writeFile(
     wb,
@@ -428,14 +447,14 @@ function tfExportPDF() {
   doc.text('Gerado em ' + hoje, 283, 19, { align: 'right' });
   doc.setFontSize(9);
   doc.setTextColor(90, 96, 122);
-  doc.text('Status: ' + (_tfStatus || 'todos') + ' | Descricao: ' + (_tfDescricao || '-') + ' | Busca: ' + (_tfBusca || '-'), 14, 31);
+  doc.text('Status: ' + (_tfStatus || 'todos') + ' | Descrição: ' + (_tfDescricao || '-') + ' | Busca: ' + (_tfBusca || '-'), 14, 31);
   doc.autoTable({
     startY: 36,
-    head: [['Vencimento', 'Pessoa', 'Descricao', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']],
+    head: [['Vencimento', 'Pessoa', 'Descrição', 'Status', 'Total', 'Baixado', 'Saldo', 'Recorrência', 'Observação']],
     body: rows.map(function(row) {
       return [
         row.Vencimento, row.Pessoa, row.Descricao, row.Status,
-        fmt(row.Total), fmt(row.Baixado), fmt(row.Saldo), row.Observacao
+        fmt(row.Total), fmt(row.Baixado), fmt(row.Saldo), row.Recorrencia, row.Observacao
       ];
     }),
     styles: { fontSize: 8, cellPadding: 2.2 },
@@ -493,6 +512,235 @@ function tfCentrosCustoOptionsHtml(selectedId) {
   }).join('');
 }
 
+function tfFechamentosCliente() {
+  var cliente = tfClienteAtivo();
+  return cliente && Array.isArray(cliente.fechamentos) ? cliente.fechamentos : [];
+}
+
+function tfAuditoriaCliente() {
+  var cliente = tfClienteAtivo();
+  return cliente && Array.isArray(cliente.auditoriaFinanceira) ? cliente.auditoriaFinanceira : [];
+}
+
+function tfFechamentoPorReferencia(referencia) {
+  return tfFechamentosCliente().find(function(item) {
+    return item && item.referencia === referencia && item.status === 'fechado';
+  }) || null;
+}
+
+function tfFechamentoAtual() {
+  return tfFechamentoPorReferencia(tfCurrentMonthKey());
+}
+
+function tfPeriodoEstaFechado(referencia) {
+  return !!tfFechamentoPorReferencia(referencia);
+}
+
+function tfDataSomarRecorrencia(dataIso, frequencia, passos, intervalo) {
+  if (!dataIso) return null;
+  var data = new Date(String(dataIso).slice(0, 10) + 'T00:00:00');
+  if (isNaN(data.getTime())) return dataIso;
+  var step = Math.max(1, Number(intervalo || 1)) * Math.max(1, Number(passos || 1));
+  if (frequencia === 'semanal') data.setDate(data.getDate() + (step * 7));
+  else data.setMonth(data.getMonth() + step);
+  return data.toISOString().slice(0, 10);
+}
+
+function tfDescribeRecorrencia(item) {
+  if (!item || !item.recorrenciaAtiva || !item.recorrenciaFrequencia) return '';
+  var cada = Math.max(1, Number(item.recorrenciaIntervalo || 1));
+  var base = item.recorrenciaFrequencia === 'semanal'
+    ? (cada === 1 ? 'Recorrência semanal' : ('Recorrência a cada ' + cada + ' semanas'))
+    : (cada === 1 ? 'Recorrência mensal' : ('Recorrência a cada ' + cada + ' meses'));
+  if (item.recorrenciaFim) base += ' até ' + formatDate(item.recorrenciaFim);
+  return base;
+}
+
+function tfReadRecorrenciaForm(prefix) {
+  var ativa = !!((document.getElementById(prefix + '-recorrente') || {}).checked);
+  if (!ativa) {
+    return {
+      ativa: false,
+      frequencia: null,
+      intervalo: 1,
+      quantidade: 1,
+      fim: null
+    };
+  }
+
+  var frequencia = ((document.getElementById(prefix + '-recorrencia-freq') || {}).value || 'mensal').trim() || 'mensal';
+  var intervalo = Math.max(1, Number(((document.getElementById(prefix + '-recorrencia-intervalo') || {}).value) || 1));
+  var quantidade = Math.max(1, Number(((document.getElementById(prefix + '-recorrencia-quantidade') || {}).value) || 1));
+  var fim = tfNormalizeDateFieldValue(prefix + '-recorrencia-fim', 'fim da recorrência');
+  if (fim === null) return null;
+
+  return {
+    ativa: true,
+    frequencia: frequencia === 'semanal' ? 'semanal' : 'mensal',
+    intervalo: intervalo,
+    quantidade: quantidade,
+    fim: fim || null
+  };
+}
+
+function tfToggleRecorrencia(prefix) {
+  var checked = !!((document.getElementById(prefix + '-recorrente') || {}).checked);
+  var targets = document.querySelectorAll('[data-tf-recorrencia="' + prefix + '"]');
+  targets.forEach(function(el) {
+    el.style.display = checked ? '' : 'none';
+  });
+}
+
+function tfAuditoriaEventoLabel(evento) {
+  var labels = {
+    titulo_criado: 'Título criado',
+    titulo_atualizado: 'Título atualizado',
+    titulo_duplicado: 'Título duplicado',
+    titulo_excluido: 'Título excluído',
+    recebimento_manual: 'Recebimento manual',
+    pagamento_manual: 'Pagamento manual',
+    baixa_excluida: 'Baixa excluída',
+    periodo_fechado: 'Período fechado',
+    periodo_reaberto: 'Período reaberto'
+  };
+  return labels[evento] || 'Evento financeiro';
+}
+
+function tfAuditoriaRecenteHtml() {
+  var itens = tfAuditoriaCliente().slice(0, 8);
+  if (!itens.length) {
+    return '<div class="pending-meta">Nenhum evento financeiro registrado ainda.</div>';
+  }
+  return '<div class="financeiro-exec-list">'
+    + itens.map(function(item) {
+      var detalhes = [];
+      if (item && item.createdAt) detalhes.push(formatDateTime(item.createdAt));
+      if (item && item.resumo) detalhes.push(item.resumo);
+      return '<div class="financeiro-exec-item">'
+        + '<strong>' + esc(tfAuditoriaEventoLabel(item && item.evento)) + '</strong>'
+        + '<span>' + esc((detalhes.join(' · ') || '-')) + '</span>'
+      + '</div>';
+    }).join('')
+    + '</div>';
+}
+
+async function tfAlternarFechamentoAtual() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  if (!activeClient) return;
+  var referencia = tfCurrentMonthKey();
+  var fechamentoAtual = tfFechamentoPorReferencia(referencia);
+  var cliente = tfClienteAtivo();
+  if (!cliente) return;
+
+  if (fechamentoAtual) {
+    var reabrir = await appConfirm('Reabrir o período ' + tfMonthLabel(referencia) + '? Alterações voltarão a ser permitidas.', {
+      title: 'Reabrir período',
+      confirmText: 'Reabrir'
+    });
+    if (!reabrir) return;
+
+    var del = await applyUserScope(
+      supabaseClient
+        .from('fechamentos_periodo')
+        .delete()
+        .eq('id', fechamentoAtual.id)
+    );
+    if (del.error) {
+      console.error(del.error);
+      alert('Não foi possível reabrir o período.');
+      return;
+    }
+    cliente.fechamentos = (cliente.fechamentos || []).filter(function(item) { return item.id !== fechamentoAtual.id; });
+    await tfRegistrarAuditoria('periodo_reaberto', 'fechamento_periodo', fechamentoAtual.id, 'Período reaberto', { referencia: referencia });
+    renderFinanceiro();
+    return;
+  }
+
+  var fechar = await appConfirm('Fechar o período ' + tfMonthLabel(referencia) + '? O sistema passará a alertar alterações em títulos desse mês.', {
+    title: 'Fechar período',
+    confirmText: 'Fechar período'
+  });
+  if (!fechar) return;
+
+  var insert = await supabaseClient
+    .from('fechamentos_periodo')
+    .insert([Object.assign({
+      cliente_id: activeClient,
+      referencia: referencia,
+      status: 'fechado',
+      observacao: 'Fechamento operacional do financeiro'
+    }, getUserScopePayload())])
+    .select()
+    .single();
+
+  if (insert.error) {
+    console.error(insert.error);
+    alert('Não foi possível fechar o período. Verifique se a migração 20260607_financeiro_recorrencia_auditoria_fechamento.sql foi aplicada no Supabase.');
+    return;
+  }
+
+  if (!Array.isArray(cliente.fechamentos)) cliente.fechamentos = [];
+  cliente.fechamentos.unshift({
+    id: insert.data.id,
+    referencia: insert.data.referencia,
+    status: insert.data.status || 'fechado',
+    observacao: insert.data.observacao || '',
+    createdAt: insert.data.created_at || null,
+    updatedAt: insert.data.updated_at || null
+  });
+  await tfRegistrarAuditoria('periodo_fechado', 'fechamento_periodo', insert.data.id, 'Período fechado', { referencia: referencia });
+  renderFinanceiro();
+}
+
+async function tfRegistrarAuditoria(evento, entidade, entidadeId, resumo, detalhes, modulo) {
+  if (!activeClient || !currentUserId()) return;
+  try {
+    var payload = {
+      cliente_id: activeClient,
+      user_id: currentUserId(),
+      modulo: modulo || 'financeiro',
+      evento: evento,
+      entidade: entidade,
+      entidade_id: entidadeId || null,
+      resumo: resumo,
+      detalhes: detalhes || {}
+    };
+    var response = await supabaseClient
+      .from('auditoria_financeira')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (response.error) {
+      var msg = String((response.error.message || '') + ' ' + (response.error.details || '')).toLowerCase();
+      if (response.error.code === '42P01' || response.error.code === 'PGRST205' || msg.includes('auditoria_financeira')) {
+        return;
+      }
+      console.warn('Nao foi possivel registrar auditoria financeira:', response.error);
+      return;
+    }
+
+    var cliente = tfClienteAtivo();
+    if (cliente) {
+      if (!Array.isArray(cliente.auditoriaFinanceira)) cliente.auditoriaFinanceira = [];
+      cliente.auditoriaFinanceira.unshift({
+        id: response.data.id,
+        modulo: response.data.modulo || 'financeiro',
+        evento: response.data.evento || '',
+        entidade: response.data.entidade || '',
+        entidadeId: response.data.entidade_id || null,
+        resumo: response.data.resumo || '',
+        detalhes: response.data.detalhes || {},
+        createdAt: response.data.created_at || null,
+        userId: response.data.user_id || null
+      });
+      if (cliente.auditoriaFinanceira.length > 100) cliente.auditoriaFinanceira.length = 100;
+    }
+  } catch (error) {
+    console.warn('Falha inesperada ao registrar auditoria financeira:', error);
+  }
+}
+
 function tfNormalizeDateFieldValue(fieldId, label) {
   var el = document.getElementById(fieldId);
   if (!el) return '';
@@ -515,8 +763,10 @@ function tfReadFormPayload(prefix) {
   var vencimento = tfNormalizeDateFieldValue(prefix + '-vencimento', 'vencimento');
   var valor = tfParseAmountFromInput(prefix + '-valor');
   var observacao = (document.getElementById(prefix + '-observacao') || {}).value || '';
+  var recorrencia = tfReadRecorrenciaForm(prefix);
 
   if (vencimento === null) return null;
+  if (recorrencia === null) return null;
 
   return {
     natureza: prefix === 'tf-pagar' ? 'pagar' : 'receber',
@@ -526,21 +776,32 @@ function tfReadFormPayload(prefix) {
     centroCustoId: centroCustoId,
     vencimento: vencimento || null,
     valorTotal: Number(valor || 0),
-    observacao: observacao.trim()
+    observacao: observacao.trim(),
+    recorrencia: recorrencia
   };
 }
 
 function tfResetForm(prefix) {
-  ['pessoa', 'descricao', 'centro-custo', 'vencimento', 'observacao'].forEach(function(suffix) {
+  ['pessoa', 'descricao', 'centro-custo', 'vencimento', 'observacao', 'recorrencia-fim'].forEach(function(suffix) {
     var el = document.getElementById(prefix + '-' + suffix);
     if (el) el.value = '';
     if (el && suffix === 'vencimento') delete el.dataset.isoDate;
+    if (el && suffix === 'recorrencia-fim') delete el.dataset.isoDate;
   });
   var valorEl = document.getElementById(prefix + '-valor');
   if (valorEl) {
     valorEl.value = '0,00';
     valorEl.dataset.cents = '0';
   }
+  var recorrenteEl = document.getElementById(prefix + '-recorrente');
+  if (recorrenteEl) recorrenteEl.checked = false;
+  var freqEl = document.getElementById(prefix + '-recorrencia-freq');
+  if (freqEl) freqEl.value = 'mensal';
+  var intEl = document.getElementById(prefix + '-recorrencia-intervalo');
+  if (intEl) intEl.value = '1';
+  var qtdEl = document.getElementById(prefix + '-recorrencia-quantidade');
+  if (qtdEl) qtdEl.value = '1';
+  tfToggleRecorrencia(prefix);
 }
 
 async function tfAddTitulo() {
@@ -552,7 +813,14 @@ async function tfAddTitulo() {
     return;
   }
 
-  var insertPayload = Object.assign({
+  if (payload.vencimento && tfPeriodoEstaFechado(tfReferenciaMes(payload.vencimento))) {
+    var seguir = await appConfirm('O período ' + tfMonthLabel(tfReferenciaMes(payload.vencimento)) + ' está fechado. Deseja cadastrar este título mesmo assim?', { title: 'Período fechado', confirmText: 'Cadastrar mesmo assim' });
+    if (!seguir) return;
+  }
+
+  var recorrencia = payload.recorrencia || { ativa: false, frequencia: null, intervalo: 1, quantidade: 1, fim: null };
+  var quantidade = recorrencia.ativa ? Math.max(1, Number(recorrencia.quantidade || 1)) : 1;
+  var basePayload = {
     cliente_id: activeClient,
     natureza: payload.natureza,
     pessoa_nome: payload.pessoaNome,
@@ -561,38 +829,82 @@ async function tfAddTitulo() {
     centro_custo_id: payload.centroCustoId || null,
     vencimento: payload.vencimento,
     valor_total: payload.valorTotal,
-    observacao: payload.observacao || null
-  }, getUserScopePayload());
+    observacao: payload.observacao || null,
+    recorrencia_ativa: !!recorrencia.ativa,
+    recorrencia_frequencia: recorrencia.ativa ? recorrencia.frequencia : null,
+    recorrencia_intervalo: recorrencia.ativa ? recorrencia.intervalo : 1,
+    recorrencia_fim: recorrencia.ativa ? recorrencia.fim : null
+  };
+  var createdRows = [];
+  var origemRecorrenciaId = null;
 
-  var response = await supabaseClient
-    .from('titulos_financeiros')
-    .insert([insertPayload])
-    .select()
-    .single();
+  for (var idx = 0; idx < quantidade; idx++) {
+    var vencimentoSerie = idx === 0
+      ? basePayload.vencimento
+      : tfDataSomarRecorrencia(basePayload.vencimento, recorrencia.frequencia, idx, recorrencia.intervalo);
 
-  if (response.error) {
-    console.error(response.error);
-    alert('Nao foi possivel cadastrar o titulo. Verifique se a migracao 20260520_titulos_financeiros_pj.sql ja foi aplicada no Supabase.');
-    return;
+    if (recorrencia.ativa && recorrencia.fim && vencimentoSerie && vencimentoSerie > recorrencia.fim) break;
+
+    var insertPayload = Object.assign({}, basePayload, getUserScopePayload(), {
+      vencimento: vencimentoSerie,
+      origem_recorrencia_id: origemRecorrenciaId
+    });
+
+    var response = await supabaseClient
+      .from('titulos_financeiros')
+      .insert([insertPayload])
+      .select()
+      .single();
+
+    if (response.error) {
+      console.error(response.error);
+      alert('Nao foi possivel cadastrar o titulo. Verifique se a migracao 20260607_financeiro_recorrencia_auditoria_fechamento.sql ja foi aplicada no Supabase.');
+      return;
+    }
+
+    if (!origemRecorrenciaId) origemRecorrenciaId = response.data.id;
+    createdRows.push(response.data);
   }
 
   var cliente = tfClienteAtivo();
   if (!Array.isArray(cliente.titulos)) cliente.titulos = [];
-  cliente.titulos.push({
-    id: response.data.id,
-    natureza: response.data.natureza,
-    pessoaNome: response.data.pessoa_nome || '',
-    descricao: response.data.descricao || '',
-    centroCustoId: response.data.centro_custo_id || null,
-    centroCusto: tfNomeCentroCustoById(response.data.centro_custo_id || null),
-    vencimento: response.data.vencimento || null,
-    valorTotal: Number(response.data.valor_total || 0),
-    observacao: response.data.observacao || '',
-    createdAt: response.data.created_at || null,
-    updatedAt: response.data.updated_at || null,
-    baixas: [],
-    userId: response.data.user_id || null
+  createdRows.forEach(function(row) {
+    cliente.titulos.push({
+      id: row.id,
+      natureza: row.natureza,
+      pessoaNome: row.pessoa_nome || '',
+      descricao: row.descricao || '',
+      centroCustoId: row.centro_custo_id || null,
+      centroCusto: tfNomeCentroCustoById(row.centro_custo_id || null),
+      vencimento: row.vencimento || null,
+      valorTotal: Number(row.valor_total || 0),
+      observacao: row.observacao || '',
+      recorrenciaAtiva: !!row.recorrencia_ativa,
+      recorrenciaFrequencia: row.recorrencia_frequencia || null,
+      recorrenciaIntervalo: Number(row.recorrencia_intervalo || 1),
+      recorrenciaFim: row.recorrencia_fim || null,
+      origemRecorrenciaId: row.origem_recorrencia_id || null,
+      createdAt: row.created_at || null,
+      updatedAt: row.updated_at || null,
+      baixas: [],
+      userId: row.user_id || null
+    });
   });
+
+  await tfRegistrarAuditoria(
+    'titulo_criado',
+    'titulo_financeiro',
+    origemRecorrenciaId || (createdRows[0] && createdRows[0].id),
+    (payload.natureza === 'receber' ? 'Título a receber criado' : 'Título a pagar criado') + (createdRows.length > 1 ? (' em série (' + createdRows.length + ')') : ''),
+    {
+      natureza: payload.natureza,
+      pessoa: payload.pessoaNome,
+      descricao: payload.descricao,
+      valor: payload.valorTotal,
+      vencimento: payload.vencimento,
+      recorrencia: recorrencia
+    }
+  );
 
   tfResetForm(tfFormPrefix());
   renderFinanceiro();
@@ -615,6 +927,11 @@ function tfUpdateLocalTitulo(row) {
     vencimento: row.vencimento || null,
     valorTotal: Number(row.valor_total || 0),
     observacao: row.observacao || '',
+    recorrenciaAtiva: !!row.recorrencia_ativa,
+    recorrenciaFrequencia: row.recorrencia_frequencia || null,
+    recorrenciaIntervalo: Number(row.recorrencia_intervalo || 1),
+    recorrenciaFim: row.recorrencia_fim || null,
+    origemRecorrenciaId: row.origem_recorrencia_id || null,
     updatedAt: row.updated_at || null
   });
 }
@@ -624,6 +941,7 @@ function tfOpenTituloModal(id) {
   if (!item) return;
   var naturezaLabel = item.natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
   var baixarLabel = item.natureza === 'receber' ? 'Registrar recebimento' : 'Registrar pagamento';
+  var recorrenciaLabel = tfDescribeRecorrencia(item);
   var baixasHtml = (item.baixas || []).length
     ? item.baixas.slice().sort(function(a, b) {
         return String(b.data || '').localeCompare(String(a.data || ''));
@@ -642,6 +960,7 @@ function tfOpenTituloModal(id) {
       + '<span class="settings-card-badge subtle">Total ' + fmt(item.valorTotal) + '</span>'
       + '<span class="settings-card-badge subtle">Baixado ' + fmt(tfTotalBaixado(item)) + '</span>'
       + '<span class="settings-card-badge subtle">Saldo ' + fmt(tfSaldo(item)) + '</span>'
+      + (recorrenciaLabel ? '<span class="settings-card-badge subtle">' + esc(recorrenciaLabel) + '</span>' : '')
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>' + (item.natureza === 'receber' ? 'Cliente pagador' : 'Favorecido / fornecedor') + '</label><input type="text" id="tf-edit-pessoa" value="' + esc(item.pessoaNome || '') + '"/></div>'
@@ -655,6 +974,7 @@ function tfOpenTituloModal(id) {
       + '<div class="form-group"><label>Observacao</label><textarea id="tf-edit-observacao" rows="3" placeholder="Informacoes importantes deste titulo">' + esc(item.observacao || '') + '</textarea></div>'
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:4px 0 18px">'
+      + '<button class="btn-sm" type="button" onclick="tfDuplicarTitulo(\'' + id + '\')">Duplicar titulo</button>'
       + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
       + '<button class="btn-add" type="button" style="margin-top:0" onclick="tfSaveTitulo(\'' + id + '\')">Salvar titulo</button>'
     + '</div>'
@@ -695,6 +1015,11 @@ async function tfSaveTitulo(id) {
     return;
   }
 
+  if (payload.vencimento && tfPeriodoEstaFechado(tfReferenciaMes(payload.vencimento))) {
+    var seguir = await appConfirm('O período ' + tfMonthLabel(tfReferenciaMes(payload.vencimento)) + ' está fechado. Deseja salvar mesmo assim?', { title: 'Período fechado', confirmText: 'Salvar mesmo assim' });
+    if (!seguir) return;
+  }
+
   var response = await applyUserScope(
     supabaseClient
       .from('titulos_financeiros')
@@ -709,6 +1034,85 @@ async function tfSaveTitulo(id) {
   }
 
   tfUpdateLocalTitulo(response.data);
+  await tfRegistrarAuditoria(
+    'titulo_atualizado',
+    'titulo_financeiro',
+    id,
+    'Título financeiro atualizado',
+    {
+      natureza: item.natureza,
+      pessoa: payload.pessoa_nome,
+      descricao: payload.descricao,
+      valor: payload.valor_total,
+      vencimento: payload.vencimento
+    }
+  );
+  closeModal();
+  renderFinanceiro();
+}
+
+async function tfDuplicarTitulo(id) {
+  var item = tfFindTituloById(id);
+  if (!item) return;
+  var frequencia = item.recorrenciaFrequencia || 'mensal';
+  var intervalo = Math.max(1, Number(item.recorrenciaIntervalo || 1));
+  var novoVencimento = tfDataSomarRecorrencia(item.vencimento, frequencia, 1, intervalo);
+  var ok = await appConfirm('Duplicar este título com vencimento em ' + formatDate(novoVencimento) + '?', { title: 'Duplicar título', confirmText: 'Duplicar' });
+  if (!ok) return;
+
+  var payload = Object.assign({
+    cliente_id: activeClient,
+    natureza: item.natureza,
+    pessoa_nome: item.pessoaNome || '',
+    descricao: item.descricao || '',
+    categoria: null,
+    centro_custo_id: item.centroCustoId || null,
+    vencimento: novoVencimento,
+    valor_total: Number(item.valorTotal || 0),
+    observacao: item.observacao || null,
+    recorrencia_ativa: !!item.recorrenciaAtiva,
+    recorrencia_frequencia: item.recorrenciaFrequencia || null,
+    recorrencia_intervalo: Number(item.recorrenciaIntervalo || 1),
+    recorrencia_fim: item.recorrenciaFim || null,
+    origem_recorrencia_id: item.origemRecorrenciaId || item.id
+  }, getUserScopePayload());
+
+  var response = await supabaseClient.from('titulos_financeiros').insert([payload]).select().single();
+  if (response.error) {
+    console.error(response.error);
+    alert('Nao foi possivel duplicar o título.');
+    return;
+  }
+
+  var cliente = tfClienteAtivo();
+  if (!Array.isArray(cliente.titulos)) cliente.titulos = [];
+  cliente.titulos.push({
+    id: response.data.id,
+    natureza: response.data.natureza,
+    pessoaNome: response.data.pessoa_nome || '',
+    descricao: response.data.descricao || '',
+    centroCustoId: response.data.centro_custo_id || null,
+    centroCusto: tfNomeCentroCustoById(response.data.centro_custo_id || null),
+    vencimento: response.data.vencimento || null,
+    valorTotal: Number(response.data.valor_total || 0),
+    observacao: response.data.observacao || '',
+    recorrenciaAtiva: !!response.data.recorrencia_ativa,
+    recorrenciaFrequencia: response.data.recorrencia_frequencia || null,
+    recorrenciaIntervalo: Number(response.data.recorrencia_intervalo || 1),
+    recorrenciaFim: response.data.recorrencia_fim || null,
+    origemRecorrenciaId: response.data.origem_recorrencia_id || null,
+    createdAt: response.data.created_at || null,
+    updatedAt: response.data.updated_at || null,
+    baixas: [],
+    userId: response.data.user_id || null
+  });
+
+  await tfRegistrarAuditoria('titulo_duplicado', 'titulo_financeiro', response.data.id, 'Título duplicado para recorrência operacional', {
+    origemTituloId: item.id,
+    novoVencimento: novoVencimento,
+    natureza: item.natureza,
+    valor: item.valorTotal
+  });
   closeModal();
   renderFinanceiro();
 }
@@ -734,6 +1138,12 @@ async function tfDeleteTitulo(id) {
 
   var cliente = tfClienteAtivo();
   cliente.titulos = (cliente.titulos || []).filter(function(entry) { return entry.id !== id; });
+  await tfRegistrarAuditoria('titulo_excluido', 'titulo_financeiro', id, 'Título financeiro excluído', {
+    natureza: item.natureza,
+    pessoa: item.pessoaNome,
+    descricao: item.descricao,
+    valor: item.valorTotal
+  });
   closeModal();
   renderFinanceiro();
 }
@@ -783,6 +1193,18 @@ async function tfRegistrarBaixa(id) {
     userId: response.data.user_id || null
   });
 
+  await tfRegistrarAuditoria(
+    item.natureza === 'receber' ? 'recebimento_manual' : 'pagamento_manual',
+    'titulo_baixa',
+    response.data.id,
+    (item.natureza === 'receber' ? 'Baixa manual de recebimento registrada' : 'Baixa manual de pagamento registrada'),
+    {
+      tituloId: id,
+      valor: valor,
+      data: dataBaixa,
+      observacao: observacao || null
+    }
+  );
   tfOpenTituloModal(id);
   renderFinanceiro();
 }
@@ -806,6 +1228,9 @@ async function tfDeleteBaixa(tituloId, baixaId) {
 
   var item = tfFindTituloById(tituloId);
   if (item) item.baixas = (item.baixas || []).filter(function(baixa) { return baixa.id !== baixaId; });
+  await tfRegistrarAuditoria('baixa_excluida', 'titulo_baixa', baixaId, 'Baixa financeira excluída', {
+    tituloId: tituloId
+  });
   tfOpenTituloModal(tituloId);
   renderFinanceiro();
 }
@@ -834,7 +1259,7 @@ function renderFinanceiro() {
   var areaHtml = buildTable('financeiro', COLS_TITULOS, itens, function(item) {
     return COLS_TITULOS.map(function(col) {
       if (col.key === '_del') {
-        return '<td><div class="row-actions"><button class="btn-icon" onclick="tfOpenTituloModal(\'' + item.id + '\')" title="Abrir titulo">&#9998;</button><button class="btn-icon danger" onclick="tfDeleteTitulo(\'' + item.id + '\')" title="Excluir titulo">&#128465;</button></div></td>';
+        return '<td><div class="row-actions"><button class="btn-icon" onclick="tfOpenTituloModal(\'' + item.id + '\')" title="Abrir título">&#9998;</button><button class="btn-icon danger" onclick="tfDeleteTitulo(\'' + item.id + '\')" title="Excluir título">&#128465;</button></div></td>';
       }
       return '<td>' + col.render(item) + '</td>';
     }).join('');
@@ -846,35 +1271,41 @@ function renderFinanceiro() {
     '<div class="summary-grid">'
       + (_tfNatureza === 'receber'
         ? '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">J? recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
         : '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
+          + '<div class="summary-card"><div class="s-label">J? pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">T?tulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
     + '</div>'
     + '<div class="form-card">'
       + '<h3>Dashboard executivo</h3>'
-      + '<p class="cartao-helper-text">Leitura rapida do caixa e da operacao financeira em ' + esc(tfMonthLabel(executivo.mesAtual)) + '.</p>'
+      + '<p class="cartao-helper-text">Leitura rápida do caixa e da operação financeira em ' + esc(tfMonthLabel(executivo.mesAtual)) + '.</p>'
       + '<div class="summary-grid pending-grid">'
-        + '<div class="summary-card pending-card"><div class="s-label">Recebido no mes</div><div class="s-val green">' + fmt(executivo.recebidoMes) + '</div><div class="pending-meta">' + esc(tfMonthLabel(executivo.mesAtual)) + '</div></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Pago no mes</div><div class="s-val red">' + fmt(executivo.pagoMes) + '</div><div class="pending-meta">' + esc(tfMonthLabel(executivo.mesAtual)) + '</div></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Liquido do mes</div><div class="s-val ' + (executivo.liquidoMes >= 0 ? 'green' : 'red') + '">' + fmt(executivo.liquidoMes) + '</div><div class="pending-meta">Recebido menos pago</div></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Conciliacao do mes</div><div class="s-val blue">' + Number(executivo.taxaConciliacaoMes || 0).toFixed(0) + '%</div><div class="pending-meta">' + executivo.extratoConciliadosMes + ' de ' + executivo.extratoElegiveisMes + ' resolvidos</div></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Devolucoes pendentes</div><div class="s-val yellow">' + executivo.devolucoesPendentesCount + '</div><div class="pending-meta">' + fmt(executivo.devolucoesPendentesValor) + '</div></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Previsao liquida</div><div class="s-val ' + (executivo.previsaoLiquida >= 0 ? 'green' : 'red') + '">' + fmt(executivo.previsaoLiquida) + '</div><div class="pending-meta">A receber aberto menos a pagar aberto</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Recebido no mês</div><div class="s-val green">' + fmt(executivo.recebidoMes) + '</div><div class="pending-meta">' + esc(tfMonthLabel(executivo.mesAtual)) + '</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Pago no mês</div><div class="s-val red">' + fmt(executivo.pagoMes) + '</div><div class="pending-meta">' + esc(tfMonthLabel(executivo.mesAtual)) + '</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Líquido do mês</div><div class="s-val ' + (executivo.liquidoMes >= 0 ? 'green' : 'red') + '">' + fmt(executivo.liquidoMes) + '</div><div class="pending-meta">Recebido menos pago</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Conciliação do mês</div><div class="s-val blue">' + Number(executivo.taxaConciliacaoMes || 0).toFixed(0) + '%</div><div class="pending-meta">' + executivo.extratoConciliadosMes + ' de ' + executivo.extratoElegiveisMes + ' resolvidos</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Devoluções pendentes</div><div class="s-val yellow">' + executivo.devolucoesPendentesCount + '</div><div class="pending-meta">' + fmt(executivo.devolucoesPendentesValor) + '</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Previsão líquida</div><div class="s-val ' + (executivo.previsaoLiquida >= 0 ? 'green' : 'red') + '">' + fmt(executivo.previsaoLiquida) + '</div><div class="pending-meta">A receber aberto menos a pagar aberto</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Inadimpl?ncia</div><div class="s-val red">' + executivo.inadimplenciaTitulos + '</div><div class="pending-meta">' + fmt(executivo.inadimplenciaValor) + '</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Já estornados</div><div class="s-val blue">' + executivo.estornosConcluidosCount + '</div><div class="pending-meta">' + fmt(executivo.estornosConcluidosValor) + '</div></div>'
       + '</div>'
       + '<div class="financeiro-exec-split">'
-        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Maiores valores a receber</h5><p>Titulos abertos com maior impacto no caixa.</p></div></div>' + tfResumoExecutivoListaHtml(executivo.topReceber, 'receber') + '</div>'
-        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Maiores valores a pagar</h5><p>Saidas abertas que merecem acompanhamento de perto.</p></div></div>' + tfResumoExecutivoListaHtml(executivo.topPagar, 'pagar') + '</div>'
+        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Maiores valores a receber</h5><p>T?tulos abertos com maior impacto no caixa.</p></div></div>' + tfResumoExecutivoListaHtml(executivo.topReceber, 'receber') + '</div>'
+        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Maiores valores a pagar</h5><p>Sa?das abertas que merecem acompanhamento de perto.</p></div></div>' + tfResumoExecutivoListaHtml(executivo.topPagar, 'pagar') + '</div>'
+      + '</div>'
+      + '<div class="financeiro-exec-split">'
+        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Fechamento do período</h5><p>' + (tfFechamentoAtual() ? ('Período ' + esc(tfMonthLabel(tfCurrentMonthKey())) + ' fechado para revisão.') : ('Período ' + esc(tfMonthLabel(tfCurrentMonthKey())) + ' ainda aberto para edição.')) + '</p></div><button class="btn-sm" type="button" onclick="tfAlternarFechamentoAtual()">' + (tfFechamentoAtual() ? 'Reabrir período' : 'Fechar período') + '</button></div></div>'
+        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Auditoria recente</h5><p>Últimos eventos da operação financeira deste cliente.</p></div></div>' + tfAuditoriaRecenteHtml() + '</div>'
       + '</div>'
     + '</div>'
     + '<div class="form-card">'
-      + '<h3>Painel de pendencias</h3>'
-      + '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atencao no Extrato e no Financeiro.</p>'
+      + '<h3>Painel de pendências</h3>'
+      + '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p>'
       + '<div class="summary-grid pending-grid">'
-        + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Não conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Pendentes de estorno</div><div class="s-val red">' + pendencias.extratoPendentesEstorno.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoPendentesEstorno.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'pendentes_estorno\')">Abrir no Extrato</button></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Lancamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Lançamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">A receber vencido</div><div class="s-val red">' + pendencias.receberVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.receberVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'atrasado\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">A pagar vencido</div><div class="s-val red">' + pendencias.pagarVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'atrasado\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Receber parcial</div><div class="s-val yellow">' + pendencias.receberParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.receberParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'parcial\')">Abrir no Financeiro</button></div>'
@@ -883,23 +1314,30 @@ function renderFinanceiro() {
     + '</div>'
     + '<div class="form-card">'
       + '<h3>Financeiro PJ</h3>'
-      + '<p class="cartao-helper-text">Cadastre os titulos a receber e a pagar da empresa. No proximo passo, vamos poder conciliar essas baixas diretamente com o Extrato.</p>'
+      + '<p class="cartao-helper-text">Cadastre os títulos a receber e a pagar da empresa. No próximo passo, vamos poder conciliar essas baixas diretamente com o Extrato.</p>'
       + '<div class="tipo-toggle" style="margin-top:14px">'
         + '<button type="button" class="tipo-btn credito' + (_tfNatureza === 'receber' ? ' active' : '') + '" onclick="tfSetNatureza(\'receber\')">A Receber</button>'
         + '<button type="button" class="tipo-btn debito' + (_tfNatureza === 'pagar' ? ' active' : '') + '" onclick="tfSetNatureza(\'pagar\')">A Pagar</button>'
       + '</div>'
     + '</div>'
-    + financeiroPanel('novo', '+ Novo titulo - ' + tituloAtivo,
+    + financeiroPanel('novo', '+ Novo título - ' + tituloAtivo,
       '<div class="form-row">'
-        + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem esta envolvido neste titulo"/></div>'
-        + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Ex.: Mensalidade, imposto, fornecedor"/></div>'
+        + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem está envolvido neste título"/></div>'
+        + '<div class="form-group"><label>Descrição</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Ex.: Mensalidade, imposto, fornecedor"/></div>'
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="' + tfFormPrefix() + '-valor" class="money-input" value="0,00"/></div>'
       + '</div>'
       + '<div class="form-row">'
-        + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informacoes complementares deste titulo"></textarea></div>'
+        + '<div class="form-group" style="max-width:170px"><label><input type="checkbox" id="' + tfFormPrefix() + '-recorrente" onchange="tfToggleRecorrencia(\'' + tfFormPrefix() + '\')"/> Título recorrente</label></div>'
+        + '<div class="form-group" style="max-width:170px;display:none" data-tf-recorrencia="' + tfFormPrefix() + '"><label>Frequ?ncia</label><select id="' + tfFormPrefix() + '-recorrencia-freq"><option value="mensal">Mensal</option><option value="semanal">Semanal</option></select></div>'
+        + '<div class="form-group" style="max-width:120px;display:none" data-tf-recorrencia="' + tfFormPrefix() + '"><label>Intervalo</label><input type="number" id="' + tfFormPrefix() + '-recorrencia-intervalo" value="1" min="1"/></div>'
+        + '<div class="form-group" style="max-width:120px;display:none" data-tf-recorrencia="' + tfFormPrefix() + '"><label>Quantidade</label><input type="number" id="' + tfFormPrefix() + '-recorrencia-quantidade" value="1" min="1"/></div>'
+        + '<div class="form-group" style="max-width:170px;display:none" data-tf-recorrencia="' + tfFormPrefix() + '"><label>Fim da recorrência</label><input type="text" id="' + tfFormPrefix() + '-recorrencia-fim" class="flex-date-input" placeholder="Opcional"/></div>'
+      + '</div>'
+      + '<div class="form-row">'
+        + '<div class="form-group"><label>Observação</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informações complementares deste título"></textarea></div>'
       + '</div>'
       + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>'
     )
@@ -907,8 +1345,8 @@ function renderFinanceiro() {
         + '<h3>Filtros</h3>'
         + '<div class="form-row">'
           + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
-          + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Filtrar pela descricao do titulo" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+          + '<div class="form-group"><label>Descrição</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Filtrar pela descrição do título" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa ou observação" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">Exportar PDF</button><button class="btn-sm" onclick="tfExportXlsx()">Exportar XLSX</button></div>'
       + '</div>'
@@ -917,5 +1355,6 @@ function renderFinanceiro() {
 
   initMoneyInputs(root);
   initFlexibleDateInputs(root);
+  tfToggleRecorrencia(tfFormPrefix());
   initDrag('financeiro', COLS_TITULOS, renderFinanceiro);
 }
