@@ -319,6 +319,10 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .summary-card .s-label{font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
 .summary-card .s-val{font-family:'DM Serif Display',serif;font-size:1.4rem;line-height:1.2}
 .s-val.red{color:var(--danger)}.s-val.green{color:var(--success)}.s-val.blue{color:var(--accent)}.s-val.yellow{color:var(--warning)}
+.pending-grid{margin-top:14px;margin-bottom:0}
+.pending-card{display:flex;flex-direction:column;gap:10px}
+.pending-meta{font-size:.78rem;color:var(--muted);font-weight:600;min-height:18px}
+.pending-card .btn-sm{width:max-content}
 
 /* ── Toggle tipo (crédito/débito) ── */
 .tipo-toggle{display:flex;border-radius:7px;overflow:hidden;border:1px solid var(--border);width:fit-content}

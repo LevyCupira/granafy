@@ -1,0 +1,17 @@
+{
+  "name": "granafy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Suite de testes E2E do Granafy com Playwright.",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "visual:check": "node scripts/playwright-visual-check.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "http-server": "^14.1.1"
+  }
+}
