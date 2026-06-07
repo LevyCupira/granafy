@@ -1,6 +1,6 @@
 // EXTRATO.JS - Conta corrente (Supabase)
 
-var _exTipo = 'credito';
+var _exTipo = 'crédito';
 var _exFiltroTipo = 'todos';
 var _exFiltroCat = '';
 var _exFiltroPeriodoModo = 'mes';
@@ -62,12 +62,13 @@ function lerValorImportadoExtrato(rawVal) {
 }
 
 function inferirTipoImportadoExtrato(valor) {
-  return Number(valor || 0) < 0 ? 'debito' : 'credito';
+  return Number(valor || 0) < 0 ? 'débito' : 'crédito';
 }
 
-function extratoSugestaoHistoricaImportacao(cliente, descricao, tipo) {
+function extratoSugestaoHistoricaImportacao(cliente, descricao, tipo, valor) {
   if (!cliente || !descricao) return null;
   var alvo = tfNormalizeText ? tfNormalizeText(descricao) : String(descricao || '').toLowerCase().trim();
+  var valorAbsoluto = Math.abs(Number(valor || 0));
   var candidatos = (cliente.extrato || []).filter(function(lanc) {
     if (!lanc || !lanc.desc) return false;
     if (extratoLancamentoEhSaldoInicial && extratoLancamentoEhSaldoInicial(lanc)) return false;
@@ -86,6 +87,9 @@ function extratoSugestaoHistoricaImportacao(cliente, descricao, tipo) {
       var texto = tfNormalizeText ? tfNormalizeText(lanc.descOriginal || lanc.desc || '') : String(lanc.descOriginal || lanc.desc || '').toLowerCase().trim();
       return texto.indexOf(alvo) >= 0 || alvo.indexOf(texto) >= 0;
     }).sort(function(a, b) {
+      var diffA = Math.abs(Math.abs(Number(a && a.valor || 0)) - valorAbsoluto);
+      var diffB = Math.abs(Math.abs(Number(b && b.valor || 0)) - valorAbsoluto);
+      if (diffA !== diffB) return diffA - diffB;
       return String(b.data || '').localeCompare(String(a.data || ''));
     });
   }
@@ -155,7 +159,7 @@ function extratoPeriodoDisplayValue() {
 
 function extratoValorComparavel(lanc) {
   var valor = Number((lanc && lanc.valor) || 0);
-  return lanc && lanc.tipo === 'debito' ? -valor : valor;
+  return lanc && lanc.tipo === 'débito' ? -valor : valor;
 }
 
 function extratoValorBate(lanc) {
@@ -194,9 +198,9 @@ function extratoImportGuideHtml() {
     + '<span class="import-guide-chip">categoria</span>'
     + '</div>'
     + '<ul class="import-guide-list">'
-    + '<li>Valor positivo vira <strong>credito</strong>.</li>'
-    + '<li>Valor negativo vira <strong>debito</strong>.</li>'
-    + '<li>A coluna <strong>tipo</strong> nao e mais necessaria.</li>'
+    + '<li>Valor positivo vira <strong>crédito</strong>.</li>'
+    + '<li>Valor negativo vira <strong>débito</strong>.</li>'
+    + '<li>A coluna <strong>tipo</strong> não e mais necessaria.</li>'
     + '</ul>'
     + '</div>';
 }
@@ -246,15 +250,15 @@ function extratoStatusEstornoValor(lanc) {
   return status;
 }
 
-function extratoLancamentoOrigemDoEstorno(cliente, lancamentoId) {
-  if (!cliente || !lancamentoId) return null;
+function extratoLancamentoOrigemDoEstorno(cliente, LançamentoId) {
+  if (!cliente || !LançamentoId) return null;
   return (cliente.extrato || []).find(function(item) {
-    return item && item.estornoLancamentoId === lancamentoId;
+    return item && item.estornoLançamentoId === LançamentoId;
   }) || null;
 }
 
-function extratoLancamentoEhEstornoVinculado(cliente, lancamentoId) {
-  return !!extratoLancamentoOrigemDoEstorno(cliente, lancamentoId);
+function extratoLancamentoEhEstornoVinculado(cliente, LançamentoId) {
+  return !!extratoLancamentoOrigemDoEstorno(cliente, LançamentoId);
 }
 
 function extratoClasseEstornoLinha(cliente, lanc) {
@@ -278,8 +282,8 @@ function extratoResumoEstorno(cliente, lanc) {
   }
 
   if (status === 'estornado') {
-    var destino = lanc && lanc.estornoLancamentoId ? (cliente.extrato || []).find(function(item) { return item.id === lanc.estornoLancamentoId; }) : null;
-    var texto = '<span class="badge badge-estorno-concluido">J? estornado</span>';
+    var destino = lanc && lanc.estornoLançamentoId ? (cliente.extrato || []).find(function(item) { return item.id === lanc.estornoLançamentoId; }) : null;
+    var texto = '<span class="badge badge-estorno-concluido">Já estornado</span>';
     if (lanc && lanc.estornoData) texto += ' em ' + esc(formatDate(lanc.estornoData));
     if (destino) texto += ' · vinculado a ' + esc(destino.desc || destino.descOriginal || '-') + ' ' + fmt(destino.valor || 0);
     if (lanc && lanc.estornoObservacao) texto += ' · ' + esc(lanc.estornoObservacao);
@@ -291,16 +295,16 @@ function extratoResumoEstorno(cliente, lanc) {
 
 function extratoLancamentosElegiveisEstorno(cliente, lanc) {
   if (!cliente || !lanc) return [];
-  var tipoEsperado = lanc.tipo === 'credito' ? 'debito' : 'credito';
+  var tipoEsperado = lanc.tipo === 'crédito' ? 'débito' : 'crédito';
   var usadoPorOutro = {};
   (cliente.extrato || []).forEach(function(item) {
-    if (item && item.estornoLancamentoId && item.id !== lanc.id) usadoPorOutro[item.estornoLancamentoId] = item.id;
+    if (item && item.estornoLançamentoId && item.id !== lanc.id) usadoPorOutro[item.estornoLançamentoId] = item.id;
   });
 
   return (cliente.extrato || []).filter(function(item) {
     if (!item || !item.id || item.id === lanc.id) return false;
     if (item.tipo !== tipoEsperado) return false;
-    if (usadoPorOutro[item.id] && item.id !== lanc.estornoLancamentoId) return false;
+    if (usadoPorOutro[item.id] && item.id !== lanc.estornoLançamentoId) return false;
     return true;
   }).sort(function(a, b) {
     var matchA = Math.abs(Number(a.valor || 0) - Number(lanc.valor || 0)) < 0.005 ? 0 : 1;
@@ -318,7 +322,7 @@ function extratoEstornoOptionsHtml(cliente, lanc, selecionadoId) {
     return '<option value="' + esc(item.id) + '" data-data="' + esc(item.data || '') + '"' + (item.id === selecionadoId ? ' selected' : '') + '>'
       + esc(formatDate(item.data))
       + ' · ' + esc(item.desc || item.descOriginal || '-')
-      + ' · ' + esc(item.tipo === 'credito' ? 'Crédito' : 'Débito')
+      + ' · ' + esc(item.tipo === 'crédito' ? 'Crédito' : 'Débito')
       + ' · ' + esc(fmt(item.valor || 0))
       + '</option>';
   }).join('');
@@ -341,21 +345,21 @@ function extratoCategoriaBadgeHtml(lanc) {
 
 function extratoResumoSaldoDiaHtml(dataDia, itens, colspan, saldoAnterior) {
   var itensValidos = itens.filter(function(item) { return !extratoLancamentoEhSaldoInicial(item); });
-  var creditos = itensValidos.filter(function(item) { return item.tipo === 'credito'; }).reduce(function(soma, item) {
+  var créditos = itensValidos.filter(function(item) { return item.tipo === 'crédito'; }).reduce(function(soma, item) {
     return soma + Number(item.valor || 0);
   }, 0);
-  var debitos = itensValidos.filter(function(item) { return item.tipo === 'debito'; }).reduce(function(soma, item) {
+  var débitos = itensValidos.filter(function(item) { return item.tipo === 'débito'; }).reduce(function(soma, item) {
     return soma + Number(item.valor || 0);
   }, 0);
-  var saldoMovimentoDia = creditos - debitos;
+  var saldoMovimentoDia = créditos - débitos;
   var saldoAcumulado = Number(saldoAnterior || 0) + saldoMovimentoDia;
   return {
     html: '<tr class="row-day-balance">'
       + '<td colspan="' + colspan + '">'
       + '<div class="day-balance-row">'
       + '<strong>Total ' + esc(formatDate(dataDia)) + '</strong>'
-      + '<span>Créditos ' + fmt(creditos) + '</span>'
-      + '<span>D?bitos ' + fmt(debitos) + '</span>'
+      + '<span>Créditos ' + fmt(créditos) + '</span>'
+      + '<span>Débitos ' + fmt(débitos) + '</span>'
       + '<span>Movimento ' + fmt(saldoMovimentoDia) + '</span>'
       + '<span class="' + (saldoAcumulado >= 0 ? 'green' : 'red') + '">Saldo acumulado ' + fmt(saldoAcumulado) + '</span>'
       + '</div>'
@@ -377,7 +381,7 @@ function extratoIgnoraConciliacao(lanc) {
 function extratoLancamentoTemEstornoResolvido(cliente, lanc) {
   if (!cliente || !lanc) return false;
   if (extratoStatusEstornoValor(lanc) === 'estornado') return true;
-  if (lanc.estornoLancamentoId) return true;
+  if (lanc.estornoLançamentoId) return true;
   if (extratoLancamentoEhEstornoVinculado(cliente, lanc.id)) return true;
   return false;
 }
@@ -431,16 +435,16 @@ function extratoLancamentosFiltrados(cliente) {
     var pendenteConciliacao = extratoPendenteConciliacao(cliente, l);
     var resolvidoConciliacao = extratoResolvidoConciliacao(cliente, l);
     var statusEstorno = extratoStatusEstornoValor(l);
-    var ehLancamentoDeEstorno = extratoLancamentoEhEstornoVinculado(cliente, l.id);
+    var ehLançamentoDeEstorno = extratoLancamentoEhEstornoVinculado(cliente, l.id);
     if (_exFiltroTipo !== 'todos' && l.tipo !== _exFiltroTipo) return false;
     if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
     if (!extratoPeriodoBate(l.data || '')) return false;
     if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
     if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
     if (financeiroPJAtivo && _exFiltroConciliacao === 'conciliados' && !resolvidoConciliacao) return false;
-    if (financeiroPJAtivo && _exFiltroConciliacao === 'nao_conciliados' && !pendenteConciliacao) return false;
+    if (financeiroPJAtivo && _exFiltroConciliacao === 'não_conciliados' && !pendenteConciliacao) return false;
     if (financeiroPJAtivo && _exFiltroEstorno === 'pendentes_estorno' && statusEstorno !== 'pendente_estorno') return false;
-    if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado' && !ehLancamentoDeEstorno) return false;
+    if (financeiroPJAtivo && _exFiltroEstorno === 'estornados' && statusEstorno !== 'estornado' && !ehLançamentoDeEstorno) return false;
     if (!extratoValorBate(l)) return false;
     if (_exFiltroBusca && !texto.includes(_exFiltroBusca)) return false;
     return true;
@@ -463,10 +467,10 @@ function exportExtratoXlsx() {
           Conta: nomeContaCliente(conta || null),
           'Descrição': l.desc || '',
           Categoria: extratoTemRateio(l) ? 'Rateado' : (l.cat || ''),
-          Tipo: l.tipo === 'credito' ? 'Crédito' : 'Débito',
+          Tipo: l.tipo === 'crédito' ? 'Crédito' : 'Débito',
           Valor: Number(l.valor || 0),
           'Conciliação': resumoConciliacaoLancamento(l),
-          Devolução: extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, ''),
+          'Devolução': extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, ''),
           Rateio: resumoRateioExtrato(l).replace(/^Rateio:\s*/, ''),
           'Observação': l.observacao || ''
         }
@@ -484,7 +488,7 @@ function exportExtratoXlsx() {
     ['Gerado em', new Date().toLocaleString('pt-BR')]
   ]), 'Resumo');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, {
-    header: ['Data', 'Conta', 'Descrição', 'Categoria', 'Tipo', 'Valor', 'Conciliação', 'Devolução', 'Rateio', 'Observação']
+    header: ['Data', 'Conta', 'Descriçãoo', 'Categoria', 'Tipo', 'Valor', 'Conciliaçãoo', 'Devoluçãoo', 'Rateio', 'Observaçãoo']
   }), 'Extrato');
   XLSX.writeFile(
     wb,
@@ -494,7 +498,7 @@ function exportExtratoXlsx() {
 
 function exportExtratoPDF() {
   var jsPDF = window.jspdf && window.jspdf.jsPDF;
-  if (!jsPDF) return alert('Biblioteca PDF nao carregada.');
+  if (!jsPDF) return alert('Biblioteca PDF não carregada.');
   if (!activeClient) return alert('Selecione um cliente.');
   var cliente = data.clients[activeClient];
   var filtrados = extratoLancamentosFiltrados(cliente);
@@ -516,14 +520,14 @@ function exportExtratoPDF() {
   doc.text('Filtros: tipo ' + (_exFiltroTipo || 'todos') + ' | categoria ' + (_exFiltroCat || 'todas') + ' | periodo ' + (_exFiltroPeriodoValor ? (_exFiltroPeriodoModo + ' ' + extratoPeriodoDisplayValue()) : 'todos') + ' | valor ' + ((_exFiltroValorModo === 'todos' || !_exFiltroValor) ? 'todos' : (_exFiltroValorModo + ' ' + fmt(_exFiltroValor))) + ' | busca ' + (_exFiltroBusca || '-'), 14, 31);
   doc.autoTable({
     startY: 36,
-    head: [['Data', 'Conta', 'Descrição', 'Categoria', 'Tipo', 'Valor', 'Conciliação/Rateio']],
+    head: [['Data', 'Conta', 'Descriçãoo', 'Categoria', 'Tipo', 'Valor', 'Conciliaçãoo/Rateio']],
     body: filtrados
       .slice()
       .sort(function(a, b) { return String(b.data || '').localeCompare(String(a.data || '')); })
       .map(function(l) {
         var conta = (contasClienteAtivo() || []).find(function(item) { return item.id === l.contaId; });
         var detalhes = [];
-        var conc = resumoConciliacaoLancamento(l);
+        var conc = resumoConciliacaoLançamento(l);
         var rateio = resumoRateioExtrato(l);
         var estorno = extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, '');
         if (conc) detalhes.push(conc);
@@ -534,8 +538,8 @@ function exportExtratoPDF() {
           nomeContaCliente(conta || null),
           l.desc || '',
           extratoTemRateio(l) ? 'Rateado' : (l.cat || '-'),
-          l.tipo === 'credito' ? 'Crédito' : 'Débito',
-          (l.tipo === 'credito' ? fmt(l.valor || 0) : ('- ' + fmt(l.valor || 0))),
+          l.tipo === 'crédito' ? 'Crédito' : 'Débito',
+          (l.tipo === 'crédito' ? fmt(l.valor || 0) : ('- ' + fmt(l.valor || 0))),
           detalhes.join(' | ')
         ];
       }),
@@ -558,8 +562,8 @@ function openExtratoRateioModal(i) {
   document.getElementById('modalTitle').textContent = 'Rateio por categoria';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-section-card">'
-      + '<div class="settings-card-head"><div><h5>' + esc(lanc.desc || 'Lancamento') + '</h5><p>Distribua o valor total desse lancamento entre as categorias do Extrato.</p></div>'
-      + '<div class="settings-card-badges"><span class="settings-card-badge subtle">Tipo ' + esc(lanc.tipo === 'credito' ? 'Crédito' : 'Débito') + '</span><span class="settings-card-badge">' + fmt(lanc.valor || 0) + '</span></div></div>'
+      + '<div class="settings-card-head"><div><h5>' + esc(lanc.desc || 'Lançamento') + '</h5><p>Distribua o valor total desse Lançamento entre as categorias do Extrato.</p></div>'
+      + '<div class="settings-card-badges"><span class="settings-card-badge subtle">Tipo ' + esc(lanc.tipo === 'crédito' ? 'Crédito' : 'Débito') + '</span><span class="settings-card-badge">' + fmt(lanc.valor || 0) + '</span></div></div>'
       + '<div id="ex-rateio-rows"></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" type="button" onclick="adicionarLinhaRateioExtrato()">+ Linha de rateio</button><button class="btn-sm red" type="button" onclick="limparRateioExtrato()">Limpar rateio</button></div>'
       + '<div id="ex-rateio-resumo" style="margin-top:12px;color:var(--muted);font-size:.85rem"></div>'
@@ -612,7 +616,7 @@ function atualizarResumoRateioExtrato(valorOriginal) {
   var modalBody = document.getElementById('modalBody');
   var base = Number(typeof valorOriginal !== 'undefined' ? valorOriginal : ((modalBody && modalBody.dataset && modalBody.dataset.rateioValor) || 0));
   var diff = Math.abs(total - base);
-  info.innerHTML = 'Rateado: <strong>' + fmt(total) + '</strong> · Total do lancamento: <strong>' + fmt(base) + '</strong>'
+  info.innerHTML = 'Rateado: <strong>' + fmt(total) + '</strong> · Total do Lançamento: <strong>' + fmt(base) + '</strong>'
     + (diff < 0.005 ? ' <span style="color:var(--success)">· Conferido</span>' : ' <span style="color:var(--danger)">· Diferenca ' + fmt(diff) + '</span>');
 }
 
@@ -630,12 +634,12 @@ async function salvarRateioExtrato(i) {
   if (!(await extratoConfirmarPeriodoFechado(lanc.data || '', 'alterar o rateio deste lançamento'))) return;
   var rows = coletarRateioExtratoModal();
   if (!rows.length) {
-    var ok = await appConfirm('Nenhum rateio foi informado. Deseja limpar o rateio desse lancamento?', { title: 'Limpar rateio', confirmText: 'Limpar' });
+    var ok = await appConfirm('Nenhum rateio foi informado. Deseja limpar o rateio desse Lançamento?', { title: 'Limpar rateio', confirmText: 'Limpar' });
     if (!ok) return;
   }
   var total = rows.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
   if (rows.length && Math.abs(total - Number(lanc.valor || 0)) >= 0.005) {
-    await appAlert('O total do rateio deve ser igual ao valor do lancamento.');
+    await appAlert('O total do rateio deve ser igual ao valor do Lançamento.');
     return;
   }
   var response = await applyUserScope(
@@ -643,7 +647,7 @@ async function salvarRateioExtrato(i) {
   ).select().single();
   if (response.error) {
     console.error(response.error);
-    await appAlert('Não foi possível salvar o rateio. Rode a migração sql/20260602_rateio_categorias_extrato.sql no Supabase.');
+    await appAlert('Não foi possível salvar o rateio. Rode a migraçãoo sql/20260602_rateio_categorias_extrato.sql no Supabase.');
     return;
   }
   lanc.rateios = extratoRateiosValidos({ rateios: response.data.rateio_categorias || rows });
@@ -652,7 +656,7 @@ async function salvarRateioExtrato(i) {
 }
 
 function syncExtratoEstornoData() {
-  var select = document.getElementById('ex-estorno-lancamento');
+  var select = document.getElementById('ex-estorno-Lançamento');
   var dataInput = document.getElementById('ex-estorno-data');
   if (!select || !dataInput) return;
   var option = select.options[select.selectedIndex];
@@ -679,7 +683,7 @@ function openExtratoEstornoModal(i) {
     document.getElementById('modalTitle').textContent = 'Lançamento de estorno';
     document.getElementById('modalBody').innerHTML =
       '<div class="settings-section-card">'
-        + '<div class="settings-card-head"><div><h5>Este lançamento já foi usado como estorno</h5><p>Ele está vinculado a um pagamento ou recebimento marcado para devolução.</p></div></div>'
+        + '<div class="settings-card-head"><div><h5>Este lançamento já foi usado como estorno</h5><p>Ele está vinculado a um pagamento ou recebimento marcado para devoluçãoo.</p></div></div>'
         + '<div class="settings-card-badges"><span class="settings-card-badge">Estorno vinculado</span><span class="settings-card-badge subtle">' + esc(formatDate(lanc.data)) + '</span><span class="settings-card-badge subtle">' + esc(fmt(lanc.valor || 0)) + '</span></div>'
         + '<div class="settings-note-box">Origem: <strong>' + esc(origem.desc || origem.descOriginal || '-') + '</strong>' + (origem.estornoData ? ' · marcado em ' + esc(formatDate(origem.estornoData)) : '') + '</div>'
       + '</div>'
@@ -692,39 +696,39 @@ function openExtratoEstornoModal(i) {
   }
 
   var statusAtual = extratoStatusEstornoValor(lanc);
-  var selectHtml = extratoEstornoOptionsHtml(c, lanc, lanc.estornoLancamentoId || '');
+  var selectHtml = extratoEstornoOptionsHtml(c, lanc, lanc.estornoLançamentoId || '');
   var dataEstorno = lanc.estornoData || '';
 
-  document.getElementById('modalTitle').textContent = 'Controle de devolução';
+  document.getElementById('modalTitle').textContent = 'Controle de devoluçãoo';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-section-card" style="margin-bottom:16px">'
-      + '<div class="settings-card-head"><div><h5>Pagamento ou recebimento</h5><p>Marque este lançamento como pendente de estorno ou vincule o lançamento que efetivou a devolução no extrato.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Pagamento ou recebimento</h5><p>Marque este lançamento como pendente de estorno ou vincule o lançamento que efetivou a devoluçãoo no extrato.</p></div></div>'
       + '<div class="settings-card-badges">'
         + '<span class="settings-card-badge subtle">' + esc(formatDate(lanc.data)) + '</span>'
-        + '<span class="settings-card-badge subtle">' + esc(lanc.tipo === 'credito' ? 'Crédito' : 'Débito') + '</span>'
+        + '<span class="settings-card-badge subtle">' + esc(lanc.tipo === 'crédito' ? 'Crédito' : 'Débito') + '</span>'
         + '<span class="settings-card-badge">' + esc(fmt(lanc.valor || 0)) + '</span>'
       + '</div>'
       + '<div class="settings-note-box" style="margin-top:14px">' + esc(lanc.descOriginal || lanc.desc || '-') + '</div>'
     + '</div>'
     + '<div class="settings-section-card">'
       + '<div class="form-row">'
-        + '<div class="form-group" style="max-width:220px"><label>Status da devolução</label><select id="ex-estorno-status" onchange="atualizarCamposExtratoEstornoModal()"><option value="normal"' + (statusAtual === 'normal' ? ' selected' : '') + '>Sem devolução</option><option value="pendente_estorno"' + (statusAtual === 'pendente_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornado"' + (statusAtual === 'estornado' ? ' selected' : '') + '>Já estornado</option></select></div>'
+        + '<div class="form-group" style="max-width:220px"><label>Status da devoluçãoo</label><select id="ex-estorno-status" onchange="atualizarCamposExtratoEstornoModal()"><option value="normal"' + (statusAtual === 'normal' ? ' selected' : '') + '>Sem devoluçãoo</option><option value="pendente_estorno"' + (statusAtual === 'pendente_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornado"' + (statusAtual === 'estornado' ? ' selected' : '') + '>Já estornado</option></select></div>'
       + '</div>'
       + '<div data-estorno-status-block="pendente_estorno" style="display:none">'
-        + '<div class="form-row"><div class="form-group"><label>Observação</label><input type="text" id="ex-estorno-obs-pendente" value="' + esc(statusAtual === 'pendente_estorno' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: valor recebido em duplicidade, cliente cancelou."/></div></div>'
+        + '<div class="form-row"><div class="form-group"><label>Observaçãoo</label><input type="text" id="ex-estorno-obs-pendente" value="' + esc(statusAtual === 'pendente_estorno' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: valor recebido em duplicidade, cliente cancelou."/></div></div>'
       + '</div>'
       + '<div data-estorno-status-block="estornado" style="display:none">'
         + '<div class="form-row">'
-          + '<div class="form-group"><label>Lancamento do estorno no extrato</label><select id="ex-estorno-lancamento" onchange="syncExtratoEstornoData()">' + selectHtml + '</select></div>'
+          + '<div class="form-group"><label>Lançamento do estorno no extrato</label><select id="ex-estorno-Lançamento" onchange="syncExtratoEstornoData()">' + selectHtml + '</select></div>'
         + '</div>'
         + '<div class="form-row">'
-          + '<div class="form-group" style="max-width:180px"><label>Data da devolução</label><input type="date" id="ex-estorno-data" value="' + esc(dataEstorno) + '"/></div>'
-          + '<div class="form-group"><label>Observação</label><input type="text" id="ex-estorno-obs-concluido" value="' + esc(statusAtual === 'estornado' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: estorno realizado no banco."/></div>'
+          + '<div class="form-group" style="max-width:180px"><label>Data da devoluçãoo</label><input type="date" id="ex-estorno-data" value="' + esc(dataEstorno) + '"/></div>'
+          + '<div class="form-group"><label>Observaçãoo</label><input type="text" id="ex-estorno-obs-concluido" value="' + esc(statusAtual === 'estornado' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: estorno realizado no banco."/></div>'
         + '</div>'
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
         + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
-        + '<button class="btn-add" type="button" style="margin-top:0" onclick="salvarExtratoEstorno(' + i + ')">Salvar devolução</button>'
+        + '<button class="btn-add" type="button" style="margin-top:0" onclick="salvarExtratoEstorno(' + i + ')">Salvar devoluçãoo</button>'
       + '</div>'
     + '</div>';
 
@@ -742,7 +746,7 @@ async function salvarExtratoEstorno(i) {
   var status = ((document.getElementById('ex-estorno-status') || {}).value || 'normal');
   var payload = {
     status_estorno: 'normal',
-    estorno_lancamento_id: null,
+    estorno_Lançamento_id: null,
     estorno_data: null,
     estorno_observacao: null
   };
@@ -753,35 +757,35 @@ async function salvarExtratoEstorno(i) {
   }
 
   if (status === 'estornado') {
-    var lancamentoEstornoId = (((document.getElementById('ex-estorno-lancamento') || {}).value) || '').trim();
+    var LançamentoEstornoId = (((document.getElementById('ex-estorno-Lançamento') || {}).value) || '').trim();
     var dataEstorno = ((document.getElementById('ex-estorno-data') || {}).value || '').trim();
     var observacaoEstorno = (((document.getElementById('ex-estorno-obs-concluido') || {}).value) || '').trim();
 
-    if (!lancamentoEstornoId) {
-      await appAlert('Selecione o lancamento do extrato que efetivou o estorno.');
+    if (!LançamentoEstornoId) {
+      await appAlert('Selecione o Lançamento do extrato que efetivou o estorno.');
       return;
     }
 
-    var lancamentoEstorno = (c.extrato || []).find(function(item) { return item.id === lancamentoEstornoId; });
-    if (!lancamentoEstorno) {
+    var LançamentoEstorno = (c.extrato || []).find(function(item) { return item.id === LançamentoEstornoId; });
+    if (!LançamentoEstorno) {
       await appAlert('Lançamento de estorno não encontrado.');
       return;
     }
 
-    var origemExistente = extratoLancamentoOrigemDoEstorno(c, lancamentoEstornoId);
+    var origemExistente = extratoLancamentoOrigemDoEstorno(c, LançamentoEstornoId);
     if (origemExistente && origemExistente.id !== lanc.id) {
-      await appAlert('Esse lancamento ja esta vinculado como estorno de outro registro.');
+      await appAlert('Esse Lançamento ja esta vinculado como estorno de outro registro.');
       return;
     }
 
-    if (lancamentoEstorno.tipo === lanc.tipo) {
-      await appAlert('O lancamento vinculado ao estorno precisa ter tipo oposto ao original.');
+    if (LançamentoEstorno.tipo === lanc.tipo) {
+      await appAlert('O Lançamento vinculado ao estorno precisa ter tipo oposto ao original.');
       return;
     }
 
     payload.status_estorno = 'estornado';
-    payload.estorno_lancamento_id = lancamentoEstornoId;
-    payload.estorno_data = dataEstorno || lancamentoEstorno.data || null;
+    payload.estorno_Lançamento_id = LançamentoEstornoId;
+    payload.estorno_data = dataEstorno || LançamentoEstorno.data || null;
     payload.estorno_observacao = observacaoEstorno || null;
   }
 
@@ -796,12 +800,12 @@ async function salvarExtratoEstorno(i) {
 
   if (response.error) {
     console.error(response.error);
-    await appAlert('Não foi possível salvar a devolução. Rode a migração sql/20260602_status_devolucao_extrato.sql no Supabase.');
+    await appAlert('Não foi possível salvar a devoluçãoo. Rode a migraçãoo sql/20260602_status_devolucao_extrato.sql no Supabase.');
     return;
   }
 
   lanc.estornoStatus = response.data.status_estorno || 'normal';
-  lanc.estornoLancamentoId = response.data.estorno_lancamento_id || null;
+  lanc.estornoLançamentoId = response.data.estorno_Lançamento_id || null;
   lanc.estornoData = response.data.estorno_data || null;
   lanc.estornoObservacao = response.data.estorno_observacao || '';
 
@@ -836,11 +840,11 @@ function aplicarAjustesVisuaisExtrato(area, lncs) {
       actions.insertBefore(btn, actions.firstChild);
     }
 
-    if (clienteAtivoEhPJ() && !actions.querySelector('button[title="Devolução"]')) {
+    if (clienteAtivoEhPJ() && !actions.querySelector('button[title="Devoluçãoo"]')) {
       var refundBtn = document.createElement('button');
       refundBtn.className = 'btn-icon';
       refundBtn.type = 'button';
-      refundBtn.title = 'Devolução';
+      refundBtn.title = 'Devoluçãoo';
       refundBtn.textContent = 'DV';
       refundBtn.addEventListener('click', function() { openExtratoEstornoModal(realIdx); });
       actions.insertBefore(refundBtn, actions.firstChild);
@@ -884,21 +888,21 @@ function centrosCustoOptionsCliente(centroCustoIdAtual, incluirVazio) {
 }
 
 function naturezaFinanceiraDoExtrato(tipo) {
-  return tipo === 'debito' ? 'pagar' : 'receber';
+  return tipo === 'débito' ? 'pagar' : 'receber';
 }
 
-function baixasFinanceirasDoLancamento(lanc) {
+function baixasFinanceirasDoLançamento(lanc) {
   if (!lanc || !lanc.id || typeof tfBaixasPorLancamentoId !== 'function') return [];
-  return tfBaixasPorLancamentoId(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'credito'));
+  return tfBaixasPorLancamentoId(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'crédito'));
 }
 
 function valorConciliadoDoLancamento(lanc) {
-  if (!lanc || !lanc.id || typeof tfValorConciliadoLancamento !== 'function') return 0;
-  return tfValorConciliadoLancamento(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'credito'));
+  if (!lanc || !lanc.id || typeof tfValorConciliadoLançamento !== 'function') return 0;
+  return tfValorConciliadoLançamento(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'crédito'));
 }
 
-function resumoConciliacaoLancamento(lanc) {
-  var baixas = baixasFinanceirasDoLancamento(lanc);
+function resumoConciliacaoLançamento(lanc) {
+  var baixas = baixasFinanceirasDoLançamento(lanc);
   if (!baixas.length) return '';
   var conciliado = valorConciliadoDoLancamento(lanc);
   var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
@@ -1139,7 +1143,7 @@ function contasOptionsObrigatoriasCliente(contaIdAtual, placeholder) {
 }
 
 function abrirImportacaoExtrato() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var sel = document.getElementById('ex-import-conta');
   if (!sel || !sel.value) {
     alert('Selecione a conta antes de importar o extrato.');
@@ -1228,14 +1232,14 @@ async function insertLancamentoComFallback(payload) {
 
   if (payload.conta_id && isMissingContaSchemaError(completo.error)) {
     delete basico.conta_id;
-    console.warn('Tentando salvar lancamento sem conta_id apos erro no schema:', completo.error);
+    console.warn('Tentando salvar Lançamento sem conta_id apos erro no schema:', completo.error);
     return supabaseClient
       .from('lancamentos')
       .insert([Object.assign(basico, getUserScopePayload())]);
   }
   if (payload.centro_custo_id && isMissingCentroCustoSchemaError(completo.error)) {
     delete basico.centro_custo_id;
-    console.warn('Tentando salvar lancamento sem centro_custo_id apos erro no schema:', completo.error);
+    console.warn('Tentando salvar Lançamento sem centro_custo_id apos erro no schema:', completo.error);
     return supabaseClient
       .from('lancamentos')
       .insert([Object.assign(basico, getUserScopePayload())]);
@@ -1244,7 +1248,7 @@ async function insertLancamentoComFallback(payload) {
 }
 
 async function cadastrarContaCliente() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var conta = await abrirFormularioContaCliente(null);
   if (!conta) return;
 
@@ -1264,7 +1268,7 @@ async function cadastrarContaCliente() {
   if (error) {
     console.error('Erro ao cadastrar conta:', error);
     if (isMissingContaSchemaError(error) || isMissingSaldoInicialSchemaError(error)) {
-      alert('A estrutura de contas ainda nao esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
+      alert('A estrutura de contas ainda não esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
       return;
     }
     alert('Não foi possível cadastrar a conta: ' + (error.message || 'erro desconhecido'));
@@ -1276,10 +1280,10 @@ async function cadastrarContaCliente() {
 }
 
 async function editarContaCliente(contaId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var conta = contasClienteAtivo().find(item => item.id === contaId);
-  if (!conta) return alert('Conta nao encontrada.');
+  if (!conta) return alert('Conta não encontrada.');
 
   var dados = await abrirFormularioContaCliente(conta);
   if (!dados) return;
@@ -1300,7 +1304,7 @@ async function editarContaCliente(contaId) {
   if (error) {
     console.error('Erro ao editar conta:', error);
     if (isMissingContaSchemaError(error) || isMissingSaldoInicialSchemaError(error)) {
-      alert('A estrutura de contas ainda nao esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
+      alert('A estrutura de contas ainda não esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
       return;
     }
     alert('Não foi possível editar a conta: ' + (error.message || 'erro desconhecido'));
@@ -1312,7 +1316,7 @@ async function editarContaCliente(contaId) {
 }
 
 async function cadastrarRelacionamentoCliente() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var relacionamento = await abrirFormularioRelacionamentoCliente(null);
   if (!relacionamento) return;
 
@@ -1341,7 +1345,7 @@ async function cadastrarRelacionamentoCliente() {
   if (error) {
     console.error('Erro ao cadastrar relacionamento:', error);
     if (isMissingRelacionamentoSchemaError(error)) {
-      alert('A tabela de relacionamentos ainda nao existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      alert('A tabela de relacionamentos ainda não existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
       return;
     }
     alert('Não foi possível cadastrar o relacionamento: ' + (error.message || 'erro desconhecido'));
@@ -1353,9 +1357,9 @@ async function cadastrarRelacionamentoCliente() {
 }
 
 async function editarRelacionamentoCliente(relacionamentoId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
-  if (!rel) return alert('Relacionamento nao encontrado.');
+  if (!rel) return alert('Relacionamento não encontrado.');
 
   var dados = await abrirFormularioRelacionamentoCliente(rel);
   if (!dados) return;
@@ -1391,7 +1395,7 @@ async function editarRelacionamentoCliente(relacionamentoId) {
   if (error) {
     console.error('Erro ao editar relacionamento:', error);
     if (isMissingRelacionamentoSchemaError(error)) {
-      alert('A tabela de relacionamentos ainda nao existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      alert('A tabela de relacionamentos ainda não existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
       return;
     }
     alert('Não foi possível editar o relacionamento: ' + (error.message || 'erro desconhecido'));
@@ -1403,11 +1407,11 @@ async function editarRelacionamentoCliente(relacionamentoId) {
 }
 
 async function excluirRelacionamentoCliente(relacionamentoId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
   if (!rel) return;
 
-  var texto = 'Excluir o relacionamento "' + nomeRelacionamento(rel) + '"? Os lancamentos vinculados permanecerao no extrato, mas sem este relacionamento.';
+  var texto = 'Excluir o relacionamento "' + nomeRelacionamento(rel) + '"? Os Lançamentos vinculados permanecerão no extrato, mas sem este relacionamento.';
   if (!(await appConfirm(texto, { title: 'Excluir relacionamento', confirmText: 'Excluir' }))) return;
 
   const { error } = await applyUserScope(
@@ -1447,7 +1451,7 @@ function abrirFormularioRelacionamentoCliente(relacionamento) {
       '</select></div>' +
       '</div>' +
       '<div class="form-group"><label>Palavras-chave</label><input type="text" id="relPalavras" value="' + esc((relacionamento && (relacionamento.palavrasChave || relacionamento.palavras_chave)) || '') + '" placeholder="Ex: levy lima, pix levy, transf levy"/></div>' +
-      '<div class="form-group"><label>Observação</label><input type="text" id="relObs" value="' + esc((relacionamento && relacionamento.observacao) || '') + '" placeholder="Ex: Pagamento pessoal feito para a empresa"/></div>' +
+      '<div class="form-group"><label>Observaçãoo</label><input type="text" id="relObs" value="' + esc((relacionamento && relacionamento.observacao) || '') + '" placeholder="Ex: Pagamento pessoal feito para a empresa"/></div>' +
       '<div class="account-form-error" id="relFormError"></div>' +
       '</div>';
     actionsEl.innerHTML =
@@ -1609,10 +1613,10 @@ function getPreviousMonthKey() {
 
 function setTipoExtrato(t) {
   _exTipo = t;
-  var cred = document.getElementById('ex-tipo-credito');
-  var deb = document.getElementById('ex-tipo-debito');
-  if (cred) cred.classList.toggle('active', t === 'credito');
-  if (deb) deb.classList.toggle('active', t === 'debito');
+  var cred = document.getElementById('ex-tipo-crédito');
+  var deb = document.getElementById('ex-tipo-débito');
+  if (cred) cred.classList.toggle('active', t === 'crédito');
+  if (deb) deb.classList.toggle('active', t === 'débito');
 }
 
 function aplicarFiltrosExtrato() {
@@ -1682,7 +1686,7 @@ function chaveResolucaoDuplicadoExtrato(chave) {
 function assinaturaLinhaDuplicadaExtrato(l) {
   return [
     l && l.id ? 'id:' + l.id : '',
-    l && (l.data || l.data_lancamento || '') || '',
+    l && (l.data || l.data_Lançamento || '') || '',
     String(l && (l.desc || l.descricao || '') || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -1763,14 +1767,14 @@ function toggleSelecionarTodosVisiveisExtrato(ids) {
 
 async function aplicarCategoriaEmLoteExtrato() {
   if (!canEditActiveClient()) {
-    alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+    alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
     return;
   }
   var categoriaEl = document.getElementById('ex-lote-categoria');
   var categoria = categoriaEl ? String(categoriaEl.value || '').trim() : '';
   var ids = Array.from(_exSelecionados);
   if (!ids.length) {
-    alert('Selecione ao menos um lancamento.');
+    alert('Selecione ao menos um Lançamento.');
     return;
   }
   if (!categoria) {
@@ -1803,7 +1807,7 @@ async function aplicarCategoriaEmLoteExtrato() {
 }
 
 function chaveDuplicidadeExtrato(l) {
-  var data = l.data || l.data_lancamento || '';
+  var data = l.data || l.data_Lançamento || '';
   var desc = String(l.desc || l.descricao || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -1873,7 +1877,7 @@ function setManterDuplicadoExtrato(chave, id) {
 }
 
 async function removerDuplicadosSelecionadosExtrato() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var c = data.clients[activeClient];
   if (!c || !Array.isArray(c.extrato)) return;
@@ -1923,7 +1927,7 @@ async function removerDuplicadosSelecionadosExtrato() {
 }
 
 async function removerDuplicadoGrupoExtrato(chaveCodificada) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var chave = decodeURIComponent(chaveCodificada);
   var c = data.clients[activeClient];
@@ -1975,13 +1979,13 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
 }
 
 async function removerDuplicadosExtratoClienteAtivo() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var linhas = null;
   var query = applyUserScope(
     supabaseClient
       .from('lancamentos')
-      .select('id,cliente_id,data_lancamento,descricao,categoria,tipo,valor')
+      .select('id,cliente_id,data_Lançamento,descricao,categoria,tipo,valor')
       .eq('cliente_id', activeClient)
   );
 
@@ -1994,7 +1998,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
 
   linhas = (resposta.data || []).map(row => ({
     id: row.id,
-    data: row.data_lancamento || '',
+    data: row.data_Lançamento || '',
     desc: row.descricao || '',
     cat: row.categoria || '',
     tipo: row.tipo || '',
@@ -2049,7 +2053,7 @@ function renderExtrato() {
   if (!area) return;
 
   if (!c) {
-    area.innerHTML = '<div class="empty-state"><div class="icon">↓</div>Selecione um cliente.</div>';
+    area.innerHTML = '<div class="empty-state"><div class="icon">â†“</div>Selecione um cliente.</div>';
     return;
   }
 
@@ -2068,15 +2072,15 @@ function renderExtrato() {
   var filtradosFinanceiros = filtrados.filter(function(l) { return !extratoLancamentoEhSaldoInicial(l); });
   var saldoInicialBase = extratoSaldoInicialBase(c);
 
-  var totalCredito = filtradosFinanceiros
-    .filter(l => l.tipo === 'credito')
+  var totalcrédito = filtradosFinanceiros
+    .filter(l => l.tipo === 'crédito')
     .reduce((s, l) => s + Number(l.valor), 0);
 
-  var totalDebito = filtradosFinanceiros
-    .filter(l => l.tipo === 'debito')
+  var totaldébito = filtradosFinanceiros
+    .filter(l => l.tipo === 'débito')
     .reduce((s, l) => s + Number(l.valor), 0);
 
-  var saldo = saldoInicialBase + totalCredito - totalDebito;
+  var saldo = saldoInicialBase + totalcrédito - totaldébito;
   var catOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var catLoteOpts = nomesCC().map(cat => '<option value="' + esc(cat) + '">' + esc(cat) + '</option>').join('');
   var filtroCatOpts = catsLanc.map(cat => '<option value="' + esc(cat) + '"' + (_exFiltroCat === cat ? ' selected' : '') + '>' + esc(cat) + '</option>').join('');
@@ -2130,7 +2134,7 @@ function renderExtrato() {
   var importarPanelBody =
     '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Baixe o modelo, selecione a conta e importe o arquivo.</p>'
     + extratoImportGuideHtml()
-    + (relacionamentoAtivo ? '<div class="rel-suggestion rel-suggestion-muted" style="margin-bottom:14px">Se <strong>Relacionado a</strong> ficar em branco, o sistema tenta sugerir o vínculo pela descrição do banco.</div>' : '')
+    + (relacionamentoAtivo ? '<div class="rel-suggestion rel-suggestion-muted" style="margin-bottom:14px">Se <strong>Relacionado a</strong> ficar em branco, o sistema tenta sugerir o vínculo pela descriçãoo do banco.</div>' : '')
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:260px"><label>Conta do extrato</label><select id="ex-import-conta">' + contasOptionsObrigatoriasCliente('', '-- selecione a conta --') + '</select></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:260px"><label>Relacionado a</label><select id="ex-import-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
@@ -2139,12 +2143,12 @@ function renderExtrato() {
 
   var novoPanelBody =
     '<div class="tipo-toggle" style="margin-bottom:12px">'
-    + '<button class="tipo-btn credito" id="ex-tipo-credito" onclick="setTipoExtrato(\'credito\')">Crédito</button>'
-    + '<button class="tipo-btn debito" id="ex-tipo-debito" onclick="setTipoExtrato(\'debito\')">Débito</button>'
+    + '<button class="tipo-btn crédito" id="ex-tipo-crédito" onclick="setTipoExtrato(\'crédito\')">Crédito</button>'
+    + '<button class="tipo-btn débito" id="ex-tipo-débito" onclick="setTipoExtrato(\'débito\')">Débito</button>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:150px"><label>Data</label><input type="date" id="ex-data"/></div>'
-    + '<div class="form-group"><label>Descrição</label><input type="text" id="ex-desc" placeholder="Ex.: salário, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
+    + '<div class="form-group"><label>Descriçãoo</label><input type="text" id="ex-desc" placeholder="Ex.: salário, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '<div class="form-group" style="max-width:180px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-cat">' + catOpts + '</select></div>'
     + (centroCustoAtivo ? '<div class="form-group" style="max-width:220px"><label>Centro de custo <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'centros_custo\')">(+ gerir)</span></label><select id="ex-centro-custo">' + centrosCustoOptionsCliente('', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:260px"><label>Conta <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="cadastrarContaCliente()">(+ nova)</span></label><select id="ex-conta">' + contasOptionsCliente('') + '</select></div>'
@@ -2152,22 +2156,22 @@ function renderExtrato() {
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
     + (relacionamentoAtivo ? '<div id="ex-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
-    + '<div class="form-row"><div class="form-group"><label>Observação</label><input type="text" id="ex-obs" placeholder="Opcional. Ex.: pagamento feito por Levy PF para a Granafy."/></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>Observaçãoo</label><input type="text" id="ex-obs" placeholder="Opcional. Ex.: pagamento feito por Levy PF para a Granafy."/></div></div>'
     + '<button class="btn-add" onclick="addExtrato()">Adicionar</button>';
 
   var filtrosPanelBody =
     '<div class="form-row">'
-    + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="credito"' + (_exFiltroTipo === 'credito' ? ' selected' : '') + '>Crédito</option><option value="debito"' + (_exFiltroTipo === 'debito' ? ' selected' : '') + '>Débito</option></select></div>'
+    + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="crédito"' + (_exFiltroTipo === 'crédito' ? ' selected' : '') + '>Crédito</option><option value="débito"' + (_exFiltroTipo === 'débito' ? ' selected' : '') + '>Débito</option></select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
     + '<div class="form-group" style="max-width:120px"><label>Período</label><select id="ex-filtro-periodo-modo" onchange="atualizarPlaceholdersFiltrosExtrato()"><option value="dia"' + (_exFiltroPeriodoModo === 'dia' ? ' selected' : '') + '>Dia</option><option value="mes"' + (_exFiltroPeriodoModo === 'mes' ? ' selected' : '') + '>Mês</option><option value="ano"' + (_exFiltroPeriodoModo === 'ano' ? ' selected' : '') + '>Ano</option></select></div>'
     + '<div class="form-group" style="max-width:170px"><label>Referência</label><input type="text" id="ex-filtro-periodo" class="' + (_exFiltroPeriodoModo === 'dia' ? 'flex-date-input' : '') + '" value="' + esc(extratoPeriodoDisplayValue()) + '" placeholder="' + esc(extratoPeriodoPlaceholder()) + '" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
-    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:180px"><label>Conciliação</label><select id="ex-filtro-conciliacao"><option value="todos"' + (_exFiltroConciliacao === 'todos' ? ' selected' : '') + '>Todos</option><option value="conciliados"' + (_exFiltroConciliacao === 'conciliados' ? ' selected' : '') + '>Conciliados</option><option value="nao_conciliados"' + (_exFiltroConciliacao === 'nao_conciliados' ? ' selected' : '') + '>Não conciliados</option></select></div>' : '')
-    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:190px"><label>Devolução</label><select id="ex-filtro-estorno"><option value="todos"' + (_exFiltroEstorno === 'todos' ? ' selected' : '') + '>Todos</option><option value="pendentes_estorno"' + (_exFiltroEstorno === 'pendentes_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornados"' + (_exFiltroEstorno === 'estornados' ? ' selected' : '') + '>Já estornados</option></select></div>' : '')
+    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:180px"><label>Conciliaçãoo</label><select id="ex-filtro-conciliacao"><option value="todos"' + (_exFiltroConciliacao === 'todos' ? ' selected' : '') + '>Todos</option><option value="conciliados"' + (_exFiltroConciliacao === 'conciliados' ? ' selected' : '') + '>Conciliados</option><option value="não_conciliados"' + (_exFiltroConciliacao === 'não_conciliados' ? ' selected' : '') + '>Não conciliados</option></select></div>' : '')
+    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:190px"><label>Devoluçãoo</label><select id="ex-filtro-estorno"><option value="todos"' + (_exFiltroEstorno === 'todos' ? ' selected' : '') + '>Todos</option><option value="pendentes_estorno"' + (_exFiltroEstorno === 'pendentes_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornados"' + (_exFiltroEstorno === 'estornados' ? ' selected' : '') + '>Já estornados</option></select></div>' : '')
     + '<div class="form-group" style="max-width:120px"><label>Valor</label><select id="ex-filtro-valor-modo" onchange="atualizarPlaceholdersFiltrosExtrato()"><option value="todos"' + (_exFiltroValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="acima"' + (_exFiltroValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_exFiltroValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option><option value="igual"' + (_exFiltroValorModo === 'igual' ? ' selected' : '') + '>Igual a</option></select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-filtro-valor" class="money-input" value="' + esc(Number(_exFiltroValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
-    + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descrição ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
+    + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descriçãoo ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button><button class="btn-sm" onclick="exportExtratoPDF()">Exportar PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">Exportar XLSX</button></div>';
   var idsFiltrados = filtrados.map(function(l) { return l.id; }).filter(Boolean);
@@ -2176,10 +2180,10 @@ function renderExtrato() {
     return '\'' + String(id).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\'';
   }).join(',');
   var loteToolbarHtml = '<div class="extrato-bulk-bar">'
-    + '<label class="extrato-bulk-toggle"><input type="checkbox"' + (_exSelecaoLote ? ' checked' : '') + ' onchange="toggleSelecaoLoteExtrato()"/><span>Selecionar v?rios</span></label>'
+    + '<label class="extrato-bulk-toggle"><input type="checkbox"' + (_exSelecaoLote ? ' checked' : '') + ' onchange="toggleSelecaoLoteExtrato()"/><span>Selecionar vários</span></label>'
     + (_exSelecaoLote
       ? '<div class="extrato-bulk-actions">'
-        + '<button class="btn-sm" type="button" onclick="toggleSelecionarTodosVisiveisExtrato([' + idsFiltradosJs + '])">' + (selecionadosVisiveis === idsFiltrados.length && idsFiltrados.length ? 'Desmarcar vis?veis' : 'Marcar vis?veis') + '</button>'
+        + '<button class="btn-sm" type="button" onclick="toggleSelecionarTodosVisiveisExtrato([' + idsFiltradosJs + '])">' + (selecionadosVisiveis === idsFiltrados.length && idsFiltrados.length ? 'Desmarcar visíveis' : 'Marcar visíveis') + '</button>'
         + '<span class="extrato-bulk-count">' + _exSelecionados.size + ' selecionado(s)</span>'
         + '<select id="ex-lote-categoria"><option value="">Categoria em lote</option>' + catLoteOpts + '</select>'
         + '<button class="btn-sm" type="button" onclick="aplicarCategoriaEmLoteExtrato()">Aplicar categoria</button>'
@@ -2191,15 +2195,15 @@ function renderExtrato() {
     '<div class="summary-grid">'
     + '<div class="summary-card"><div class="s-label">Saldo</div><div class="s-val ' + (saldo >= 0 ? 'green' : 'red') + '">' + fmt(saldo) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Saldo inicial</div><div class="s-val blue">' + fmt(saldoInicialBase) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Créditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">D?bitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + filtradosFinanceiros.length + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Créditos</div><div class="s-val green">' + fmt(totalcrédito) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Débitos</div><div class="s-val red">' + fmt(totaldébito) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">' + filtradosFinanceiros.length + '</div></div>'
     + '</div>'
     + '<div class="extrato-panels-grid">'
     + extratoPanel('contas', 'Contas do cliente', contasPanelBody)
     + (relacionamentoAtivo ? extratoPanel('relacionamentos', 'Relacionamentos', relacionamentosPanelBody) : '')
     + extratoPanel('importar', 'Importar extrato via planilha', importarPanelBody)
-    + extratoPanel('novo', '+ Novo lancamento', novoPanelBody)
+    + extratoPanel('novo', '+ Novo Lançamento', novoPanelBody)
     + extratoPanel('filtros', 'Filtros', filtrosPanelBody)
     + '</div>'
     + (qtdDuplicadosPendentes
@@ -2213,8 +2217,8 @@ function renderExtrato() {
       if (!_exManterDuplicado[grupo.chave] && grupo.linhas[0]) _exManterDuplicado[grupo.chave] = grupo.linhas[0].id;
 
       html += '<div class="form-card" style="padding:12px 14px;margin-bottom:12px">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px"><p class="section-title" style="margin-bottom:0">Grupo ' + (gi + 1) + ' - ' + grupo.linhas.length + ' registros iguais</p><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="manterTodosDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Manter todos</button><button class="btn-sm red" onclick="removerDuplicadoGrupoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Excluir nao mantidos</button></span></div>'
-        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px"><p class="section-title" style="margin-bottom:0">Grupo ' + (gi + 1) + ' - ' + grupo.linhas.length + ' registros iguais</p><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="manterTodosDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Manter todos</button><button class="btn-sm red" onclick="removerDuplicadoGrupoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Excluir não mantidos</button></span></div>'
+        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descriçãoo</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
 
       grupo.linhas.forEach(l => {
         var realIdx = lncs.indexOf(l);
@@ -2222,7 +2226,7 @@ function renderExtrato() {
         var detalhes = [];
         if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
         if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
-        var concResumo = resumoConciliacaoLancamento(l);
+        var concResumo = resumoConciliacaoLançamento(l);
         if (concResumo) detalhes.push(concResumo);
         html += '<tr class="row-' + l.tipo + '">'
           + '<td><input type="radio" name="dup-' + gi + '" onchange="setManterDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\',\'' + encodeURIComponent(l.id) + '\')" ' + checked + '/></td>'
@@ -2232,7 +2236,7 @@ function renderExtrato() {
           + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
           + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
           + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
-          + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
+          + '<td><span class="val ' + (l.tipo === 'crédito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'crédito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
           + '<td><div class="row-actions">'
           + (financeiroPJAtivo && !extratoIgnoraConciliacao(l) ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
           + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
@@ -2246,7 +2250,7 @@ function renderExtrato() {
   if (false && _exMostrarDuplicados && dedupe.duplicados.length) {
     html += '<p class="section-title">Duplicados ocultos</p>'
       + '<table class="data-table" style="margin-bottom:18px">'
-      + '<thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
+      + '<thead><tr><th>Data</th><th>Descriçãoo</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...dedupe.duplicados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
@@ -2254,8 +2258,8 @@ function renderExtrato() {
         + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
         + '<td>' + esc(l.desc || '') + '</td>'
         + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
-        + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'credito' ? 'Receita' : 'Despesa') + '</span></td>'
-        + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
+        + '<td><span style="font-size:.79rem;color:' + (l.tipo === 'crédito' ? 'var(--success)' : 'var(--danger)') + '">' + (l.tipo === 'crédito' ? 'Receita' : 'Despesa') + '</span></td>'
+        + '<td><span class="val ' + (l.tipo === 'crédito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'crédito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
         + '<td><div class="row-actions"><button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
         + '</tr>';
     });
@@ -2263,13 +2267,13 @@ function renderExtrato() {
   }
 
   if (lncs.length === 0) {
-    html += '<div class="empty-state">Nenhum lancamento</div>';
+    html += '<div class="empty-state">Nenhum Lançamento</div>';
   } else if (filtrados.length === 0) {
-    html += '<div class="empty-state">Nenhum lancamento encontrado com os filtros atuais.</div>';
+    html += '<div class="empty-state">Nenhum Lançamento encontrado com os filtros atuais.</div>';
   } else {
     html += loteToolbarHtml;
     html += '<table class="data-table">';
-    html += '<thead><tr>' + (_exSelecaoLote ? '<th style="width:42px">Sel.</th>' : '') + '<th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
+    html += '<thead><tr>' + (_exSelecaoLote ? '<th style="width:42px">Sel.</th>' : '') + '<th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descriçãoo</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
     var colspanTabela = 6 + (_exSelecaoLote ? 1 : 0) + (centroCustoAtivo ? 1 : 0) + (relacionamentoAtivo ? 1 : 0);
     var filtradosOrdenados = [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
     var gruposDia = [];
@@ -2297,7 +2301,7 @@ function renderExtrato() {
       var detalhes = [];
       if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
       if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
-      var concResumo = resumoConciliacaoLancamento(l);
+      var concResumo = resumoConciliacaoLançamento(l);
       if (concResumo) detalhes.push(concResumo);
       var resumoEstorno = extratoResumoEstorno(c, l);
       if (resumoEstorno) detalhes.push(resumoEstorno);
@@ -2310,7 +2314,7 @@ function renderExtrato() {
         + (relacionamentoAtivo ? '<td style="color:var(--muted);font-size:.78rem">' + esc(nomeRelacionamentoPorId(c, l.relacionamentoId)) + '</td>' : '')
         + '<td>' + esc(l.desc || '') + (detalhes.length ? '<div style="color:var(--muted);font-size:.72rem;margin-top:3px">' + detalhes.join(' · ') + '</div>' : '') + '</td>'
         + '<td>' + extratoCategoriaBadgeHtml(l) + '</td>'
-        + '<td><span class="val ' + (l.tipo === 'credito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'credito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
+        + '<td><span class="val ' + (l.tipo === 'crédito' ? 'val-pos' : 'val-neg') + '">' + (l.tipo === 'crédito' ? '+ ' : '- ') + fmt(l.valor) + '</span></td>'
         + '<td><div class="row-actions">'
         + (financeiroPJAtivo && !extratoIgnoraConciliacao(l) ? '<button class="btn-icon" onclick="openExtratoConciliacaoModal(' + realIdx + ')" title="Conciliar">C</button>' : '')
         + '<button class="btn-icon" onclick="editExtrato(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteExtrato(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
@@ -2341,7 +2345,7 @@ function renderExtrato() {
   }
 }
 async function addExtrato() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var dataLanc = document.getElementById('ex-data').value;
   var desc = formatDescriptionTitleCase(document.getElementById('ex-desc').value);
   var cat = document.getElementById('ex-cat').value;
@@ -2362,7 +2366,7 @@ async function addExtrato() {
 
   const payload = {
     cliente_id: activeClient,
-    data_lancamento: dataLanc || null,
+    data_Lançamento: dataLanc || null,
     descricao: desc,
     descricao_original: desc,
     categoria: cat || null,
@@ -2379,7 +2383,7 @@ async function addExtrato() {
   if (error) {
     console.error(error);
     if (isMissingRelacionamentoSchemaError(error)) {
-      alert('Os campos de relacionamento ainda nao existem no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      alert('Os campos de relacionamento ainda não existem no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
       return;
     }
     alert('Erro ao salvar: ' + (error.message || 'erro desconhecido'));
@@ -2430,7 +2434,7 @@ async function importExtratoXlsx(event) {
       var tipo = inferirTipoImportadoExtrato(valorBruto);
       var valor = Math.abs(Number(valorBruto || 0));
       var cat = iCat >= 0 ? String(row[iCat] || 'Outros').trim() : 'Outros';
-      var historico = extratoSugestaoHistoricaImportacao(c, desc, tipo);
+      var historico = extratoSugestaoHistoricaImportacao(c, desc, tipo, valor);
       var rateioCategorias = [];
       if ((!cat || tfNormalizeText(cat) === 'outros') && historico && historico.categoria) {
         cat = historico.categoria;
@@ -2448,7 +2452,7 @@ async function importExtratoXlsx(event) {
 
       var referenciaMes = String(dataFmt || '').slice(0, 7);
       if (referenciaMes && extratoPeriodoFechado(dataFmt) && !mesesConfirmados[referenciaMes]) {
-        var seguirImportando = await appConfirm('A importação contém lançamentos em ' + (typeof tfMonthLabel === 'function' ? tfMonthLabel(referenciaMes) : referenciaMes) + ', que já está fechado. Deseja importar mesmo assim?', {
+        var seguirImportando = await appConfirm('A importaçãoo contém lançamentos em ' + (typeof tfMonthLabel === 'function' ? tfMonthLabel(referenciaMes) : referenciaMes) + ', que já está fechado. Deseja importar mesmo assim?', {
           title: 'Período fechado',
           confirmText: 'Importar mesmo assim'
         });
@@ -2467,7 +2471,7 @@ async function importExtratoXlsx(event) {
         && (l.contaId || '') === contaId
       );
 
-      if (duplicado && !(await appConfirm('Já existe um lançamento nessa conta com a mesma data, descrição, valor e tipo: "' + desc + '". Deseja importar novamente?', { title: 'Lançamento duplicado', confirmText: 'Importar novamente' }))) {
+      if (duplicado && !(await appConfirm('Já existe um lançamento nessa conta com a mesma data, descriçãoo, valor e tipo: "' + desc + '". Deseja importar novamente?', { title: 'Lançamento duplicado', confirmText: 'Importar novamente' }))) {
         continue;
       }
 
@@ -2475,7 +2479,7 @@ async function importExtratoXlsx(event) {
 
       const { error } = await insertLancamentoComFallback({
         cliente_id: activeClient,
-        data_lancamento: dataFmt || null,
+        data_Lançamento: dataFmt || null,
         descricao: desc,
         descricao_original: desc,
         categoria: cat || 'Outros',
@@ -2521,24 +2525,24 @@ function openExtratoEditModal(i) {
   document.getElementById('modalBody').innerHTML =
     '<div class="form-row">'
     + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="date" id="ex-edit-data" value="' + esc(lanc.data || '') + '"/></div>'
-    + '<div class="form-group"><label>Descrição</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex.: salário, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
+    + '<div class="form-group"><label>Descriçãoo</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex.: salário, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '</div>'
     + '<div class="form-row">'
-    + '<div class="form-group"><label>Descrição do banco</label><input type="text" id="ex-edit-desc-original" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div>'
+    + '<div class="form-group"><label>Descriçãoo do banco</label><input type="text" id="ex-edit-desc-original" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:190px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-edit-cat">' + catOpts + '</select></div>'
     + (extratoCentroCustoAtivo() ? '<div class="form-group" style="max-width:220px"><label>Centro de custo</label><select id="ex-edit-centro-custo">' + centrosCustoOptionsCliente(lanc.centroCustoId || '', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-edit-conta">' + contasOptionsCliente(lanc.contaId || '') + '</select></div>'
     + (extratoRelacionamentoAtivo() ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-edit-relacionamento">' + relacionamentoOptionsCliente(lanc.relacionamentoId || '', true) + '</select></div>' : '')
-    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="credito"' + (lanc.tipo === 'credito' ? ' selected' : '') + '>Crédito</option><option value="debito"' + (lanc.tipo === 'debito' ? ' selected' : '') + '>Débito</option></select></div>'
+    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="crédito"' + (lanc.tipo === 'crédito' ? ' selected' : '') + '>Crédito</option><option value="débito"' + (lanc.tipo === 'débito' ? ' selected' : '') + '>Débito</option></select></div>'
     + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="ex-edit-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
     + (extratoRelacionamentoAtivo() ? '<div id="ex-edit-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
-    + '<div class="form-row"><div class="form-group"><label>Observação</label><input type="text" id="ex-edit-obs" value="' + esc(lanc.observacao || '') + '" placeholder="Opcional. Ex.: pagamento pessoal feito para a empresa."/></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>Observaçãoo</label><input type="text" id="ex-edit-obs" value="' + esc(lanc.observacao || '') + '" placeholder="Opcional. Ex.: pagamento pessoal feito para a empresa."/></div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
     + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
-    + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveExtratoEditModal(' + i + ')">Salvar alterações</button>'
+    + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveExtratoEditModal(' + i + ')">Salvar alteraçõeses</button>'
     + '</div>';
 
   document.getElementById('modalOverlay').classList.add('open');
@@ -2632,6 +2636,19 @@ function extratoPontuarTituloConciliacao(lanc, titulo, restante) {
     motivos.push('descricao exata');
   }
 
+  if (lanc && lanc.data && titulo && titulo.vencimento) {
+    var diffDias = Math.abs(Math.round((new Date(titulo.vencimento).getTime() - new Date(lanc.data).getTime()) / 86400000));
+    if (!isNaN(diffDias)) {
+      if (diffDias <= 3) {
+        score += 16;
+        motivos.push('data muito próxima');
+      } else if (diffDias <= 10) {
+        score += 8;
+        motivos.push('data próxima');
+      }
+    }
+  }
+
   if (tfStatusOf(titulo) === 'atrasado') {
     score += 6;
     motivos.push('titulo vencido');
@@ -2666,7 +2683,7 @@ function extratoSugestoesConciliacao(lanc, natureza, restante) {
 function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
   if (!sugestoes.length) return '';
   return '<div class="settings-section-card" style="margin-bottom:16px">'
-    + '<div class="settings-card-head"><div><h5>Sugestões de conciliação</h5><p>O Granafy analisou valor, nome e descrição para sugerir os títulos mais prováveis.</p></div></div>'
+    + '<div class="settings-card-head"><div><h5>Sugestões de conciliaçãoo</h5><p>O Granafy analisou valor, nome e descriçãoo para sugerir os títulos mais prováveis.</p></div></div>'
     + '<div class="summary-grid pending-grid">'
     + sugestoes.map(function(item) {
       return '<div class="summary-card pending-card">'
@@ -2687,13 +2704,13 @@ function extratoSelecionarSugestaoConciliacao(tituloId, restante) {
   syncExtratoConciliacaoValor(restante);
 }
 
-function syncExtratoConciliacaoValor(lancamentoValor) {
+function syncExtratoConciliacaoValor(LançamentoValor) {
   var select = document.getElementById('ex-conciliar-titulo');
   var valorInput = document.getElementById('ex-conciliar-valor');
   if (!select || !valorInput) return;
   var option = select.options[select.selectedIndex];
   var saldo = option ? Number(option.dataset.saldo || 0) : 0;
-  var restante = Number(lancamentoValor || 0);
+  var restante = Number(LançamentoValor || 0);
   if (!saldo || !restante) {
     valorInput.value = '0,00';
     valorInput.dataset.cents = '0';
@@ -2705,19 +2722,19 @@ function syncExtratoConciliacaoValor(lancamentoValor) {
 }
 
 function openExtratoConciliacaoModal(i) {
-  if (!clienteAtivoEhPJ()) return alert('A conciliação financeira está disponível apenas para clientes PJ.');
+  if (!clienteAtivoEhPJ()) return alert('A conciliaçãoo financeira está disponível apenas para clientes PJ.');
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
 
-  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'crédito');
   var naturezaLabel = natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
   var acaoLabel = natureza === 'receber' ? 'Conciliar recebimento' : 'Conciliar pagamento';
   var conciliado = valorConciliadoDoLancamento(lanc);
   var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
   var sugestoes = extratoSugestoesConciliacao(lanc, natureza, restante);
   var tituloSugeridoId = sugestoes.length ? sugestoes[0].id : '';
-  var baixas = baixasFinanceirasDoLancamento(lanc);
+  var baixas = baixasFinanceirasDoLançamento(lanc);
   var baixasHtml = baixas.length
     ? baixas.map(function(item) {
         return '<div class="tf-baixa-item">'
@@ -2725,22 +2742,22 @@ function openExtratoConciliacaoModal(i) {
           + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.baixa.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoBaixa(\'' + esc(lanc.id) + '\',\'' + esc(item.tituloId) + '\',\'' + esc(item.baixa.id) + '\',' + i + ')" title="Desconciliar">&#128465;</button></div>'
           + '</div>';
       }).join('')
-    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliação registrada neste lançamento.</div>';
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliaçãoo registrada neste lançamento.</div>';
 
   document.getElementById('modalTitle').textContent = acaoLabel;
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-card-badges" style="margin:0 0 18px 0">'
       + '<span class="settings-card-badge">' + esc(naturezaLabel) + '</span>'
-      + '<span class="settings-card-badge subtle">Lancamento ' + fmt(lanc.valor || 0) + '</span>'
+      + '<span class="settings-card-badge subtle">Lançamento ' + fmt(lanc.valor || 0) + '</span>'
       + '<span class="settings-card-badge subtle">Conciliado ' + fmt(conciliado) + '</span>'
       + '<span class="settings-card-badge subtle">Restante ' + fmt(restante) + '</span>'
     + '</div>'
     + '<div class="settings-section-card" style="margin-bottom:16px">'
-      + '<div class="settings-card-head"><div><h5>Lancamento do extrato</h5><p>Use este credito ou debito do banco para baixar um titulo financeiro do cliente PJ.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Lançamento do extrato</h5><p>Use este crédito ou débito do banco para baixar um título financeiro do cliente PJ.</p></div></div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="text" value="' + esc(formatDate(lanc.data)) + '" readonly/></div>'
         + '<div class="form-group" style="max-width:180px"><label>Conta</label><input type="text" value="' + esc(nomeContaPorId(c, lanc.contaId)) + '" readonly/></div>'
-        + '<div class="form-group" style="max-width:160px"><label>Tipo</label><input type="text" value="' + esc(lanc.tipo === 'credito' ? 'Crédito' : 'Débito') + '" readonly/></div>'
+        + '<div class="form-group" style="max-width:160px"><label>Tipo</label><input type="text" value="' + esc(lanc.tipo === 'crédito' ? 'Crédito' : 'Débito') + '" readonly/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor</label><input type="text" value="' + esc(fmt(lanc.valor || 0)) + '" readonly/></div>'
       + '</div>'
       + '<div class="form-row"><div class="form-group"><label>Descrição do banco</label><input type="text" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div></div>'
@@ -2751,7 +2768,7 @@ function openExtratoConciliacaoModal(i) {
       + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Você pode vincular este lançamento a mais de um título, desde que o total conciliado não ultrapasse o valor do banco.</p></div></div>'
       + baixasHtml
       + '<div class="form-row" style="margin-top:16px">'
-        + '<div class="form-group"><label>T?tulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+        + '<div class="form-group"><label>Título para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
@@ -2759,7 +2776,7 @@ function openExtratoConciliacaoModal(i) {
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
         + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
-        + '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLancamento(' + i + ')">' + acaoLabel + '</button>'
+        + '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLançamento(' + i + ')">' + acaoLabel + '</button>'
       + '</div>'
     + '</div>';
 
@@ -2769,12 +2786,12 @@ function openExtratoConciliacaoModal(i) {
   syncExtratoConciliacaoValor(restante);
 }
 
-async function conciliarExtratoLancamento(i) {
+async function conciliarExtratoLançamento(i) {
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
 
-  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'crédito');
   var tituloId = ((document.getElementById('ex-conciliar-titulo') || {}).value) || '';
   var valor = parseMoney(document.getElementById('ex-conciliar-valor'));
   var observacao = ((document.getElementById('ex-conciliar-obs') || {}).value || '').trim();
@@ -2782,14 +2799,14 @@ async function conciliarExtratoLancamento(i) {
   if (!tituloId) return alert('Selecione um titulo para conciliar.');
   if (!valor || valor <= 0) return alert('Informe um valor de baixa maior que zero.');
 
-  if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
+  if (typeof tfFindTituloById !== 'function') return alert('O módulo Financeiro não está disponível neste momento.');
   var titulo = tfFindTituloById(tituloId);
-  if (!titulo) return alert('Titulo nao encontrado.');
+  if (!titulo) return alert('Titulo não encontrado.');
 
   var saldoTitulo = tfSaldo(titulo);
   var restanteLanc = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
   if (valor > saldoTitulo) return alert('O valor informado ultrapassa o saldo do titulo.');
-  if (valor > restanteLanc) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+  if (valor > restanteLanc) return alert('O valor informado ultrapassa o restante disponível deste lançamento.');
 
   var response = await supabaseClient
     .from('titulos_financeiros_baixas')
@@ -2807,7 +2824,7 @@ async function conciliarExtratoLancamento(i) {
 
   if (response.error) {
     console.error(response.error);
-    alert('Não foi possível conciliar este lançamento. Verifique se a migração 20260520_titulos_financeiros_pj.sql já foi aplicada no Supabase.');
+    alert('Não foi possível conciliar este lançamento. Verifique se a migraçãoo 20260520_titulos_financeiros_pj.sql já foi aplicada no Supabase.');
     return;
   }
 
@@ -2818,19 +2835,19 @@ async function conciliarExtratoLancamento(i) {
     valor: Number(response.data.valor || 0),
     observacao: response.data.observacao || '',
     origem: response.data.origem || 'extrato',
-    lancamentoId: response.data.extrato_lancamento_id || null,
+    LançamentoId: response.data.extrato_lancamento_id || null,
     userId: response.data.user_id || null
   });
 
   closeModal();
-  if (_exFiltroConciliacao === 'nao_conciliados') {
+  if (_exFiltroConciliacao === 'não_conciliados') {
     _exFiltroConciliacao = 'todos';
   }
   await loadData();
   renderExtrato();
 }
 
-async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extratoIdx) {
+async function desconciliarExtratoBaixa(LançamentoId, tituloId, baixaId, extratoIdx) {
   var ok = await appConfirm('Desconciliar esta baixa do extrato?', { title: 'Desconciliar baixa', confirmText: 'Desconciliar' });
   if (!ok) return;
 
@@ -2843,7 +2860,7 @@ async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extrato
 
   if (response.error) {
     console.error(response.error);
-    alert('Não foi possível desfazer a conciliação.');
+    alert('Não foi possível desfazer a conciliaçãoo.');
     return;
   }
 
@@ -2858,19 +2875,19 @@ async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extrato
   await loadData();
   renderExtrato();
   var cAtual = data.clients[activeClient];
-  var novoIdx = cAtual && cAtual.extrato ? cAtual.extrato.findIndex(function(item) { return item.id === lancamentoId; }) : -1;
+  var novoIdx = cAtual && cAtual.extrato ? cAtual.extrato.findIndex(function(item) { return item.id === LançamentoId; }) : -1;
   if (novoIdx >= 0) openExtratoConciliacaoModal(novoIdx);
 }
 
 async function deleteExtrato(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var c = data.clients[activeClient];
   var lanc = c.extrato[i];
 
   if (!lanc) return;
 
   var origensEstorno = (c.extrato || []).filter(function(item) {
-    return item && item.estornoLancamentoId === lanc.id;
+    return item && item.estornoLançamentoId === lanc.id;
   });
   if (origensEstorno.length) {
     const { error: estornoError } = await applyUserScope(
@@ -2878,7 +2895,7 @@ async function deleteExtrato(i) {
         .from('lancamentos')
         .update({
           status_estorno: 'pendente_estorno',
-          estorno_lancamento_id: null,
+          estorno_Lançamento_id: null,
           estorno_data: null
         })
         .in('id', origensEstorno.map(function(item) { return item.id; }))
@@ -2902,7 +2919,7 @@ async function deleteExtrato(i) {
       );
       if (baixaError) {
         console.error(baixaError);
-        alert('Não foi possível remover as conciliações financeiras antes de excluir o lançamento.');
+        alert('Não foi possível remover as conciliaçõeses financeiras antes de excluir o lançamento.');
         return;
       }
     }
@@ -2931,12 +2948,12 @@ async function deleteExtrato(i) {
 }
 
 async function editExtrato(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   openExtratoEditModal(i);
 }
 
 async function saveExtratoEditModal(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
@@ -2949,25 +2966,25 @@ async function saveExtratoEditModal(i) {
   var novaContaId = document.getElementById('ex-edit-conta').value || null;
   var relField = document.getElementById('ex-edit-relacionamento');
   var novoRelacionamentoId = extratoRelacionamentoAtivo() && relField ? (relField.value || null) : null;
-  var novoTipo = document.getElementById('ex-edit-tipo').value === 'credito' ? 'credito' : 'debito';
+  var novoTipo = document.getElementById('ex-edit-tipo').value === 'crédito' ? 'crédito' : 'débito';
   var novoValor = parseMoney(document.getElementById('ex-edit-valor'));
   var novaObservacao = document.getElementById('ex-edit-obs').value.trim();
   var origemEstorno = extratoLancamentoOrigemDoEstorno(c, lanc.id);
 
-  if (!novaDesc || !novoValor) return alert('Descrição e valor são obrigatórios.');
+  if (!novaDesc || !novoValor) return alert('Descriçãoo e valor são obrigatórios.');
 
   var valorConciliado = valorConciliadoDoLancamento(lanc);
-  if (valorConciliado > 0 && novoTipo !== (lanc.tipo || 'credito')) {
-    return alert('Desfaça primeiro a conciliação financeira antes de mudar o tipo deste lançamento.');
+  if (valorConciliado > 0 && novoTipo !== (lanc.tipo || 'crédito')) {
+    return alert('Desfaça primeiro a conciliaçãoo financeira antes de mudar o tipo deste lançamento.');
   }
   if (valorConciliado > 0 && Number(novoValor || 0) < valorConciliado) {
-    return alert('O novo valor nao pode ser menor que o valor ja conciliado no Financeiro.');
+    return alert('O novo valor não pode ser menor que o valor ja conciliado no Financeiro.');
   }
-  if (origemEstorno && novoTipo !== (lanc.tipo || 'credito')) {
-    return alert('Esse lancamento esta vinculado como estorno de outro registro. Desfaca o vinculo antes de mudar o tipo.');
+  if (origemEstorno && novoTipo !== (lanc.tipo || 'crédito')) {
+    return alert('Esse Lançamento esta vinculado como estorno de outro registro. Desfaça o vínculo antes de mudar o tipo.');
   }
   if (origemEstorno && Math.abs(Number(novoValor || 0) - Number(lanc.valor || 0)) >= 0.005) {
-    return alert('Esse lancamento esta vinculado como estorno de outro registro. Desfaca o vinculo antes de alterar o valor.');
+    return alert('Esse Lançamento esta vinculado como estorno de outro registro. Desfaça o vínculo antes de alterar o valor.');
   }
 
   if (!(await extratoConfirmarPeriodoFechado(novaData || lanc.data || '', 'salvar este lançamento'))) {
@@ -2978,7 +2995,7 @@ async function saveExtratoEditModal(i) {
     supabaseClient
       .from('lancamentos')
       .update({
-        data_lancamento: novaData || null,
+        data_Lançamento: novaData || null,
         descricao: novaDesc,
         descricao_original: descOriginal || lanc.descOriginal || lanc.desc || null,
         categoria: novaCat || null,
@@ -2993,9 +3010,9 @@ async function saveExtratoEditModal(i) {
   );
 
   if (error) {
-    console.error('Erro ao editar lancamento:', error);
+    console.error('Erro ao editar Lançamento:', error);
     if (isMissingRelacionamentoSchemaError(error)) {
-      alert('Os campos de relacionamento ainda nao existem no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
+      alert('Os campos de relacionamento ainda não existem no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
       return;
     }
     alert('Não foi possível editar o lançamento: ' + (error.message || 'erro desconhecido'));
@@ -3005,4 +3022,86 @@ async function saveExtratoEditModal(i) {
   await loadData();
   closeModal();
   renderExtrato();
+}
+
+function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
+  if (!sugestoes.length) return '';
+  return '<div class="settings-section-card" style="margin-bottom:16px">'
+    + '<div class="settings-card-head"><div><h5>Sugestões de conciliaçãoo</h5><p>O Granafy analisou valor, nome, descriçãoo e data para sugerir os títulos mais prováveis.</p></div></div>'
+    + '<div class="summary-grid pending-grid">'
+    + sugestoes.map(function(item) {
+      return '<div class="summary-card pending-card">'
+        + '<div class="s-label">' + esc(item.pessoaNome) + '</div>'
+        + '<div class="pending-meta">' + esc(item.descricao) + '</div>'
+        + '<div class="pending-meta">Saldo ' + fmt(item.saldo) + ' · ' + esc(item.motivos.join(' · ')) + '</div>'
+        + '<button class="btn-sm" type="button" onclick="extratoSelecionarSugestaoConciliacao(\'' + esc(item.id) + '\',' + Number(restante || 0) + ')">Usar sugestão</button>'
+      + '</div>';
+    }).join('')
+    + '</div>'
+  + '</div>';
+}
+
+function openExtratoConciliacaoModal(i) {
+  if (!clienteAtivoEhPJ()) return alert('A conciliaçãoo financeira está disponível apenas para clientes PJ.');
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'crédito');
+  var naturezaLabel = natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
+  var acaoLabel = natureza === 'receber' ? 'Conciliar recebimento' : 'Conciliar pagamento';
+  var conciliado = valorConciliadoDoLancamento(lanc);
+  var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var sugestoes = extratoSugestoesConciliacao(lanc, natureza, restante);
+  var tituloSugeridoId = sugestoes.length ? sugestoes[0].id : '';
+  var baixas = baixasFinanceirasDoLançamento(lanc);
+  var baixasHtml = baixas.length
+    ? baixas.map(function(item) {
+        return '<div class="tf-baixa-item">'
+          + '<div><strong>' + esc(item.tituloPessoa || '-') + '</strong><small>' + esc(item.tituloDescricao || '-') + ' · ' + esc(formatDate(item.baixa.data)) + '</small></div>'
+          + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.baixa.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoBaixa(\'' + esc(lanc.id) + '\',\'' + esc(item.tituloId) + '\',\'' + esc(item.baixa.id) + '\',' + i + ')" title="Desconciliar">&#128465;</button></div>'
+          + '</div>';
+      }).join('')
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliaçãoo registrada neste lançamento.</div>';
+
+  document.getElementById('modalTitle').textContent = acaoLabel;
+  document.getElementById('modalBody').innerHTML =
+    '<div class="settings-card-badges" style="margin:0 0 18px 0">'
+      + '<span class="settings-card-badge">' + esc(naturezaLabel) + '</span>'
+      + '<span class="settings-card-badge subtle">Lançamento ' + fmt(lanc.valor || 0) + '</span>'
+      + '<span class="settings-card-badge subtle">Conciliado ' + fmt(conciliado) + '</span>'
+      + '<span class="settings-card-badge subtle">Restante ' + fmt(restante) + '</span>'
+    + '</div>'
+    + '<div class="settings-section-card" style="margin-bottom:16px">'
+      + '<div class="settings-card-head"><div><h5>Lançamento do extrato</h5><p>Use este crédito ou débito do banco para baixar um título financeiro do cliente PJ.</p></div></div>'
+      + '<div class="form-row">'
+        + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="text" value="' + esc(formatDate(lanc.data)) + '" readonly/></div>'
+        + '<div class="form-group" style="max-width:180px"><label>Conta</label><input type="text" value="' + esc(nomeContaPorId(c, lanc.contaId)) + '" readonly/></div>'
+        + '<div class="form-group" style="max-width:160px"><label>Tipo</label><input type="text" value="' + esc(lanc.tipo === 'crédito' ? 'Crédito' : 'Débito') + '" readonly/></div>'
+        + '<div class="form-group" style="max-width:170px"><label>Valor</label><input type="text" value="' + esc(fmt(lanc.valor || 0)) + '" readonly/></div>'
+      + '</div>'
+      + '<div class="form-row"><div class="form-group"><label>Descriçãoo do banco</label><input type="text" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div></div>'
+      + (extratoRelacionamentoAtivo() && lanc.relacionamentoId ? '<div class="form-row"><div class="form-group"><label>Relacionado a</label><input type="text" value="' + esc(nomeRelacionamentoPorId(c, lanc.relacionamentoId)) + '" readonly/></div></div>' : '')
+    + '</div>'
+    + extratoSugestoesConciliacaoHtml(sugestoes, restante)
+    + '<div class="settings-section-card">'
+      + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Você pode vincular este lançamento a mais de um título, desde que o total conciliado não ultrapasse o valor do banco.</p></div></div>'
+      + baixasHtml
+      + '<div class="form-row" style="margin-top:16px">'
+        + '<div class="form-group"><label>Título para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+      + '</div>'
+      + '<div class="form-row">'
+        + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+        + '<div class="form-group"><label>Observaçãoo</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: recebimento parcial, pagamento a fornecedor"/></div>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
+        + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
+        + '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLançamento(' + i + ')">' + acaoLabel + '</button>'
+      + '</div>'
+    + '</div>';
+
+  document.getElementById('modalOverlay').classList.add('open');
+  document.addEventListener('keydown', handleMainModalEscape);
+  initMoneyInputs(document.getElementById('modalBody'));
+  syncExtratoConciliacaoValor(restante);
 }
