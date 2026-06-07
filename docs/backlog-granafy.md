@@ -2,41 +2,47 @@
 
 Backlog vivo do produto, organizado por prioridade e contexto operacional.
 
-## Agora
+## Em andamento
 
 ### Painel de pendencias
-- Mostrar nao conciliados do Extrato
-- Mostrar pendentes de estorno
-- Mostrar titulos vencidos
-- Mostrar titulos recebidos/pagos parcialmente
-- Mostrar lancamentos com rateio
-- Virar uma tela de trabalho do dia
+- Base ja publicada no Financeiro
+- Mostra:
+  - nao conciliados do Extrato
+  - pendentes de estorno
+  - titulos vencidos
+  - titulos recebidos/pagos parcialmente
+  - lancamentos com rateio
+- Proximo passo:
+  - virar uma tela de trabalho ainda mais operacional
 
 ### Conciliacao inteligente
-- Sugerir automaticamente qual titulo financeiro combina com o lancamento do Extrato
-- Considerar:
+- Primeira versao ja iniciada no modal do Extrato
+- Sugere automaticamente titulos por:
   - valor
   - nome da pessoa / fornecedor
-  - data proxima
+  - descricao parecida
   - status do titulo
-- Permitir aceitar a sugestao com menos cliques
+- Proximo passo:
+  - refinar relevancia
+  - incluir mais contexto de data
+  - medir acerto em casos reais
 
-### Saldo inicial por conta
-- Definir saldo inicial oficial por conta
-- Usar esse saldo como base para o saldo acumulado do Extrato
-- Preparar abertura por periodo quando necessario
+### Dashboards executivos
+- Primeira versao ja iniciada no Financeiro
+- Cards atuais:
+  - recebido no mes
+  - pago no mes
+  - liquido do mes
+  - conciliacao do mes
+  - devolucoes pendentes
+  - previsao liquida
+- Blocos atuais:
+  - maiores valores a receber
+  - maiores valores a pagar
+- Proximo passo:
+  - amadurecer indicadores de inadimplencia e estornos
 
-### Caixa / dinheiro em especie
-- Tratar especie como conta
-- Exemplos:
-  - Caixa
-  - Caixa loja
-  - Caixa operacional
-- Permitir:
-  - entrada em dinheiro
-  - saida em dinheiro
-  - deposito no banco
-  - transferencia entre caixa e banco
+## Agora
 
 ### Titulos recorrentes no Financeiro
 - Criar contas recorrentes
@@ -54,14 +60,6 @@ Backlog vivo do produto, organizado por prioridade e contexto operacional.
   - alterou rateio
   - mudou categoria
 - Melhorar rastreabilidade para operacao compartilhada
-
-### Dashboards executivos
-- Recebido no mes
-- A receber do mes
-- Inadimplencia
-- Devolucoes
-- Estornos
-- Visao mais gerencial para PJ
 
 ### Importacao mais inteligente
 - Aprender padroes do extrato
@@ -95,6 +93,14 @@ Backlog vivo do produto, organizado por prioridade e contexto operacional.
 - Sugerir rateio com base em historico
 - Filtro so de lancamentos rateados
 
+### Concluido recente
+- Saldo inicial por conta
+  - saldo inicial oficial por conta
+  - base do saldo acumulado do Extrato
+- Caixa / dinheiro em especie
+  - conta do tipo caixa
+  - especie tratada como conta operacional
+
 ## Guardado
 
 ### LGPD - pendentes do fim de semana
@@ -125,10 +131,10 @@ Backlog vivo do produto, organizado por prioridade e contexto operacional.
 ## Observacoes
 
 - Prioridade atual recomendada:
-  1. Painel de pendencias
-  2. Conciliacao inteligente
-  3. Saldo inicial por conta
-  4. Caixa / dinheiro em especie
-  5. Titulos recorrentes
+  1. Conciliacao inteligente
+  2. Dashboards executivos
+  3. Titulos recorrentes no Financeiro
+  4. Importacao mais inteligente
+  5. Auditoria financeira
 
 - Este backlog deve ser revisado sempre que uma frente nova entrar em producao ou mudar de prioridade.

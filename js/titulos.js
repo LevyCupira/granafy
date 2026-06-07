@@ -169,6 +169,94 @@ function tfSummaryValues() {
   };
 }
 
+function tfCurrentMonthKey() {
+  var now = new Date();
+  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+}
+
+function tfMonthLabel(key) {
+  var parts = String(key || '').split('-');
+  if (parts.length !== 2) return key || '-';
+  return parts[1] + '/' + parts[0];
+}
+
+function tfLancamentoContaComoInicial(lanc) {
+  return typeof extratoLancamentoEhSaldoInicial === 'function' ? extratoLancamentoEhSaldoInicial(lanc) : false;
+}
+
+function tfResumoExecutivo() {
+  var cliente = tfClienteAtivo();
+  var resumo = tfSummaryValues();
+  var mesAtual = tfCurrentMonthKey();
+  var extrato = cliente && Array.isArray(cliente.extrato) ? cliente.extrato : [];
+  var titulos = tfTitulosCliente();
+  var extratoOperacional = extrato.filter(function(lanc) {
+    return !tfLancamentoContaComoInicial(lanc);
+  });
+  var extratoMes = extratoOperacional.filter(function(lanc) {
+    return String(lanc.data || '').slice(0, 7) === mesAtual;
+  });
+  var recebidoMes = extratoMes.filter(function(lanc) { return lanc.tipo === 'credito'; }).reduce(function(total, lanc) {
+    return total + Number(lanc.valor || 0);
+  }, 0);
+  var pagoMes = extratoMes.filter(function(lanc) { return lanc.tipo === 'debito'; }).reduce(function(total, lanc) {
+    return total + Number(lanc.valor || 0);
+  }, 0);
+  var devolucoesPendentes = extratoOperacional.filter(function(lanc) {
+    return typeof extratoStatusEstornoValor === 'function' && extratoStatusEstornoValor(lanc) === 'pendente_estorno';
+  });
+  var devolucoesPendentesValor = devolucoesPendentes.reduce(function(total, lanc) {
+    return total + Math.abs(Number(lanc.valor || 0));
+  }, 0);
+  var elegiveisMes = extratoMes.filter(function(lanc) {
+    return typeof extratoIgnoraConciliacao === 'function' ? !extratoIgnoraConciliacao(lanc) : true;
+  });
+  var conciliadosMes = elegiveisMes.filter(function(lanc) {
+    return typeof extratoResolvidoConciliacao === 'function' ? extratoResolvidoConciliacao(cliente, lanc) : false;
+  });
+  var taxaConciliacaoMes = elegiveisMes.length ? (conciliadosMes.length / elegiveisMes.length) * 100 : 100;
+  var receberAbertos = titulos.filter(function(item) {
+    return item.natureza === 'receber' && tfSaldo(item) > 0;
+  }).sort(function(a, b) {
+    return tfSaldo(b) - tfSaldo(a);
+  }).slice(0, 5);
+  var pagarAbertos = titulos.filter(function(item) {
+    return item.natureza === 'pagar' && tfSaldo(item) > 0;
+  }).sort(function(a, b) {
+    return tfSaldo(b) - tfSaldo(a);
+  }).slice(0, 5);
+
+  return {
+    mesAtual: mesAtual,
+    recebidoMes: recebidoMes,
+    pagoMes: pagoMes,
+    liquidoMes: recebidoMes - pagoMes,
+    taxaConciliacaoMes: taxaConciliacaoMes,
+    extratoElegiveisMes: elegiveisMes.length,
+    extratoConciliadosMes: conciliadosMes.length,
+    devolucoesPendentesCount: devolucoesPendentes.length,
+    devolucoesPendentesValor: devolucoesPendentesValor,
+    previsaoLiquida: resumo.receber - resumo.pagar,
+    topReceber: receberAbertos,
+    topPagar: pagarAbertos
+  };
+}
+
+function tfResumoExecutivoListaHtml(items, natureza) {
+  if (!items.length) {
+    return '<div class="pending-meta">Nenhum titulo aberto relevante.</div>';
+  }
+  return '<div class="financeiro-exec-list">'
+    + items.map(function(item) {
+      return '<div class="financeiro-exec-item">'
+        + '<strong>' + esc(item.pessoaNome || '-') + '</strong>'
+        + '<span>' + esc(item.descricao || '-') + '</span>'
+        + '<span class="' + (natureza === 'receber' ? 'green' : 'red') + '">' + fmt(tfSaldo(item)) + '</span>'
+      + '</div>';
+    }).join('')
+    + '</div>';
+}
+
 function tfPendenciasResumo() {
   var cliente = tfClienteAtivo();
   var pendencias = {
@@ -738,6 +826,7 @@ function renderFinanceiro() {
 
   var resumo = tfSummaryValues();
   var pendencias = tfPendenciasResumo();
+  var executivo = tfResumoExecutivo();
   var tituloAtivo = tfTituloAtivoLabel();
   var pessoaLabel = _tfNatureza === 'pagar' ? 'Favorecido / fornecedor' : 'Cliente pagador';
   var btnLabel = _tfNatureza === 'pagar' ? 'Cadastrar conta a pagar' : 'Cadastrar conta a receber';
@@ -762,6 +851,22 @@ function renderFinanceiro() {
           + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
+    + '</div>'
+    + '<div class="form-card">'
+      + '<h3>Dashboard executivo</h3>'
+      + '<p class="cartao-helper-text">Leitura rapida do caixa e da operacao financeira em ' + esc(tfMonthLabel(executivo.mesAtual)) + '.</p>'
+      + '<div class="summary-grid pending-grid">'
+        + '<div class="summary-card pending-card"><div class="s-label">Recebido no mes</div><div class="s-val green">' + fmt(executivo.recebidoMes) + '</div><div class="pending-meta">' + esc(tfMonthLabel(executivo.mesAtual)) + '</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Pago no mes</div><div class="s-val red">' + fmt(executivo.pagoMes) + '</div><div class="pending-meta">' + esc(tfMonthLabel(executivo.mesAtual)) + '</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Liquido do mes</div><div class="s-val ' + (executivo.liquidoMes >= 0 ? 'green' : 'red') + '">' + fmt(executivo.liquidoMes) + '</div><div class="pending-meta">Recebido menos pago</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Conciliacao do mes</div><div class="s-val blue">' + Number(executivo.taxaConciliacaoMes || 0).toFixed(0) + '%</div><div class="pending-meta">' + executivo.extratoConciliadosMes + ' de ' + executivo.extratoElegiveisMes + ' resolvidos</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Devolucoes pendentes</div><div class="s-val yellow">' + executivo.devolucoesPendentesCount + '</div><div class="pending-meta">' + fmt(executivo.devolucoesPendentesValor) + '</div></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Previsao liquida</div><div class="s-val ' + (executivo.previsaoLiquida >= 0 ? 'green' : 'red') + '">' + fmt(executivo.previsaoLiquida) + '</div><div class="pending-meta">A receber aberto menos a pagar aberto</div></div>'
+      + '</div>'
+      + '<div class="financeiro-exec-split">'
+        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Maiores valores a receber</h5><p>Titulos abertos com maior impacto no caixa.</p></div></div>' + tfResumoExecutivoListaHtml(executivo.topReceber, 'receber') + '</div>'
+        + '<div class="settings-section-card"><div class="settings-card-head"><div><h5>Maiores valores a pagar</h5><p>Saidas abertas que merecem acompanhamento de perto.</p></div></div>' + tfResumoExecutivoListaHtml(executivo.topPagar, 'pagar') + '</div>'
+      + '</div>'
     + '</div>'
     + '<div class="form-card">'
       + '<h3>Painel de pendencias</h3>'

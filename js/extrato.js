@@ -135,9 +135,18 @@ function extratoValorBate(lanc) {
 function atualizarPlaceholdersFiltrosExtrato() {
   var periodoInput = document.getElementById('ex-filtro-periodo');
   var periodoModo = document.getElementById('ex-filtro-periodo-modo');
+  var valorModo = document.getElementById('ex-filtro-valor-modo');
+  var valorInput = document.getElementById('ex-filtro-valor');
   if (periodoInput && periodoModo) {
     var modo = periodoModo.value || 'mes';
     periodoInput.placeholder = modo === 'dia' ? 'dd/mm/aaaa' : (modo === 'ano' ? 'aaaa' : 'mm/aaaa');
+  }
+  if (valorInput && valorModo) {
+    var modoValor = valorModo.value || 'todos';
+    var desabilitado = modoValor === 'todos';
+    valorInput.disabled = desabilitado;
+    valorInput.placeholder = desabilitado ? 'Nao usado' : '0,00';
+    valorInput.style.opacity = desabilitado ? '0.65' : '';
   }
 }
 
@@ -331,6 +340,14 @@ function extratoIgnoraConciliacao(lanc) {
   return extratoLancamentoEhSaldoInicial(lanc);
 }
 
+function extratoLancamentoTemEstornoResolvido(cliente, lanc) {
+  if (!cliente || !lanc) return false;
+  if (extratoStatusEstornoValor(lanc) === 'estornado') return true;
+  if (lanc.estornoLancamentoId) return true;
+  if (extratoLancamentoEhEstornoVinculado(cliente, lanc.id)) return true;
+  return false;
+}
+
 function extratoSaldoInicialBase(cliente) {
   if (!cliente) return 0;
   var contas = Array.isArray(cliente.contas) ? cliente.contas : [];
@@ -347,8 +364,7 @@ function extratoPendenteConciliacao(cliente, lanc) {
   if (!lanc) return false;
   if (extratoIgnoraConciliacao(lanc)) return false;
   if (valorConciliadoDoLancamento(lanc) > 0) return false;
-  if (extratoStatusEstornoValor(lanc) === 'estornado') return false;
-  if (extratoLancamentoEhEstornoVinculado(cliente, lanc.id)) return false;
+  if (extratoLancamentoTemEstornoResolvido(cliente, lanc)) return false;
   return true;
 }
 
@@ -2099,7 +2115,7 @@ function renderExtrato() {
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
     + (financeiroPJAtivo ? '<div class="form-group" style="max-width:180px"><label>Conciliacao</label><select id="ex-filtro-conciliacao"><option value="todos"' + (_exFiltroConciliacao === 'todos' ? ' selected' : '') + '>Todos</option><option value="conciliados"' + (_exFiltroConciliacao === 'conciliados' ? ' selected' : '') + '>Conciliados</option><option value="nao_conciliados"' + (_exFiltroConciliacao === 'nao_conciliados' ? ' selected' : '') + '>Nao conciliados</option></select></div>' : '')
     + (financeiroPJAtivo ? '<div class="form-group" style="max-width:190px"><label>Devolucao</label><select id="ex-filtro-estorno"><option value="todos"' + (_exFiltroEstorno === 'todos' ? ' selected' : '') + '>Todos</option><option value="pendentes_estorno"' + (_exFiltroEstorno === 'pendentes_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornados"' + (_exFiltroEstorno === 'estornados' ? ' selected' : '') + '>Ja estornados</option></select></div>' : '')
-    + '<div class="form-group" style="max-width:120px"><label>Valor</label><select id="ex-filtro-valor-modo"><option value="todos"' + (_exFiltroValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="acima"' + (_exFiltroValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_exFiltroValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option><option value="igual"' + (_exFiltroValorModo === 'igual' ? ' selected' : '') + '>Igual a</option></select></div>'
+    + '<div class="form-group" style="max-width:120px"><label>Valor</label><select id="ex-filtro-valor-modo" onchange="atualizarPlaceholdersFiltrosExtrato()"><option value="todos"' + (_exFiltroValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="acima"' + (_exFiltroValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_exFiltroValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option><option value="igual"' + (_exFiltroValorModo === 'igual' ? ' selected' : '') + '>Igual a</option></select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-filtro-valor" class="money-input" value="' + esc(Number(_exFiltroValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
