@@ -929,9 +929,14 @@ function resumoConciliacaoLançamento(lanc) {
   var baixas = baixasFinanceirasDoLançamento(lanc);
   if (!baixas.length) return '';
   var conciliado = valorConciliadoDoLancamento(lanc);
+  if (conciliado <= 0.004) return '';
   var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
   var prefixo = restante > 0 ? 'Financeiro parcial' : 'Financeiro conciliado';
   return prefixo + ': ' + fmt(conciliado) + (restante > 0 ? ' · saldo pendente ' + fmt(restante) : '');
+}
+
+function resumoConciliacaoLancamento(lanc) {
+  return resumoConciliacaoLançamento(lanc);
 }
 
 function relacionamentosClienteAtivo() {
@@ -1710,7 +1715,7 @@ function chaveResolucaoDuplicadoExtrato(chave) {
 function assinaturaLinhaDuplicadaExtrato(l) {
   return [
     l && l.id ? 'id:' + l.id : '',
-    l && (l.data || l.data_Lançamento || '') || '',
+    l && (l.data || l.data_lancamento || '') || '',
     String(l && (l.desc || l.descricao || '') || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -1831,7 +1836,7 @@ async function aplicarCategoriaEmLoteExtrato() {
 }
 
 function chaveDuplicidadeExtrato(l) {
-  var data = l.data || l.data_Lançamento || '';
+  var data = l.data || l.data_lancamento || '';
   var desc = String(l.desc || l.descricao || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -2009,7 +2014,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
   var query = applyUserScope(
     supabaseClient
       .from('lancamentos')
-      .select('id,cliente_id,data_Lançamento,descricao,categoria,tipo,valor')
+      .select('id,cliente_id,data_lancamento,descricao,categoria,tipo,valor')
       .eq('cliente_id', activeClient)
   );
 
@@ -2022,7 +2027,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
 
   linhas = (resposta.data || []).map(row => ({
     id: row.id,
-    data: row.data_Lançamento || '',
+    data: row.data_lancamento || '',
     desc: row.descricao || '',
     cat: row.categoria || '',
     tipo: row.tipo || '',
@@ -2390,7 +2395,7 @@ async function addExtrato() {
 
   const payload = {
     cliente_id: activeClient,
-    data_Lançamento: dataLanc || null,
+    data_lancamento: dataLanc || null,
     descricao: desc,
     descricao_original: desc,
     categoria: cat || null,
@@ -2436,7 +2441,7 @@ async function importExtratoXlsx(event) {
     var ws = wb.Sheets[wb.SheetNames[0]];
     var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-    var header = (rows[0] || []).map(h => String(h).toLowerCase().trim());
+    var header = (rows[0] || []).map(h => String(h || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
     var iDate = header.findIndex(h => h.includes('data') || h.includes('date'));
     var iDesc = header.findIndex(h => h.includes('desc'));
     var iVal = header.findIndex(h => h.includes('valor') || h.includes('value') || h.includes('amount'));
@@ -2449,6 +2454,7 @@ async function importExtratoXlsx(event) {
     var c = data.clients[activeClient];
     var count = 0;
     var erros = 0;
+    var primeiroErro = '';
     var mesesConfirmados = {};
 
     for (const row of rows.slice(1)) {
@@ -2491,7 +2497,7 @@ async function importExtratoXlsx(event) {
         (l.data || '') === (dataFmt || '')
         && String(l.desc || '') === desc
         && Number(l.valor || 0) === Number(valor || 0)
-        && (l.tipo || '') === tipo
+        && extratoTipoNormalizado(l.tipo || '') === extratoTipoNormalizado(tipo)
         && (l.contaId || '') === contaId
       );
 
@@ -2503,7 +2509,7 @@ async function importExtratoXlsx(event) {
 
       const { error } = await insertLancamentoComFallback({
         cliente_id: activeClient,
-        data_Lançamento: dataFmt || null,
+        data_lancamento: dataFmt || null,
         descricao: desc,
         descricao_original: desc,
         categoria: cat || 'Outros',
@@ -2518,6 +2524,7 @@ async function importExtratoXlsx(event) {
       if (error) {
         console.error('Erro ao importar item do extrato:', row, error);
         erros++;
+        if (!primeiroErro) primeiroErro = error.message || error.details || 'erro desconhecido';
       } else {
         count++;
       }
@@ -2525,7 +2532,7 @@ async function importExtratoXlsx(event) {
 
     await loadData();
     renderExtrato();
-    alert(count + ' lançamento(s) do extrato importado(s) com sucesso!' + (erros ? ' ' + erros + ' falharam.' : ''));
+    alert(count + ' lançamento(s) do extrato importado(s) com sucesso!' + (erros ? ' ' + erros + ' falharam.' + (primeiroErro ? ' Primeiro erro: ' + primeiroErro : '') : ''));
   };
 
   reader.readAsArrayBuffer(file);
@@ -3019,7 +3026,7 @@ async function saveExtratoEditModal(i) {
     supabaseClient
       .from('lancamentos')
       .update({
-        data_Lançamento: novaData || null,
+        data_lancamento: novaData || null,
         descricao: novaDesc,
         descricao_original: descOriginal || lanc.descOriginal || lanc.desc || null,
         categoria: novaCat || null,
