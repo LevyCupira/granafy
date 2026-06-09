@@ -921,12 +921,8 @@ function baixasFinanceirasDoLançamento(lanc) {
 }
 
 function valorConciliadoDoLancamento(lanc) {
-  if (!lanc || !lanc.id) return 0;
-  var calcularValorConciliado = typeof tfValorConciliadoLancamento === 'function'
-    ? tfValorConciliadoLancamento
-    : (typeof tfValorConciliadoLançamento === 'function' ? tfValorConciliadoLançamento : null);
-  if (!calcularValorConciliado) return 0;
-  return calcularValorConciliado(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'crédito'));
+  if (!lanc || !lanc.id || typeof tfValorConciliadoLançamento !== 'function') return 0;
+  return tfValorConciliadoLançamento(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'crédito'));
 }
 
 function resumoConciliacaoLançamento(lanc) {
