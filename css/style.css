@@ -297,6 +297,8 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .badge-estorno-concluido{background:rgba(62,207,176,.12);color:var(--success);border:1px solid rgba(62,207,176,.3)}
 .badge-estorno-vinculado{background:rgba(91,140,255,.14);color:var(--accent);border:1px solid rgba(91,140,255,.28)}
 .badge-payment{background:rgba(91,140,255,.16);color:var(--accent);border:1px solid rgba(91,140,255,.25)}
+.badge-conciliado{background:rgba(62,207,176,.12);color:var(--success);border:1px solid rgba(62,207,176,.3)}
+.badge-conciliacao-parcial{background:rgba(255,198,107,.14);color:var(--warning);border:1px solid rgba(255,198,107,.28)}
 .tf-status-badge{display:inline-flex;align-items:center;justify-content:center;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:700;white-space:nowrap}
 .tf-status-badge.aberto{background:rgba(91,140,255,.15);color:var(--accent)}
 .tf-status-badge.parcial{background:rgba(255,198,107,.15);color:var(--warning)}

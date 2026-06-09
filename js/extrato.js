@@ -939,6 +939,14 @@ function resumoConciliacaoLancamento(lanc) {
   return resumoConciliacaoLançamento(lanc);
 }
 
+function extratoConciliacaoBadgeHtml(lanc) {
+  var conciliado = valorConciliadoDoLancamento(lanc);
+  if (conciliado <= 0.004) return '';
+  var restante = Math.max(0, Number(lanc && lanc.valor || 0) - conciliado);
+  if (restante > 0.004) return '<span class="badge badge-conciliacao-parcial">Parcial</span>';
+  return '<span class="badge badge-conciliado">Conciliado</span>';
+}
+
 function relacionamentosClienteAtivo() {
   var c = data.clients[activeClient];
   return c && Array.isArray(c.relacionamentos) ? c.relacionamentos : [];
@@ -2255,6 +2263,8 @@ function renderExtrato() {
         var detalhes = [];
         if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
         if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
+        var concBadge = extratoConciliacaoBadgeHtml(l);
+        if (concBadge) detalhes.push(concBadge);
         var concResumo = resumoConciliacaoLançamento(l);
         if (concResumo) detalhes.push(concResumo);
         html += '<tr class="row-' + l.tipo + '">'
@@ -2330,6 +2340,8 @@ function renderExtrato() {
       var detalhes = [];
       if (l.descOriginal && l.descOriginal !== l.desc) detalhes.push('Banco: ' + esc(l.descOriginal));
       if (l.observacao) detalhes.push('Obs: ' + esc(l.observacao));
+      var concBadge = extratoConciliacaoBadgeHtml(l);
+      if (concBadge) detalhes.push(concBadge);
       var concResumo = resumoConciliacaoLançamento(l);
       if (concResumo) detalhes.push(concResumo);
       var resumoEstorno = extratoResumoEstorno(c, l);
