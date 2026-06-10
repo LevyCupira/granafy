@@ -541,12 +541,11 @@ async function refreshAppAfterAuth() {
   if (typeof renderTabs === 'function') renderTabs();
   if (typeof renderClientList === 'function') renderClientList();
 
-  var saved = typeof getRestorableActiveClientId === 'function' ? getRestorableActiveClientId() : localStorage.getItem(activeClientStorageKey());
+  var saved = localStorage.getItem(activeClientStorageKey());
   if (saved && data.clients[saved] && typeof selectClient === 'function') {
     selectClient(saved);
   } else if (typeof clearActiveClientView === 'function') {
     localStorage.removeItem(activeClientStorageKey());
-    localStorage.removeItem('fb_activeClient');
     clearActiveClientView();
   } else if (typeof renderTab === 'function') {
     renderTab(activeTab || 'cartao');
