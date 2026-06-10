@@ -1268,6 +1268,8 @@ function renderFinanceiro() {
   var root = document.getElementById('financeiro-content');
   if (!root) return;
 
+  if (typeof restoreActiveClientFromState === 'function') restoreActiveClientFromState();
+
   if (!activeClient || !tfClienteAtivo()) {
     root.innerHTML = '<div class="empty-state"><div class="icon">ðŸ‘‡</div>Selecione um cliente.</div>';
     return;
