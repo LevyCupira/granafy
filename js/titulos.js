@@ -1268,6 +1268,10 @@ function renderFinanceiro() {
   var root = document.getElementById('financeiro-content');
   if (!root) return;
 
+  if ((!activeClient || !tfClienteAtivo()) && typeof restoreActiveClientIfPossible === 'function') {
+    restoreActiveClientIfPossible(false);
+  }
+
   if (!activeClient || !tfClienteAtivo()) {
     root.innerHTML = '<div class="empty-state"><div class="icon">ðŸ‘‡</div>Selecione um cliente.</div>';
     return;
