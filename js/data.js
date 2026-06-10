@@ -61,33 +61,8 @@ function getRestorableActiveClientId() {
     if (candidates[i] && clients[candidates[i]]) return candidates[i];
   }
 
-  var domId = getClientIdFromRenderedSelection();
-  if (domId && clients[domId]) return domId;
-
   var ids = Object.keys(clients);
   return ids.length === 1 ? ids[0] : '';
-}
-
-function getClientIdFromRenderedSelection() {
-  var clients = data && data.clients ? data.clients : {};
-  var activeItem = document.querySelector('.client-dropdown-item.active button[onclick^="selectClient"]');
-  var onclick = activeItem ? String(activeItem.getAttribute('onclick') || '') : '';
-  var match = onclick.match(/selectClient\(['"]([^'"]+)['"]\)/);
-  if (match && clients[match[1]]) return match[1];
-
-  var label = '';
-  var labelEl = document.getElementById('toggleLabel');
-  if (labelEl) label = String(labelEl.textContent || '').trim();
-  if (!label || label === 'Selecionar cliente...') {
-    var titleEl = document.getElementById('clientTitle');
-    label = titleEl ? String(titleEl.textContent || '').replace(/\s+·.*$/, '').trim() : '';
-  }
-  if (!label) return '';
-
-  var matches = Object.keys(clients).filter(function(id) {
-    return String((clients[id] && clients[id].name) || '').trim() === label;
-  });
-  return matches.length === 1 ? matches[0] : '';
 }
 
 function restoreActiveClientIfPossible(shouldRender) {
