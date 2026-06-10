@@ -622,6 +622,47 @@ function getVisibleTabs() {
   return visible;
 }
 
+function clientNameFromRenderedText(text) {
+  return String(text || '')
+    .replace(/\s+[\u00b7\u00c2]\s+.*$/, '')
+    .trim();
+}
+
+function recoverActiveClientFromUi() {
+  if (activeClient && data && data.clients && data.clients[activeClient]) return true;
+  var clients = (data && data.clients) || {};
+  var candidates = [];
+
+  try {
+    if (typeof activeClientStorageKey === 'function') candidates.push(localStorage.getItem(activeClientStorageKey()));
+    candidates.push(localStorage.getItem('fb_activeClient'));
+  } catch (e) {}
+
+  var labelEl = document.getElementById('toggleLabel');
+  var titleEl = document.getElementById('clientTitle');
+  var renderedNames = [
+    clientNameFromRenderedText(labelEl ? labelEl.textContent : ''),
+    clientNameFromRenderedText(titleEl ? titleEl.textContent : '')
+  ].filter(Boolean);
+
+  renderedNames.forEach(function(name) {
+    var found = Object.entries(clients).find(function(entry) {
+      return String(entry[1] && entry[1].name || '').trim().toLowerCase() === name.toLowerCase();
+    });
+    if (found) candidates.push(found[0]);
+  });
+
+  var restored = candidates.find(function(id) { return id && clients[id]; });
+  if (!restored) return false;
+
+  activeClient = restored;
+  try {
+    if (typeof activeClientStorageKey === 'function') localStorage.setItem(activeClientStorageKey(), restored);
+    localStorage.setItem('fb_activeClient', restored);
+  } catch (e) {}
+  return true;
+}
+
 function moveTabBefore(srcKey, dstKey) {
   if (!srcKey || !dstKey || srcKey === dstKey) return;
 
@@ -724,6 +765,7 @@ function initTabDrag(container) {
 }
 
 function switchTab(tabKey) {
+  recoverActiveClientFromUi();
   var visibleTabs = getVisibleTabs();
   activeTab = visibleTabs.find(function(tab) { return tab.key === tabKey; }) ? tabKey : (visibleTabs[0] ? visibleTabs[0].key : 'cartao');
   renderTabs();
@@ -731,13 +773,14 @@ function switchTab(tabKey) {
 }
 
 function renderTab(tabKey) {
+  recoverActiveClientFromUi();
   const visibleTabs = getVisibleTabs();
   const tab = visibleTabs.find(function(item) { return item.key === tabKey; }) || visibleTabs[0] || TAB_DEFS[0];
   activeTab = tab.key;
 
   renderTabs();
 
-  if (!activeClient || !data.clients[activeClient]) {
+  if (!recoverActiveClientFromUi()) {
     const target = document.getElementById(tab.contentId);
     if (target) {
       target.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
