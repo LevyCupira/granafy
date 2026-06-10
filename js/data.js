@@ -636,76 +636,9 @@ function moveTabBefore(srcKey, dstKey) {
   renderTabs();
 }
 
-function normalizeClientRuntimeState(clientId) {
-  if (!clientId || !data || !data.clients || !data.clients[clientId]) return false;
-  var c = data.clients[clientId];
-  if (!c.cartoes) c.cartoes = [];
-  if (!c.cartao) c.cartao = [];
-  if (!c.dividas) c.dividas = [];
-  if (!Array.isArray(c.extrato)) c.extrato = [];
-  if (!Array.isArray(c.contas)) c.contas = [];
-  if (!Array.isArray(c.titulos)) c.titulos = [];
-  if (!Array.isArray(c.catsCC) && typeof loadCatsCC === 'function') c.catsCC = loadCatsCC(clientId);
-  if (!Array.isArray(c.catsCartao) && typeof loadCatsCartao === 'function') c.catsCartao = loadCatsCartao(clientId);
-  if (!Array.isArray(c.catsFinanceiro) && typeof loadCatsFinanceiro === 'function') c.catsFinanceiro = loadCatsFinanceiro(clientId);
-  return true;
-}
-
-function cleanRenderedClientName(value) {
-  return String(value || '')
-    .replace(/\s+[\u00b7\u00c2]\s+.*$/, '')
-    .replace(/\s+\-\s+(Editor|Visualizador|Consultor|Administrador).*$/i, '')
-    .trim();
-}
-
-function findClientIdByRenderedName(value) {
-  var name = cleanRenderedClientName(value);
-  if (!name || /selecionar cliente/i.test(name) || /selecione um cliente/i.test(name)) return '';
-  var entries = Object.entries((data && data.clients) || {});
-  var lower = name.toLowerCase();
-  var found = entries.find(function(entry) {
-    return String(entry[1] && entry[1].name || '').toLowerCase() === lower;
-  });
-  return found ? found[0] : '';
-}
-
-function restoreActiveClientFromState() {
-  var clients = (data && data.clients) || {};
-  var ids = Object.keys(clients);
-  if (activeClient && clients[activeClient]) {
-    normalizeClientRuntimeState(activeClient);
-    return true;
-  }
-
-  var candidates = [];
-  try {
-    if (typeof activeClientStorageKey === 'function') candidates.push(localStorage.getItem(activeClientStorageKey()));
-    candidates.push(localStorage.getItem('fb_activeClient'));
-  } catch (e) {}
-
-  var title = document.getElementById('clientTitle');
-  var label = document.getElementById('toggleLabel');
-  candidates.push(findClientIdByRenderedName(label ? label.textContent : ''));
-  candidates.push(findClientIdByRenderedName(title ? title.textContent : ''));
-  if (ids.length === 1) candidates.push(ids[0]);
-
-  var restored = candidates.find(function(id) { return id && clients[id]; });
-  if (!restored) return false;
-
-  activeClient = restored;
-  normalizeClientRuntimeState(restored);
-  try {
-    if (typeof activeClientStorageKey === 'function') localStorage.setItem(activeClientStorageKey(), restored);
-    localStorage.setItem('fb_activeClient', restored);
-  } catch (e) {}
-  return true;
-}
-
 function renderTabs() {
   const container = document.getElementById('tabsContainer');
   if (!container) return;
-
-  restoreActiveClientFromState();
 
   var visibleTabs = getVisibleTabs();
   if (!visibleTabs.length) return;
@@ -791,7 +724,6 @@ function initTabDrag(container) {
 }
 
 function switchTab(tabKey) {
-  restoreActiveClientFromState();
   var visibleTabs = getVisibleTabs();
   activeTab = visibleTabs.find(function(tab) { return tab.key === tabKey; }) ? tabKey : (visibleTabs[0] ? visibleTabs[0].key : 'cartao');
   renderTabs();
@@ -799,14 +731,13 @@ function switchTab(tabKey) {
 }
 
 function renderTab(tabKey) {
-  restoreActiveClientFromState();
   const visibleTabs = getVisibleTabs();
   const tab = visibleTabs.find(function(item) { return item.key === tabKey; }) || visibleTabs[0] || TAB_DEFS[0];
   activeTab = tab.key;
 
   renderTabs();
 
-  if (!restoreActiveClientFromState()) {
+  if (!activeClient || !data.clients[activeClient]) {
     const target = document.getElementById(tab.contentId);
     if (target) {
       target.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
@@ -834,8 +765,6 @@ function renderTab(tabKey) {
   const saved = localStorage.getItem(activeClientStorageKey());
   if (saved && data.clients[saved]) {
     selectClient(saved);
-  } else if (restoreActiveClientFromState() && activeClient && data.clients[activeClient]) {
-    selectClient(activeClient);
   } else {
     localStorage.removeItem(activeClientStorageKey());
     if (typeof clearActiveClientView === 'function') clearActiveClientView();

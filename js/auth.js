@@ -544,8 +544,6 @@ async function refreshAppAfterAuth() {
   var saved = localStorage.getItem(activeClientStorageKey());
   if (saved && data.clients[saved] && typeof selectClient === 'function') {
     selectClient(saved);
-  } else if (typeof restoreActiveClientFromState === 'function' && restoreActiveClientFromState() && activeClient && data.clients[activeClient] && typeof selectClient === 'function') {
-    selectClient(activeClient);
   } else if (typeof clearActiveClientView === 'function') {
     localStorage.removeItem(activeClientStorageKey());
     clearActiveClientView();

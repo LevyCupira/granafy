@@ -374,18 +374,14 @@ function selectClient(id) {
 
   var c = data.clients[id];
 
-  if (typeof normalizeClientRuntimeState === 'function') {
-    normalizeClientRuntimeState(id);
-  } else {
-    if (!c.cartoes) c.cartoes = [];
-    if (!c.cartao) c.cartao = [];
-    if (!c.dividas) c.dividas = [];
-    if (!Array.isArray(c.extrato)) c.extrato = [];
-    if (!Array.isArray(c.contas)) c.contas = [];
-    if (!Array.isArray(c.catsCC)) c.catsCC = loadCatsCC(id);
-    if (!Array.isArray(c.catsCartao)) c.catsCartao = loadCatsCartao(id);
-    if (!Array.isArray(c.catsFinanceiro)) c.catsFinanceiro = loadCatsFinanceiro(id);
-  }
+  if (!c.cartoes) c.cartoes = [];
+  if (!c.cartao) c.cartao = [];
+  if (!c.dividas) c.dividas = [];
+  if (!Array.isArray(c.extrato)) c.extrato = [];
+  if (!Array.isArray(c.contas)) c.contas = [];
+  if (!Array.isArray(c.catsCC)) c.catsCC = loadCatsCC(id);
+  if (!Array.isArray(c.catsCartao)) c.catsCartao = loadCatsCartao(id);
+  if (!Array.isArray(c.catsFinanceiro)) c.catsFinanceiro = loadCatsFinanceiro(id);
 
   _ccFiltro = new Set();
   _ccFiltroMes = '';
