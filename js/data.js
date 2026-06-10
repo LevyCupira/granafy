@@ -48,10 +48,14 @@ function isActiveClientPJ() {
 }
 
 async function loadData() {
-  data = { clients: {} };
   const uid = typeof currentUserId === 'function' ? currentUserId() : null;
 
-  if (!uid) return;
+  if (!uid) {
+    data = { clients: {} };
+    return;
+  }
+
+  const nextData = { clients: {} };
 
   async function carregarComEscopo() {
     const [
@@ -494,7 +498,7 @@ async function loadData() {
   });
 
   (clientesRows || []).forEach(c => {
-    data.clients[c.id] = {
+    nextData.clients[c.id] = {
       id: c.id,
       userId: c.user_id || null,
       name: c.nome || '',
@@ -523,6 +527,8 @@ async function loadData() {
       catsFinanceiro: catsFinanceiroPorCliente[c.id] ? sincronizarCatsFinanceiro(catsFinanceiroPorCliente[c.id]) : loadCatsFinanceiro(c.id)
     };
   });
+
+  data = nextData;
 }
 
 function saveData() {
