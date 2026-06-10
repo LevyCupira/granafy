@@ -47,6 +47,41 @@ function isActiveClientPJ() {
   return !!(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj');
 }
 
+function getRestorableActiveClientId() {
+  var clients = data && data.clients ? data.clients : {};
+  if (activeClient && clients[activeClient]) return activeClient;
+
+  var candidates = [];
+  try {
+    if (typeof activeClientStorageKey === 'function') candidates.push(localStorage.getItem(activeClientStorageKey()));
+    candidates.push(localStorage.getItem('fb_activeClient'));
+  } catch (e) {}
+
+  for (var i = 0; i < candidates.length; i++) {
+    if (candidates[i] && clients[candidates[i]]) return candidates[i];
+  }
+
+  var ids = Object.keys(clients);
+  return ids.length === 1 ? ids[0] : '';
+}
+
+function restoreActiveClientIfPossible(shouldRender) {
+  var id = getRestorableActiveClientId();
+  if (!id) return false;
+
+  if (shouldRender && activeClient !== id && typeof selectClient === 'function') {
+    selectClient(id);
+    return true;
+  }
+
+  activeClient = id;
+  try {
+    if (typeof activeClientStorageKey === 'function') localStorage.setItem(activeClientStorageKey(), id);
+    localStorage.setItem('fb_activeClient', id);
+  } catch (e) {}
+  return true;
+}
+
 async function loadData() {
   data = { clients: {} };
   const uid = typeof currentUserId === 'function' ? currentUserId() : null;
@@ -718,6 +753,10 @@ function initTabDrag(container) {
 }
 
 function switchTab(tabKey) {
+  if ((!activeClient || !data.clients[activeClient]) && typeof restoreActiveClientIfPossible === 'function') {
+    restoreActiveClientIfPossible(false);
+  }
+
   var visibleTabs = getVisibleTabs();
   activeTab = visibleTabs.find(function(tab) { return tab.key === tabKey; }) ? tabKey : (visibleTabs[0] ? visibleTabs[0].key : 'cartao');
   renderTabs();
@@ -725,6 +764,10 @@ function switchTab(tabKey) {
 }
 
 function renderTab(tabKey) {
+  if ((!activeClient || !data.clients[activeClient]) && typeof restoreActiveClientIfPossible === 'function') {
+    restoreActiveClientIfPossible(false);
+  }
+
   const visibleTabs = getVisibleTabs();
   const tab = visibleTabs.find(function(item) { return item.key === tabKey; }) || visibleTabs[0] || TAB_DEFS[0];
   activeTab = tab.key;
@@ -756,11 +799,12 @@ function renderTab(tabKey) {
   renderClientList();
   if (typeof renderAuthUser === 'function') renderAuthUser();
 
-  const saved = localStorage.getItem(activeClientStorageKey());
+  const saved = typeof getRestorableActiveClientId === 'function' ? getRestorableActiveClientId() : localStorage.getItem(activeClientStorageKey());
   if (saved && data.clients[saved]) {
     selectClient(saved);
   } else {
     localStorage.removeItem(activeClientStorageKey());
+    localStorage.removeItem('fb_activeClient');
     if (typeof clearActiveClientView === 'function') clearActiveClientView();
   }
 

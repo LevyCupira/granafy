@@ -365,6 +365,11 @@ function toggleDropdown() {
 }
 
 function selectClient(id) {
+  if (!id || !data.clients[id]) {
+    if (typeof clearActiveClientView === 'function') clearActiveClientView();
+    return;
+  }
+
   activeClient = id;
   localStorage.setItem(activeClientStorageKey(), id);
   localStorage.setItem('fb_activeClient', id);
