@@ -48,14 +48,10 @@ function isActiveClientPJ() {
 }
 
 async function loadData() {
+  data = { clients: {} };
   const uid = typeof currentUserId === 'function' ? currentUserId() : null;
 
-  if (!uid) {
-    data = { clients: {} };
-    return;
-  }
-
-  const nextData = { clients: {} };
+  if (!uid) return;
 
   async function carregarComEscopo() {
     const [
@@ -185,38 +181,6 @@ async function loadData() {
     return res;
   }
 
-  async function carregarAuditoriaFinanceira() {
-    var query = supabaseClient.from('auditoria_financeira').select('*');
-    var res = await query.order('created_at', { ascending: false });
-
-    if (!res.error) return res;
-
-    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
-    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
-    if (tabelaAusente && msg.includes('auditoria_financeira')) {
-      console.warn('Tabela auditoria_financeira ainda nao existe no Supabase. Rode a migracao 20260607_financeiro_recorrencia_auditoria_fechamento.sql.');
-      return { data: [], error: null };
-    }
-
-    return res;
-  }
-
-  async function carregarFechamentosPeriodo() {
-    var query = supabaseClient.from('fechamentos_periodo').select('*');
-    var res = await query.order('referencia', { ascending: false });
-
-    if (!res.error) return res;
-
-    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
-    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
-    if (tabelaAusente && msg.includes('fechamentos_periodo')) {
-      console.warn('Tabela fechamentos_periodo ainda nao existe no Supabase. Rode a migracao 20260607_financeiro_recorrencia_auditoria_fechamento.sql.');
-      return { data: [], error: null };
-    }
-
-    return res;
-  }
-
   let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo();
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
@@ -266,16 +230,6 @@ async function loadData() {
     console.warn('Nao foi possivel carregar acessos compartilhados:', acessosClientesRes.error);
   }
   const acessosClientesRows = acessosClientesRes.data || [];
-  const auditoriaFinanceiraRes = await carregarAuditoriaFinanceira();
-  if (auditoriaFinanceiraRes.error) {
-    console.warn('Nao foi possivel carregar auditoria financeira:', auditoriaFinanceiraRes.error);
-  }
-  const auditoriaFinanceiraRows = auditoriaFinanceiraRes.data || [];
-  const fechamentosPeriodoRes = await carregarFechamentosPeriodo();
-  if (fechamentosPeriodoRes.error) {
-    console.warn('Nao foi possivel carregar fechamentos de periodo:', fechamentosPeriodoRes.error);
-  }
-  const fechamentosPeriodoRows = fechamentosPeriodoRes.data || [];
 
   const contasPorCliente = {};
   (contasRows || []).forEach(conta => {
@@ -437,11 +391,6 @@ async function loadData() {
       vencimento: t.vencimento || null,
       valorTotal: Number(t.valor_total || 0),
       observacao: t.observacao || '',
-      recorrenciaAtiva: !!t.recorrencia_ativa,
-      recorrenciaFrequencia: t.recorrencia_frequencia || null,
-      recorrenciaIntervalo: Number(t.recorrencia_intervalo || 1),
-      recorrenciaFim: t.recorrencia_fim || null,
-      origemRecorrenciaId: t.origem_recorrencia_id || null,
       createdAt: t.created_at || null,
       updatedAt: t.updated_at || null,
       baixas: baixasPorTitulo[t.id] || [],
@@ -465,40 +414,8 @@ async function loadData() {
     });
   });
 
-  const auditoriaFinanceiraPorCliente = {};
-  (auditoriaFinanceiraRows || []).forEach(function(item) {
-    if (!item || !item.cliente_id) return;
-    if (!auditoriaFinanceiraPorCliente[item.cliente_id]) auditoriaFinanceiraPorCliente[item.cliente_id] = [];
-    auditoriaFinanceiraPorCliente[item.cliente_id].push({
-      id: item.id,
-      modulo: item.modulo || 'financeiro',
-      evento: item.evento || '',
-      entidade: item.entidade || '',
-      entidadeId: item.entidade_id || null,
-      resumo: item.resumo || '',
-      detalhes: item.detalhes || {},
-      createdAt: item.created_at || null,
-      userId: item.user_id || null
-    });
-  });
-
-  const fechamentosPorCliente = {};
-  (fechamentosPeriodoRows || []).forEach(function(item) {
-    if (!item || !item.cliente_id || !item.referencia) return;
-    if (!fechamentosPorCliente[item.cliente_id]) fechamentosPorCliente[item.cliente_id] = [];
-    fechamentosPorCliente[item.cliente_id].push({
-      id: item.id,
-      referencia: item.referencia,
-      status: item.status || 'fechado',
-      observacao: item.observacao || '',
-      createdAt: item.created_at || null,
-      updatedAt: item.updated_at || null,
-      userId: item.user_id || null
-    });
-  });
-
   (clientesRows || []).forEach(c => {
-    nextData.clients[c.id] = {
+    data.clients[c.id] = {
       id: c.id,
       userId: c.user_id || null,
       name: c.nome || '',
@@ -516,8 +433,6 @@ async function loadData() {
       relacionamentos: relacionamentosPorCliente[c.id] || [],
       titulos: titulosPorCliente[c.id] || [],
       acessos: acessosPorCliente[c.id] || [],
-      auditoriaFinanceira: auditoriaFinanceiraPorCliente[c.id] || [],
-      fechamentos: fechamentosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],
       centrosCustoMeta: centrosCustoMetaPorCliente[c.id] || [],
@@ -527,8 +442,6 @@ async function loadData() {
       catsFinanceiro: catsFinanceiroPorCliente[c.id] ? sincronizarCatsFinanceiro(catsFinanceiroPorCliente[c.id]) : loadCatsFinanceiro(c.id)
     };
   });
-
-  data = nextData;
 }
 
 function saveData() {
@@ -620,47 +533,6 @@ function getVisibleTabs() {
     return fallback.length ? [fallback[0]] : [];
   }
   return visible;
-}
-
-function clientNameFromRenderedText(text) {
-  return String(text || '')
-    .replace(/\s+[\u00b7\u00c2]\s+.*$/, '')
-    .trim();
-}
-
-function recoverActiveClientFromUi() {
-  if (activeClient && data && data.clients && data.clients[activeClient]) return true;
-  var clients = (data && data.clients) || {};
-  var candidates = [];
-
-  try {
-    if (typeof activeClientStorageKey === 'function') candidates.push(localStorage.getItem(activeClientStorageKey()));
-    candidates.push(localStorage.getItem('fb_activeClient'));
-  } catch (e) {}
-
-  var labelEl = document.getElementById('toggleLabel');
-  var titleEl = document.getElementById('clientTitle');
-  var renderedNames = [
-    clientNameFromRenderedText(labelEl ? labelEl.textContent : ''),
-    clientNameFromRenderedText(titleEl ? titleEl.textContent : '')
-  ].filter(Boolean);
-
-  renderedNames.forEach(function(name) {
-    var found = Object.entries(clients).find(function(entry) {
-      return String(entry[1] && entry[1].name || '').trim().toLowerCase() === name.toLowerCase();
-    });
-    if (found) candidates.push(found[0]);
-  });
-
-  var restored = candidates.find(function(id) { return id && clients[id]; });
-  if (!restored) return false;
-
-  activeClient = restored;
-  try {
-    if (typeof activeClientStorageKey === 'function') localStorage.setItem(activeClientStorageKey(), restored);
-    localStorage.setItem('fb_activeClient', restored);
-  } catch (e) {}
-  return true;
 }
 
 function moveTabBefore(srcKey, dstKey) {
@@ -765,7 +637,6 @@ function initTabDrag(container) {
 }
 
 function switchTab(tabKey) {
-  recoverActiveClientFromUi();
   var visibleTabs = getVisibleTabs();
   activeTab = visibleTabs.find(function(tab) { return tab.key === tabKey; }) ? tabKey : (visibleTabs[0] ? visibleTabs[0].key : 'cartao');
   renderTabs();
@@ -773,14 +644,13 @@ function switchTab(tabKey) {
 }
 
 function renderTab(tabKey) {
-  recoverActiveClientFromUi();
   const visibleTabs = getVisibleTabs();
   const tab = visibleTabs.find(function(item) { return item.key === tabKey; }) || visibleTabs[0] || TAB_DEFS[0];
   activeTab = tab.key;
 
   renderTabs();
 
-  if (!recoverActiveClientFromUi()) {
+  if (!activeClient || !data.clients[activeClient]) {
     const target = document.getElementById(tab.contentId);
     if (target) {
       target.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
