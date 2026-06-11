@@ -1,5 +1,21 @@
 var _resumoPeriodos = null;
 
+function resumoTipoNormalizado(tipo) {
+  return String(tipo || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function resumoEhCredito(tipo) {
+  return resumoTipoNormalizado(tipo) === 'credito';
+}
+
+function resumoEhDebito(tipo) {
+  return resumoTipoNormalizado(tipo) === 'debito';
+}
+
 function getTransacoes(clienteId) {
   var c = data.clients[clienteId];
   if (!c) return [];
@@ -108,10 +124,13 @@ function consolidarTransacoesAnaliticas(transacoes) {
     };
     var valor = Number(l.valor || 0);
 
-    if (l.tipo === 'credito') bucket.creditos += valor;
+    var ehCredito = resumoEhCredito(l.tipo);
+    var ehDebito = resumoEhDebito(l.tipo);
+
+    if (ehCredito) bucket.creditos += valor;
     else bucket.debitos += valor;
 
-    if ((l.tipo === 'credito' && classe !== 'receita') || (l.tipo === 'debito' && classe === 'receita')) {
+    if ((ehCredito && classe !== 'receita') || (ehDebito && classe === 'receita')) {
       l.ehAbatimentoResumo = true;
     }
 
@@ -226,8 +245,8 @@ function renderResumo() {
   var tD = consolidado.totalDespesas;
   var resultado = tR - tD;
 
-  var movEntradas = movContas.filter(function(l) { return l.tipo === 'credito'; }).reduce(function(s, l) { return s + l.valor; }, 0);
-  var movSaidas = movContas.filter(function(l) { return l.tipo === 'debito'; }).reduce(function(s, l) { return s + l.valor; }, 0);
+  var movEntradas = movContas.filter(function(l) { return resumoEhCredito(l.tipo); }).reduce(function(s, l) { return s + l.valor; }, 0);
+  var movSaidas = movContas.filter(function(l) { return resumoEhDebito(l.tipo); }).reduce(function(s, l) { return s + l.valor; }, 0);
 
   var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
 
@@ -250,11 +269,12 @@ function renderResumo() {
     ? '<div class="empty-state" style="padding:26px"><div class="icon">&#128202;</div>Nenhum lancamento no periodo.</div>'
     : '<table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>'
       + transacoesTabela.slice().sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); }).map(function(l) {
-          var tipoLabel = l.tipo === 'credito' ? 'Receita' : 'Despesa';
-          var tipoColor = l.tipo === 'credito' ? 'var(--success)' : 'var(--danger)';
-          var valorClass = l.tipo === 'credito' ? 'val-pos' : 'val-neg';
-          var valorPrefixo = l.tipo === 'credito' ? '+' : '-';
-          return '<tr class="row-' + l.tipo + '">'
+          var ehCredito = resumoEhCredito(l.tipo);
+          var tipoLabel = ehCredito ? 'Receita' : 'Despesa';
+          var tipoColor = ehCredito ? 'var(--success)' : 'var(--danger)';
+          var valorClass = ehCredito ? 'val-pos' : 'val-neg';
+          var valorPrefixo = ehCredito ? '+' : '-';
+          return '<tr class="row-' + resumoTipoNormalizado(l.tipo) + '">'
             + '<td style="color:var(--muted);font-size:.78rem">' + (l.data ? l.data.split('-').reverse().join('/') : '-') + '</td>'
             + '<td><span style="font-size:.75rem;color:var(--muted)">' + esc(l.fonte || '') + '</span></td>'
             + '<td>' + esc(l.desc) + '</td>'
