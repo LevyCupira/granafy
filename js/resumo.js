@@ -266,7 +266,7 @@ function renderResumo() {
 
   var transacoesTabela = movContas.concat(consolidado.analiticas);
   var tabela = transacoesTabela.length === 0
-    ? '<div class="empty-state" style="padding:26px"><div class="icon">&#128202;</div>Nenhum lancamento no periodo.</div>'
+    ? '<div class="empty-state" style="padding:26px"><div class="icon">&#128202;</div>Nenhum lançamento no período.</div>'
     : '<table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>'
       + transacoesTabela.slice().sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); }).map(function(l) {
           var ehCredito = resumoEhCredito(l.tipo);

@@ -1,5 +1,5 @@
 ﻿// ====================================================
-// SETTINGS.JS - Configuracoes, perfil e backup
+// SETTINGS.JS - Configurações, perfil e backup
 // ====================================================
 
 function openModal(section, tab) {
@@ -47,7 +47,7 @@ function renderBackupModal() {
   document.getElementById('modalTitle').textContent = 'Backup';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-hero backup-hero">'
-    + '<div><span class="settings-eyebrow">Seguranca dos dados</span><h4>Backup e restauracao</h4><p>Baixe uma copia em JSON para guardar fora do sistema ou restaurar uma base ja existente.</p></div>'
+    + '<div><span class="settings-eyebrow">Segurança dos dados</span><h4>Backup e restauração</h4><p>Baixe uma cópia em JSON para guardar fora do sistema ou restaurar uma base já existente.</p></div>'
     + '</div>'
     + '<div class="settings-section-card">'
     + '<div class="settings-card-grid backup-card-grid">'
@@ -58,7 +58,7 @@ function renderBackupModal() {
     + '</div>'
     + '<div class="settings-action-card">'
     + '<span class="settings-action-title">Importar backup</span>'
-    + '<small>Restaura dados a partir de um arquivo JSON ja salvo, respeitando as protecoes contra duplicidade.</small>'
+    + '<small>Restaura dados a partir de um arquivo JSON já salvo, respeitando as proteções contra duplicidade.</small>'
     + '<button class="btn-sm" style="margin-top:14px;padding:9px 18px;font-size:.83rem" onclick="document.getElementById(\'importFileInput\').click()">Selecionar arquivo</button>'
     + '</div>'
     + '</div>'
@@ -69,11 +69,11 @@ function renderLegalModal(activeTabKey) {
   document.getElementById('modalTitle').textContent = 'Documentos legais';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-hero backup-hero">'
-    + '<div><span class="settings-eyebrow">Transparencia</span><h4>Termos e privacidade</h4><p>Leia as regras de uso do Granafy e como os dados pessoais e financeiros sao tratados dentro da plataforma.</p></div>'
+    + '<div><span class="settings-eyebrow">Transparência</span><h4>Termos e privacidade</h4><p>Leia as regras de uso do Granafy e como os dados pessoais e financeiros são tratados dentro da plataforma.</p></div>'
     + '</div>'
     + '<div class="modal-tabs settings-tabs" id="legalTabs">'
     + '<button class="modal-tab" data-ltab="terms" onclick="switchLegalTab(\'terms\')">Termos de uso</button>'
-    + '<button class="modal-tab" data-ltab="privacy" onclick="switchLegalTab(\'privacy\')">Politica de privacidade</button>'
+    + '<button class="modal-tab" data-ltab="privacy" onclick="switchLegalTab(\'privacy\')">Política de privacidade</button>'
     + '<button class="modal-tab" data-ltab="lgpd" onclick="switchLegalTab(\'lgpd\')">LGPD</button>'
     + '</div>'
     + '<div id="modal-panel-terms" class="modal-panel"></div>'
@@ -100,46 +100,46 @@ function switchLegalTab(tab) {
 
 function legalTermsHtml() {
   return '<div class="settings-section-card legal-doc">'
-    + '<div class="settings-card-head"><div><h5>Termos de uso do Granafy</h5><p>Ultima atualizacao: 31/05/2026</p></div></div>'
+    + '<div class="settings-card-head"><div><h5>Termos de uso do Granafy</h5><p>Última atualização: 31/05/2026</p></div></div>'
     + '<div class="legal-doc-body">'
-    + '<h6>1. Objeto</h6><p>O Granafy e uma plataforma de organizacao financeira que ajuda a registrar lancamentos, acompanhar cartoes, dividas, extrato, financeiro PJ, relatorios e acessos compartilhados por cliente.</p>'
-    + '<h6>2. Cadastro e responsabilidade</h6><p>Quem cria ou usa uma conta deve informar dados verdadeiros, manter a senha em sigilo e responder pelas atividades feitas com o proprio login. O usuario que compartilha um cliente deve conceder acesso apenas a pessoas autorizadas.</p>'
-    + '<h6>3. Perfis e permissoes</h6><p>O sistema pode oferecer perfis como Master, Consultor, Usuario, Visualizador e Editor. Cada perfil possui limites e permissoes diferentes. O uso indevido de um perfil ou de acessos compartilhados pode levar a bloqueio ou revogacao.</p>'
-    + '<h6>4. Uso permitido</h6><p>O Granafy deve ser usado para fins legitimos de gestao financeira. Nao e permitido tentar acessar dados sem autorizacao, burlar permissoes, inserir conteudo ilicito ou comprometer a seguranca do sistema.</p>'
-    + '<h6>5. Dados e backups</h6><p>O usuario e responsavel por revisar as informacoes que cadastra, importa ou exporta. Recursos de backup e restauracao ajudam na seguranca operacional, mas nao substituem o cuidado do usuario com a revisao dos dados e o armazenamento seguro dos arquivos exportados.</p>'
-    + '<h6>6. Disponibilidade</h6><p>O Granafy pode passar por manutencoes, correcoes e melhorias. Embora exista esforco para manter a plataforma disponivel, podem ocorrer indisponibilidades temporarias, falhas de terceiros, erros de sincronizacao ou limites de servicos integrados.</p>'
-    + '<h6>7. Suspensao e encerramento</h6><p>O acesso pode ser restringido, suspenso ou encerrado em caso de fraude, abuso, violacao destes termos, exigencia legal ou risco relevante para a seguranca da plataforma e dos dados.</p>'
-    + '<h6>8. Alteracoes destes termos</h6><p>Os termos podem ser atualizados para refletir mudancas legais, tecnicas ou operacionais. O uso continuado da plataforma apos a publicacao de uma nova versao representa ciencia do texto atualizado.</p>'
+    + '<h6>1. Objeto</h6><p>O Granafy é uma plataforma de organização financeira que ajuda a registrar lançamentos, acompanhar cartões, dívidas, extrato, financeiro PJ, relatórios e acessos compartilhados por cliente.</p>'
+    + '<h6>2. Cadastro e responsabilidade</h6><p>Quem cria ou usa uma conta deve informar dados verdadeiros, manter a senha em sigilo e responder pelas atividades feitas com o próprio login. O usuário que compartilha um cliente deve conceder acesso apenas a pessoas autorizadas.</p>'
+    + '<h6>3. Perfis e permissoes</h6><p>O sistema pode oferecer perfis como Master, Consultor, Usuário, Visualizador e Editor. Cada perfil possui limites e permissões diferentes. O uso indevido de um perfil ou de acessos compartilhados pode levar a bloqueio ou revogação.</p>'
+    + '<h6>4. Uso permitido</h6><p>O Granafy deve ser usado para fins legítimos de gestão financeira. Não é permitido tentar acessar dados sem autorização, burlar permissões, inserir conteúdo ilícito ou comprometer a segurança do sistema.</p>'
+    + '<h6>5. Dados e backups</h6><p>O usuário é responsável por revisar as informações que cadastra, importa ou exporta. Recursos de backup e restauração ajudam na segurança operacional, mas não substituem o cuidado do usuário com a revisão dos dados e o armazenamento seguro dos arquivos exportados.</p>'
+    + '<h6>6. Disponibilidade</h6><p>O Granafy pode passar por manutenções, correções e melhorias. Embora exista esforço para manter a plataforma disponível, podem ocorrer indisponibilidades temporárias, falhas de terceiros, erros de sincronização ou limites de serviços integrados.</p>'
+    + '<h6>7. Suspensão e encerramento</h6><p>O acesso pode ser restringido, suspenso ou encerrado em caso de fraude, abuso, violação destes termos, exigência legal ou risco relevante para a segurança da plataforma e dos dados.</p>'
+    + '<h6>8. Alterações destes termos</h6><p>Os termos podem ser atualizados para refletir mudanças legais, técnicas ou operacionais. O uso continuado da plataforma após a publicação de uma nova versão representa ciência do texto atualizado.</p>'
     + '</div>'
     + '</div>';
 }
 
 function legalPrivacyHtml() {
   return '<div class="settings-section-card legal-doc">'
-    + '<div class="settings-card-head"><div><h5>Politica de privacidade</h5><p>Ultima atualizacao: 31/05/2026</p></div></div>'
+    + '<div class="settings-card-head"><div><h5>Política de privacidade</h5><p>Última atualização: 31/05/2026</p></div></div>'
     + '<div class="legal-doc-body">'
-    + '<h6>1. Dados tratados</h6><p>O Granafy pode tratar dados cadastrais e financeiros, como nome, e-mail, telefone, CPF ou CNPJ, empresa, clientes, contas, cartoes, dividas, titulos financeiros, descricoes de extrato e historicos de uso.</p>'
-    + '<h6>2. Finalidades</h6><p>Os dados sao usados para permitir autenticacao, controle de acesso, organizacao financeira, compartilhamento de clientes, importacao e exportacao de dados, geracao de relatorios, suporte operacional e seguranca da plataforma.</p>'
-    + '<h6>3. Bases de tratamento</h6><p>O tratamento pode ocorrer para execucao da relacao contratual, cumprimento de obrigacoes legais, protecao do credito, exercicio regular de direitos e interesses legitimos ligados a seguranca, auditoria e operacao do sistema. Quando necessario, o sistema podera solicitar consentimento especifico.</p>'
+    + '<h6>1. Dados tratados</h6><p>O Granafy pode tratar dados cadastrais e financeiros, como nome, e-mail, telefone, CPF ou CNPJ, empresa, clientes, contas, cartões, dívidas, títulos financeiros, descrições de extrato e históricos de uso.</p>'
+    + '<h6>2. Finalidades</h6><p>Os dados são usados para permitir autenticação, controle de acesso, organização financeira, compartilhamento de clientes, importação e exportação de dados, geração de relatórios, suporte operacional e segurança da plataforma.</p>'
+    + '<h6>3. Bases de tratamento</h6><p>O tratamento pode ocorrer para execução da relação contratual, cumprimento de obrigações legais, proteção do crédito, exercício regular de direitos e interesses legítimos ligados à segurança, auditoria e operação do sistema. Quando necessário, o sistema poderá solicitar consentimento específico.</p>'
     + '<h6>4. Compartilhamento</h6><p>Os dados podem ser processados por provedores de infraestrutura e autenticacao usados pelo Granafy, inclusive banco de dados, hospedagem, envio de e-mails e armazenamento. O acesso interno aos dados respeita perfis e permissoes da plataforma.</p>'
-    + '<h6>5. Retencao</h6><p>Os dados sao mantidos pelo tempo necessario para a operacao da conta, cumprimento de obrigacoes legais, atendimento de auditoria, defesa em processos e preservacao da integridade da base financeira, observado o principio da necessidade.</p>'
-    + '<h6>6. Direitos do titular</h6><p>O titular pode solicitar confirmacao de tratamento, acesso, correcao, atualizacao, informacao sobre compartilhamento e outras medidas previstas na LGPD, conforme a natureza do dado e a relacao existente com a plataforma e com o responsavel pela base.</p>'
-    + '<h6>7. Seguranca</h6><p>O Granafy adota controles tecnicos e organizacionais razoaveis para reduzir risco de acesso indevido, perda, alteracao ou divulgacao nao autorizada. Mesmo assim, nenhum ambiente conectado e totalmente imune a incidentes.</p>'
-    + '<h6>8. Controlador, operador e suboperadores</h6><p>Em regra, o cliente dono da base atua como controlador dos dados da propria operacao financeira. O Granafy atua como operador para viabilizar autenticacao, armazenamento, compartilhamento controlado, relatorios e trilhas operacionais. Servicos de infraestrutura e autenticacao utilizados pela plataforma podem atuar como suboperadores.</p>'
-    + '<h6>9. Contato</h6><p>Solicitacoes relacionadas a privacidade, correcao de dados e exercicio de direitos devem ser direcionadas ao responsavel informado pela base ou ao canal operacional definido para a conta utilizada. O uso produtivo da plataforma deve manter um canal claro para esse atendimento.</p>'
+    + '<h6>5. Retencao</h6><p>Os dados são mantidos pelo tempo necessário para a operação da conta, cumprimento de obrigações legais, atendimento de auditoria, defesa em processos e preservação da integridade da base financeira, observado o princípio da necessidade.</p>'
+    + '<h6>6. Direitos do titular</h6><p>O titular pode solicitar confirmação de tratamento, acesso, correção, atualização, informação sobre compartilhamento e outras medidas previstas na LGPD, conforme a natureza do dado e a relação existente com a plataforma e com o responsável pela base.</p>'
+    + '<h6>7. Seguranca</h6><p>O Granafy adota controles técnicos e organizacionais razoáveis para reduzir risco de acesso indevido, perda, alteração ou divulgação não autorizada. Mesmo assim, nenhum ambiente conectado é totalmente imune a incidentes.</p>'
+    + '<h6>8. Controlador, operador e suboperadores</h6><p>Em regra, o cliente dono da base atua como controlador dos dados da própria operação financeira. O Granafy atua como operador para viabilizar autenticação, armazenamento, compartilhamento controlado, relatórios e trilhas operacionais. Serviços de infraestrutura e autenticação utilizados pela plataforma podem atuar como suboperadores.</p>'
+    + '<h6>9. Contato</h6><p>Solicitações relacionadas à privacidade, correção de dados e exercício de direitos devem ser direcionadas ao responsável informado pela base ou ao canal operacional definido para a conta utilizada. O uso produtivo da plataforma deve manter um canal claro para esse atendimento.</p>'
     + '</div>'
     + '</div>';
 }
 
 function legalLgpdHtml() {
   return '<div class="settings-section-card legal-doc">'
-    + '<div class="settings-card-head"><div><h5>Programa LGPD do Granafy</h5><p>Base inicial de governanca e conformidade do produto.</p></div></div>'
+    + '<div class="settings-card-head"><div><h5>Programa LGPD do Granafy</h5><p>Base inicial de governança e conformidade do produto.</p></div></div>'
     + '<div class="legal-doc-body">'
-    + '<h6>1. O que ja existe</h6><p>O produto ja conta com aceite de termos, politica de privacidade, perfis de acesso, compartilhamento por cliente, segregacao entre clientes, trilhas operacionais e documentacao inicial de LGPD no repositorio.</p>'
-    + '<h6>2. O que ainda precisa ser fechado</h6><p>As proximas etapas sao formalizar canal de atendimento ao titular, politica de retencao, procedimento de exportacao/correcao/exclusao, inventario de operadores e rito de incidente.</p>'
-    + '<h6>3. Referencias oficiais usadas</h6><p>Esta fase foi estruturada com base na LGPD, nos guias da ANPD sobre agentes de tratamento, direitos do titular, seguranca da informacao para pequeno porte e regulamentos aplicaveis.</p>'
+    + '<h6>1. O que já existe</h6><p>O produto ja conta com aceite de termos, política de privacidade, perfis de acesso, compartilhamento por cliente, segregacao entre clientes, trilhas operacionais e documentacao inicial de LGPD no repositorio.</p>'
+    + '<h6>2. O que ainda precisa ser fechado</h6><p>As próximas etapas são formalizar canal de atendimento ao titular, política de retenção, procedimento de exportação/correção/exclusão, inventário de operadores e rito de incidente.</p>'
+    + '<h6>3. Referências oficiais usadas</h6><p>Esta fase foi estruturada com base na LGPD, nos guias da ANPD sobre agentes de tratamento, direitos do titular, segurança da informação para pequeno porte e regulamentos aplicáveis.</p>'
     + '<h6>4. Documentos do projeto</h6><ul><li><code>docs/lgpd-plano-granafy.md</code></li><li><code>docs/lgpd-registro-tratamento.md</code></li><li><code>docs/lgpd-incidentes-e-direitos.md</code></li></ul>'
-    + '<h6>5. Recomendacao operacional</h6><p>Antes de operar em escala maior, a base deve definir responsavel por privacidade, revisar acessos compartilhados, validar backups, mapear retencao e treinar quem concede acesso a clientes e terceiros.</p>'
+    + '<h6>5. Recomendação operacional</h6><p>Antes de operar em escala maior, a base deve definir responsável por privacidade, revisar acessos compartilhados, validar backups, mapear retenção e treinar quem concede acesso a clientes e terceiros.</p>'
     + '</div>'
     + '</div>';
 }
@@ -163,9 +163,9 @@ async function importData(event) {
       if (!uid) throw new Error('Entre com o login do cliente antes de importar o backup.');
 
       var imp = JSON.parse(e.target.result);
-      if (!imp.clients) throw new Error('Estrutura invalida.');
+      if (!imp.clients) throw new Error('Estrutura inválida.');
 
-      if (!(await appConfirm('Importar este JSON para o Supabase no login atual? Dados iguais serao ignorados para evitar duplicidade.', {
+      if (!(await appConfirm('Importar este JSON para o Supabase no login atual? Dados iguais serão ignorados para evitar duplicidade.', {
         title: 'Importar backup',
         confirmText: 'Importar'
       }))) return;
@@ -179,13 +179,13 @@ async function importData(event) {
       alert(
         'Backup importado para o Supabase!\n\n'
         + 'Clientes criados: ' + resumo.clientes + '\n'
-        + 'Dividas: ' + resumo.dividas + '\n'
-        + 'Titulos financeiros: ' + resumo.titulos + '\n'
+        + 'Dívidas: ' + resumo.dividas + '\n'
+        + 'Títulos financeiros: ' + resumo.titulos + '\n'
         + 'Baixas financeiras: ' + resumo.baixasTitulos + '\n'
         + 'Relacionamentos: ' + resumo.relacionamentos + '\n'
-        + 'Lancamentos do extrato: ' + resumo.lancamentos + '\n'
-        + 'Cartoes: ' + resumo.cartoes + '\n'
-        + 'Lancamentos de cartao: ' + resumo.lancamentosCartao + '\n'
+        + 'Lançamentos do extrato: ' + resumo.lancamentos + '\n'
+        + 'Cartões: ' + resumo.cartoes + '\n'
+        + 'Lançamentos de cartão: ' + resumo.lancamentosCartao + '\n'
         + 'Ignorados por duplicidade: ' + resumo.ignorados
       );
     } catch (err) {
@@ -619,7 +619,7 @@ function renderSettingsModal(activeTabKey) {
     tabButtons += '<button class="modal-tab" data-stab="auditoria" onclick="switchSettingsTab(\'auditoria\')">Auditoria</button>';
   }
 
-  document.getElementById('modalTitle').textContent = 'Configuracoes';
+  document.getElementById('modalTitle').textContent = 'Configurações';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-hero">'
     + '<div><span class="settings-eyebrow">Ambiente do cliente</span><h4>' + esc(clienteNome) + '</h4><p>' + heroText + '</p></div>'
@@ -676,7 +676,7 @@ function renderLgpdPanel() {
     '<div class="settings-section-card">'
     + '<div class="settings-card-head"><div><h5>LGPD do ambiente</h5><p>Base inicial de governanca para o Granafy e para a operacao deste cliente.</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + esc(clienteNome) + '</span></div></div>'
     + '<div class="settings-card-grid backup-card-grid">'
-      + '<div class="settings-action-card"><span class="settings-action-title">Ja coberto</span><small>Termos e politica de privacidade, aceite no cadastro, perfis de acesso, segregacao por cliente, compartilhamento controlado e trilhas operacionais.</small></div>'
+      + '<div class="settings-action-card"><span class="settings-action-title">Ja coberto</span><small>Termos e política de privacidade, aceite no cadastro, perfis de acesso, segregacao por cliente, compartilhamento controlado e trilhas operacionais.</small></div>'
       + '<div class="settings-action-card"><span class="settings-action-title">Pendente priorizado</span><small>Canal do titular, retencao e descarte, exportacao/correcao/exclusao, registro formal de incidente e revisao periodica de acessos.</small></div>'
     + '</div>'
     + '<div class="settings-card-grid backup-card-grid" style="margin-top:16px">'
@@ -788,14 +788,14 @@ async function renderUsuariosPanel() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    panel.innerHTML = '<p style="color:var(--danger);font-size:.83rem">Nao foi possivel carregar usuarios. Rode a migracao de perfis no Supabase.</p>';
+    panel.innerHTML = '<p style="color:var(--danger);font-size:.83rem">Não foi possível carregar usuários. Rode a migração de perfis no Supabase.</p>';
     console.error(error);
     return;
   }
 
   panel.innerHTML =
     '<div class="settings-section-card">'
-    + '<div class="settings-card-head"><div><h5>Perfis de acesso</h5><p>Gerencie perfil, limite de clientes, plano, status e solicitacoes pendentes.</p></div></div>'
+    + '<div class="settings-card-head"><div><h5>Perfis de acesso</h5><p>Gerencie perfil, limite de clientes, plano, status e solicitações pendentes.</p></div></div>'
     + '<div class="user-table-wrap settings-table-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Limite</th><th>Plano</th><th>Status</th><th>Solicitacao</th><th></th></tr></thead><tbody>'
     + (perfis || []).map(function(p) {
       var id = esc(p.id);
@@ -805,7 +805,7 @@ async function renderUsuariosPanel() {
         ? '<strong>' + esc(accessTypeLabel(p.solicitacao_tipo_acesso)) + '</strong>'
           + (p.solicitacao_perfil_motivo ? '<br><span style="color:var(--muted);font-size:.72rem">' + esc(p.solicitacao_perfil_motivo) + '</span>' : '')
           + (p.solicitacao_perfil_em ? '<br><span style="color:var(--muted);font-size:.72rem">' + esc(formatDate(p.solicitacao_perfil_em)) + '</span>' : '')
-        : '<span style="color:var(--muted);font-size:.72rem">Sem solicitacao</span>';
+        : '<span style="color:var(--muted);font-size:.72rem">Sem solicitação</span>';
       return '<tr>'
         + '<td><strong>' + esc(p.nome || p.email || '-') + '</strong><br><span style="color:var(--muted);font-size:.72rem">' + esc(p.email || '-') + (p.telefone ? ' · ' + esc(p.telefone) : '') + '</span></td>'
         + '<td><select id="usr-tipo-' + id + '"><option value="usuario"' + (tipoAtual === 'usuario' ? ' selected' : '') + '>Usuario</option><option value="consultor"' + (tipoAtual === 'consultor' ? ' selected' : '') + '>Consultor</option><option value="master"' + (tipoAtual === 'master' ? ' selected' : '') + '>Master</option></select></td>'
@@ -855,7 +855,7 @@ async function salvarPerfilUsuario(id) {
 
 async function solicitarAlteracaoPerfil() {
   if (!authUser || !authUser.id) {
-    alert('Usuario nao autenticado.');
+    alert('Usuário não autenticado.');
     return;
   }
 
@@ -865,7 +865,7 @@ async function solicitarAlteracaoPerfil() {
   var motivo = motivoEl ? motivoEl.value.trim() : '';
 
   if (!motivo) {
-    alert('Explique o motivo da solicitacao.');
+    alert('Explique o motivo da solicitação.');
     return;
   }
 
@@ -880,12 +880,12 @@ async function solicitarAlteracaoPerfil() {
 
   if (error) {
     console.error(error);
-    alert('Nao foi possivel enviar a solicitacao.');
+    alert('Não foi possível enviar a solicitação.');
     return;
   }
 
   await loadAuthProfile();
-  alert('Solicitacao enviada ao Master.');
+  alert('Solicitação enviada ao Master.');
   renderUsuariosPanel();
 }
 
@@ -935,10 +935,10 @@ function renderCatsPanel(tipo) {
   var desc = tipo === 'cc'
     ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
     : (tipo === 'cartao'
-      ? 'Categorias dos lancamentos do <strong style="color:var(--text)">Cartao de Credito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variavel no DRE.'
+      ? 'Categorias dos lançamentos do <strong style="color:var(--text)">Cartao de Credito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variável no DRE.'
       : (tipo === 'financeiro'
-        ? 'Categorias do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Use essas opcoes em contas a receber e contas a pagar.'
-        : 'Centros de custo do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Organize extrato e titulos por area de responsabilidade.'));
+        ? 'Categorias do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Use essas opções em contas a receber e contas a pagar.'
+        : 'Centros de custo do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Organize extrato e títulos por área de responsabilidade.'));
   var clienteTipo = data.clients[activeClient] && data.clients[activeClient].tipoCliente ? clientTypeLabel(data.clients[activeClient].tipoCliente) : 'Cliente';
   var totalCats = cats.length;
 
@@ -1164,7 +1164,7 @@ async function saveCategoryEdit(tipo, i) {
 }
 
 async function resetCategories(tipo) {
-  if (!(await appConfirm('Restaurar categorias padrao?', { title: 'Restaurar categorias', confirmText: 'Restaurar' }))) return;
+  if (!(await appConfirm('Restaurar categorias padrão?', { title: 'Restaurar categorias', confirmText: 'Restaurar' }))) return;
   if (tipo === 'cc') await Promise.resolve(saveCatsCC(DC_CC.map(function(c) { return Object.assign({}, c); })));
   else if (tipo === 'cartao') await Promise.resolve(saveCatsCartao(DC_CART.slice()));
   else if (tipo === 'financeiro') await Promise.resolve(saveCatsFinanceiro(DC_FINANCEIRO.slice()));

@@ -67,19 +67,19 @@ function renderDRE() {
     + '<th style="padding:10px 12px;text-align:right;font-size:.69rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">Valor</th>'
     + '</tr></thead><tbody>'
     + '<tr style="background:rgba(62,207,176,.06)"><td colspan="2" style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.8px">Receitas</td></tr>'
-    + (recRows || '<tr><td colspan="2" style="padding:8px 12px 8px 20px;font-size:.82rem;color:var(--muted)">Nenhuma receita no periodo.</td></tr>')
+    + (recRows || '<tr><td colspan="2" style="padding:8px 12px 8px 20px;font-size:.82rem;color:var(--muted)">Nenhuma receita no período.</td></tr>')
     + dreTotal('(=) Total de Receitas', tReceita, 'val-pos', false)
     + '<tr style="background:rgba(255,107,107,.05)"><td colspan="2" style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.8px">Despesas Fixas</td></tr>'
-    + (fixRows || '<tr><td colspan="2" style="padding:8px 12px 8px 20px;font-size:.82rem;color:var(--muted)">Nenhuma despesa fixa no periodo.</td></tr>')
+    + (fixRows || '<tr><td colspan="2" style="padding:8px 12px 8px 20px;font-size:.82rem;color:var(--muted)">Nenhuma despesa fixa no período.</td></tr>')
     + dreTotal('(-) Total de Despesas Fixas', tFixas, 'val-neg', false)
     + '<tr style="background:rgba(255,198,107,.05)"><td colspan="2" style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--warning);text-transform:uppercase;letter-spacing:.8px">Despesas Variaveis</td></tr>'
-    + (varRows || '<tr><td colspan="2" style="padding:8px 12px 8px 20px;font-size:.82rem;color:var(--muted)">Nenhuma despesa variavel no periodo.</td></tr>')
+    + (varRows || '<tr><td colspan="2" style="padding:8px 12px 8px 20px;font-size:.82rem;color:var(--muted)">Nenhuma despesa variável no período.</td></tr>')
     + dreTotal('(-) Total de Despesas Variaveis', tVariavel, 'val-neg', false)
     + dreTotal('(=) Resultado Liquido', resultado, resClass, true)
     + '<tr><td style="padding:8px 12px;font-size:.82rem;color:var(--muted)">Taxa de poupanca</td><td style="text-align:right;padding:8px 12px;font-size:.84rem;font-weight:600" class="' + (txPoupanca >= 0 ? 'val-pos' : 'val-neg') + '">' + txPoupanca.toFixed(1) + '%</td></tr>'
     + '</tbody></table></div>'
     + '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;font-size:.8rem;color:var(--muted)">'
-    + '<strong style="color:var(--text)">Observacao:</strong> a categoria Mov. Contas e tratada como transferencia interna. Ela nao entra como receita nem como despesa no DRE. Total do periodo: <strong style="color:var(--text)">' + fmt(movTotal) + '</strong>.'
+    + '<strong style="color:var(--text)">Observacao:</strong> a categoria Mov. Contas e tratada como transferencia interna. Ela nao entra como receita nem como despesa no DRE. Total do período: <strong style="color:var(--text)">' + fmt(movTotal) + '</strong>.'
     + '</div>';
 
   document.getElementById('dre-content').innerHTML = html;

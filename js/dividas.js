@@ -555,7 +555,7 @@ async function insertDividaComFallback(payload) {
 }
 
 async function addDivida() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   _dvDraft = coletarRascunhoDivida();
   var org = document.getElementById('dv-org').value.trim();
   var tipo = document.getElementById('dv-tipo').value;
@@ -614,7 +614,7 @@ async function addDivida() {
 }
 
 async function deleteDivida(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   if (!(await appConfirm('Excluir divida?', { title: 'Excluir divida', confirmText: 'Excluir' }))) return;
 
   var c = data.clients[activeClient];
@@ -638,7 +638,7 @@ async function deleteDivida(i) {
 }
 
 async function registrarPagamentoDivida(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var valor = parseMoney(document.getElementById('dv-pag-inp-' + i));
   var parcelaRef = parseInt((document.getElementById('dv-parcela-inp-' + i) || {}).value, 10) || 0;
   var dataPagamento = ((document.getElementById('dv-data-pag-inp-' + i) || {}).value) || new Date().toISOString().slice(0, 10);

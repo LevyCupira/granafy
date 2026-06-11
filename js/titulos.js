@@ -321,7 +321,7 @@ function tfExportXlsx() {
 
 function tfExportPDF() {
   var jsPDF = window.jspdf && window.jspdf.jsPDF;
-  if (!jsPDF) return alert('Biblioteca PDF nao carregada.');
+  if (!jsPDF) return alert('Biblioteca PDF não carregada.');
   if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente.');
   var rows = tfExportRows();
   if (!rows.length) return alert('Nao ha dados para exportar com os filtros atuais.');
@@ -456,11 +456,11 @@ function tfResetForm(prefix) {
 }
 
 async function tfAddTitulo() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var payload = tfReadFormPayload(tfFormPrefix());
   if (!payload) return;
   if (!payload.pessoaNome || !payload.descricao || payload.valorTotal <= 0) {
-    alert('Preencha pessoa, descricao e valor do titulo.');
+    alert('Preencha pessoa, descrição e valor do título.');
     return;
   }
 
@@ -603,7 +603,7 @@ async function tfSaveTitulo(id) {
   if (payload.vencimento === null) return;
 
   if (!payload.pessoa_nome || !payload.descricao || payload.valor_total <= 0) {
-    alert('Preencha pessoa, descricao e valor do titulo.');
+    alert('Preencha pessoa, descrição e valor do título.');
     return;
   }
 
@@ -765,7 +765,7 @@ function renderFinanceiro() {
     + '</div>'
     + '<div class="form-card">'
       + '<h3>Painel de pendencias</h3>'
-      + '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atencao no Extrato e no Financeiro.</p>'
+      + '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p>'
       + '<div class="summary-grid pending-grid">'
         + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Pendentes de estorno</div><div class="s-val red">' + pendencias.extratoPendentesEstorno.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoPendentesEstorno.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'pendentes_estorno\')">Abrir no Extrato</button></div>'
@@ -778,7 +778,7 @@ function renderFinanceiro() {
     + '</div>'
     + '<div class="form-card">'
       + '<h3>Financeiro PJ</h3>'
-      + '<p class="cartao-helper-text">Cadastre os titulos a receber e a pagar da empresa. No proximo passo, vamos poder conciliar essas baixas diretamente com o Extrato.</p>'
+      + '<p class="cartao-helper-text">Cadastre os títulos a receber e a pagar da empresa. No próximo passo, vamos poder conciliar essas baixas diretamente com o Extrato.</p>'
       + '<div class="tipo-toggle" style="margin-top:14px">'
         + '<button type="button" class="tipo-btn credito' + (_tfNatureza === 'receber' ? ' active' : '') + '" onclick="tfSetNatureza(\'receber\')">A Receber</button>'
         + '<button type="button" class="tipo-btn debito' + (_tfNatureza === 'pagar' ? ' active' : '') + '" onclick="tfSetNatureza(\'pagar\')">A Pagar</button>'
@@ -786,7 +786,7 @@ function renderFinanceiro() {
     + '</div>'
     + financeiroPanel('novo', '+ Novo titulo - ' + tituloAtivo,
       '<div class="form-row">'
-        + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem esta envolvido neste titulo"/></div>'
+        + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem está envolvido neste título"/></div>'
         + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Ex.: Mensalidade, imposto, fornecedor"/></div>'
       + '</div>'
       + '<div class="form-row">'
@@ -794,7 +794,7 @@ function renderFinanceiro() {
         + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="' + tfFormPrefix() + '-valor" class="money-input" value="0,00"/></div>'
       + '</div>'
       + '<div class="form-row">'
-        + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informacoes complementares deste titulo"></textarea></div>'
+        + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informações complementares deste título"></textarea></div>'
       + '</div>'
       + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>'
     )
@@ -802,8 +802,8 @@ function renderFinanceiro() {
         + '<h3>Filtros</h3>'
         + '<div class="form-row">'
           + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
-          + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Filtrar pela descricao do titulo" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+          + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Filtrar pela descrição do título" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa ou observação" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">Exportar PDF</button><button class="btn-sm" onclick="tfExportXlsx()">Exportar XLSX</button></div>'
       + '</div>'

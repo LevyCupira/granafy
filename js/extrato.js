@@ -450,7 +450,7 @@ function exportExtratoXlsx() {
 
 function exportExtratoPDF() {
   var jsPDF = window.jspdf && window.jspdf.jsPDF;
-  if (!jsPDF) return alert('Biblioteca PDF nao carregada.');
+  if (!jsPDF) return alert('Biblioteca PDF não carregada.');
   if (!activeClient) return alert('Selecione um cliente.');
   var cliente = data.clients[activeClient];
   var filtrados = extratoLancamentosFiltrados(cliente);
@@ -1094,7 +1094,7 @@ function contasOptionsObrigatoriasCliente(contaIdAtual, placeholder) {
 }
 
 function abrirImportacaoExtrato() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var sel = document.getElementById('ex-import-conta');
   if (!sel || !sel.value) {
     alert('Selecione a conta antes de importar o extrato.');
@@ -1166,8 +1166,8 @@ var BANCOS_COMUNS = [
 ];
 
 var TIPOS_RELACIONAMENTO = [
-  { value: 'pf', label: 'Pessoa fisica' },
-  { value: 'pj', label: 'Pessoa juridica' },
+  { value: 'pf', label: 'Pessoa física' },
+  { value: 'pj', label: 'Pessoa jurídica' },
   { value: 'interno', label: 'Interno' },
   { value: 'terceiro', label: 'Terceiro' }
 ];
@@ -1199,7 +1199,7 @@ async function insertLancamentoComFallback(payload) {
 }
 
 async function cadastrarContaCliente() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var conta = await abrirFormularioContaCliente(null);
   if (!conta) return;
 
@@ -1231,7 +1231,7 @@ async function cadastrarContaCliente() {
 }
 
 async function editarContaCliente(contaId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var conta = contasClienteAtivo().find(item => item.id === contaId);
   if (!conta) return alert('Conta nao encontrada.');
@@ -1267,7 +1267,7 @@ async function editarContaCliente(contaId) {
 }
 
 async function cadastrarRelacionamentoCliente() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var relacionamento = await abrirFormularioRelacionamentoCliente(null);
   if (!relacionamento) return;
 
@@ -1308,7 +1308,7 @@ async function cadastrarRelacionamentoCliente() {
 }
 
 async function editarRelacionamentoCliente(relacionamentoId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
   if (!rel) return alert('Relacionamento nao encontrado.');
 
@@ -1358,7 +1358,7 @@ async function editarRelacionamentoCliente(relacionamentoId) {
 }
 
 async function excluirRelacionamentoCliente(relacionamentoId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
   if (!rel) return;
 
@@ -1718,7 +1718,7 @@ function toggleSelecionarTodosVisiveisExtrato(ids) {
 
 async function aplicarCategoriaEmLoteExtrato() {
   if (!canEditActiveClient()) {
-    alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+    alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
     return;
   }
   var categoriaEl = document.getElementById('ex-lote-categoria');
@@ -1828,7 +1828,7 @@ function setManterDuplicadoExtrato(chave, id) {
 }
 
 async function removerDuplicadosSelecionadosExtrato() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var c = data.clients[activeClient];
   if (!c || !Array.isArray(c.extrato)) return;
@@ -1878,7 +1878,7 @@ async function removerDuplicadosSelecionadosExtrato() {
 }
 
 async function removerDuplicadoGrupoExtrato(chaveCodificada) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var chave = decodeURIComponent(chaveCodificada);
   var c = data.clients[activeClient];
@@ -1930,7 +1930,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
 }
 
 async function removerDuplicadosExtratoClienteAtivo() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var linhas = null;
   var query = applyUserScope(
@@ -2296,7 +2296,7 @@ function renderExtrato() {
   }
 }
 async function addExtrato() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var dataLanc = document.getElementById('ex-data').value;
   var desc = formatDescriptionTitleCase(document.getElementById('ex-desc').value);
   var cat = document.getElementById('ex-cat').value;
@@ -2589,7 +2589,7 @@ function extratoSugestoesConciliacao(lanc, natureza, restante) {
 function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
   if (!sugestoes.length) return '';
   return '<div class="settings-section-card" style="margin-bottom:16px">'
-    + '<div class="settings-card-head"><div><h5>Sugestoes de conciliacao</h5><p>O Granafy analisou valor, nome e descricao para sugerir os titulos mais provaveis.</p></div></div>'
+    + '<div class="settings-card-head"><div><h5>Sugestoes de conciliacao</h5><p>O Granafy analisou valor, nome e descrição para sugerir os títulos mais prováveis.</p></div></div>'
     + '<div class="summary-grid pending-grid">'
     + sugestoes.map(function(item) {
       return '<div class="summary-card pending-card">'
@@ -2648,7 +2648,7 @@ function openExtratoConciliacaoModal(i) {
           + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.baixa.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoBaixa(\'' + esc(lanc.id) + '\',\'' + esc(item.tituloId) + '\',\'' + esc(item.baixa.id) + '\',' + i + ')" title="Desconciliar">&#128465;</button></div>'
           + '</div>';
       }).join('')
-    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliacao registrada neste lancamento.</div>';
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliação registrada neste lançamento.</div>';
 
   document.getElementById('modalTitle').textContent = acaoLabel;
   document.getElementById('modalBody').innerHTML =
@@ -2659,7 +2659,7 @@ function openExtratoConciliacaoModal(i) {
       + '<span class="settings-card-badge subtle">Restante ' + fmt(restante) + '</span>'
     + '</div>'
     + '<div class="settings-section-card" style="margin-bottom:16px">'
-      + '<div class="settings-card-head"><div><h5>Lancamento do extrato</h5><p>Use este credito ou debito do banco para baixar um titulo financeiro do cliente PJ.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Lancamento do extrato</h5><p>Use este crédito ou débito do banco para baixar um título financeiro do cliente PJ.</p></div></div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="text" value="' + esc(formatDate(lanc.data)) + '" readonly/></div>'
         + '<div class="form-group" style="max-width:180px"><label>Conta</label><input type="text" value="' + esc(nomeContaPorId(c, lanc.contaId)) + '" readonly/></div>'
@@ -2671,7 +2671,7 @@ function openExtratoConciliacaoModal(i) {
     + '</div>'
     + extratoSugestoesConciliacaoHtml(sugestoes, restante)
     + '<div class="settings-section-card">'
-      + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Voce pode vincular este lancamento a mais de um titulo, desde que o total conciliado nao ultrapasse o valor do banco.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Você pode vincular este lançamento a mais de um título, desde que o total conciliado não ultrapasse o valor do banco.</p></div></div>'
       + baixasHtml
       + '<div class="form-row" style="margin-top:16px">'
         + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
@@ -2702,17 +2702,17 @@ async function conciliarExtratoLancamento(i) {
   var valor = parseMoney(document.getElementById('ex-conciliar-valor'));
   var observacao = ((document.getElementById('ex-conciliar-obs') || {}).value || '').trim();
 
-  if (!tituloId) return alert('Selecione um titulo para conciliar.');
+  if (!tituloId) return alert('Selecione um título para conciliar.');
   if (!valor || valor <= 0) return alert('Informe um valor de baixa maior que zero.');
 
   if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
   var titulo = tfFindTituloById(tituloId);
-  if (!titulo) return alert('Titulo nao encontrado.');
+  if (!titulo) return alert('Título não encontrado.');
 
   var saldoTitulo = tfSaldo(titulo);
   var restanteLanc = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
-  if (valor > saldoTitulo) return alert('O valor informado ultrapassa o saldo do titulo.');
-  if (valor > restanteLanc) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+  if (valor > saldoTitulo) return alert('O valor informado ultrapassa o saldo do título.');
+  if (valor > restanteLanc) return alert('O valor informado ultrapassa o restante disponível deste lançamento.');
 
   var response = await supabaseClient
     .from('titulos_financeiros_baixas')
@@ -2786,7 +2786,7 @@ async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extrato
 }
 
 async function deleteExtrato(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var c = data.clients[activeClient];
   var lanc = c.extrato[i];
 
@@ -2854,12 +2854,12 @@ async function deleteExtrato(i) {
 }
 
 async function editExtrato(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   openExtratoEditModal(i);
 }
 
 async function saveExtratoEditModal(i) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
@@ -2877,14 +2877,14 @@ async function saveExtratoEditModal(i) {
   var novaObservacao = document.getElementById('ex-edit-obs').value.trim();
   var origemEstorno = extratoLancamentoOrigemDoEstorno(c, lanc.id);
 
-  if (!novaDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
+  if (!novaDesc || !novoValor) return alert('Descrição e valor são obrigatórios.');
 
   var valorConciliado = valorConciliadoDoLancamento(lanc);
   if (valorConciliado > 0 && extratoTipoNormalizado(novoTipo) !== extratoTipoNormalizado(lanc.tipo || 'credito')) {
-    return alert('Desfaca primeiro a conciliacao financeira antes de mudar o tipo deste lancamento.');
+    return alert('Desfaça primeiro a conciliação financeira antes de mudar o tipo deste lançamento.');
   }
   if (valorConciliado > 0 && Number(novoValor || 0) < valorConciliado) {
-    return alert('O novo valor nao pode ser menor que o valor ja conciliado no Financeiro.');
+    return alert('O novo valor não pode ser menor que o valor já conciliado no Financeiro.');
   }
   if (origemEstorno && extratoTipoNormalizado(novoTipo) !== extratoTipoNormalizado(lanc.tipo || 'credito')) {
     return alert('Esse lancamento esta vinculado como estorno de outro registro. Desfaca o vinculo antes de mudar o tipo.');

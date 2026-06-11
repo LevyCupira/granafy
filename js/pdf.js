@@ -4,7 +4,7 @@
 
 function exportPDF() {
   var jsPDF = window.jspdf && window.jspdf.jsPDF;
-  if (!jsPDF) return alert('Biblioteca PDF nao carregada.');
+  if (!jsPDF) return alert('Biblioteca PDF não carregada.');
   if (!activeClient) return alert('Selecione um cliente.');
 
   var c = data.clients[activeClient];

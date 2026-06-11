@@ -135,8 +135,8 @@ function openClientFormModal(id) {
     '<div class="form-row">'
       + '<div class="form-group" style="max-width:190px"><label>Tipo do cliente</label>'
       + '<select id="client-form-tipo" onchange="syncClientFormByType()">'
-      + '<option value="pf"' + (tipo === 'pf' ? ' selected' : '') + '>Pessoa fisica</option>'
-      + '<option value="pj"' + (tipo === 'pj' ? ' selected' : '') + '>Pessoa juridica</option>'
+      + '<option value="pf"' + (tipo === 'pf' ? ' selected' : '') + '>Pessoa física</option>'
+      + '<option value="pj"' + (tipo === 'pj' ? ' selected' : '') + '>Pessoa jurídica</option>'
       + '</select></div>'
     + '</div>'
     + '<div class="form-row client-form-type client-form-type-pf">'
@@ -319,7 +319,7 @@ function renderClientList() {
 
 async function deleteClient(id) {
   if (!isOwnClient(id)) {
-    alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+    alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
     return;
   }
   var c = data.clients[id];

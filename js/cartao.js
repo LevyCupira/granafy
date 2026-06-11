@@ -20,7 +20,7 @@ var COLS_CARTAO = [
   { key:'_del',   label:'',          render: () => '' },
 ];
 
-var CARTAO_READONLY_MSG = 'Este cliente pertence a outro login e esta disponivel apenas para visualizacao.';
+var CARTAO_READONLY_MSG = 'Este cliente pertence a outro login e está disponível apenas para visualização.';
 
 function canEditCartaoClient() {
   if (canEditActiveClient()) return true;
@@ -691,7 +691,7 @@ async function saveCartaoEditModal(i) {
   var infoItemAtual = parseCartaoInstallmentInfo(item.desc || '');
 
   if (!novoCartaoId) return alert('Selecione um cartao.');
-  if (!novoDesc || !novoValor) return alert('Descricao e valor sao obrigatorios.');
+  if (!novoDesc || !novoValor) return alert('Descrição e valor são obrigatórios.');
 
   var error = null;
   if (aplicarSerie) {

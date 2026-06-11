@@ -243,8 +243,8 @@ function applyInviteContextToAuthScreen() {
   if (title) title.textContent = 'Primeiro acesso';
   if (subtitle) {
     subtitle.textContent = invite.clientName
-      ? ('Seu acesso ao cliente ' + invite.clientName + ' ja foi liberado. Crie sua senha usando este e-mail.')
-      : 'Seu acesso compartilhado ja foi liberado. Crie sua senha usando este e-mail.';
+      ? ('Seu acesso ao cliente ' + invite.clientName + ' já foi liberado. Crie sua senha usando este e-mail.')
+      : 'Seu acesso compartilhado já foi liberado. Crie sua senha usando este e-mail.';
   }
   if (emailEl && !emailEl.value) emailEl.value = invite.email;
   setAuthMessage('Use o mesmo e-mail do convite para concluir o primeiro acesso.');
@@ -252,7 +252,7 @@ function applyInviteContextToAuthScreen() {
 
 function supabaseAuthReady() {
   if (window.supabaseClient && window.supabaseClient.auth) return true;
-  setAuthMessage('Nao foi possivel carregar o Supabase. Recarregue a pagina com Ctrl + F5.', 'error');
+  setAuthMessage('Não foi possível carregar o Supabase. Recarregue a página com Ctrl + F5.', 'error');
   return false;
 }
 
@@ -270,22 +270,22 @@ function renderAuthScreen() {
       + '<div class="auth-panel">'
         + '<div class="auth-brand">Granafy</div>'
         + '<h1 id="auth-title">Entrar</h1>'
-        + '<p id="auth-subtitle">Use seu e-mail e senha para acessar a gestao financeira.</p>'
+        + '<p id="auth-subtitle">Use seu e-mail e senha para acessar a gestão financeira.</p>'
         + '<div class="form-group auth-signup-only" style="display:none"><label>Nome completo</label><input id="auth-name" type="text" autocomplete="name" placeholder="Seu nome"/></div>'
         + '<div class="form-group auth-signup-only" style="display:none"><label>WhatsApp</label><input id="auth-phone" type="tel" autocomplete="tel" placeholder="(00) 00000-0000"/></div>'
-        + '<div class="form-group auth-signup-only" style="display:none"><label>Perfil de uso</label><select id="auth-usage-type"><option value="pf">Pessoa fisica</option><option value="pj">Pessoa juridica</option><option value="consultor">Consultor / escritorio</option></select></div>'
+        + '<div class="form-group auth-signup-only" style="display:none"><label>Perfil de uso</label><select id="auth-usage-type"><option value="pf">Pessoa física</option><option value="pj">Pessoa jurídica</option><option value="consultor">Consultor / escritório</option></select></div>'
         + '<div class="form-group auth-signup-only" style="display:none"><label>CPF ou CNPJ</label><input id="auth-document" type="text" autocomplete="off" placeholder="Documento principal"/></div>'
-        + '<div class="form-group auth-signup-only" style="display:none"><label>Empresa ou razao social</label><input id="auth-company" type="text" autocomplete="organization" placeholder="Obrigatorio para PJ/consultor"/></div>'
+        + '<div class="form-group auth-signup-only" style="display:none"><label>Empresa ou razão social</label><input id="auth-company" type="text" autocomplete="organization" placeholder="Obrigatório para PJ/consultor"/></div>'
         + '<div class="form-group"><label>E-mail</label><input id="auth-email" type="email" autocomplete="email" placeholder="voce@email.com"/></div>'
         + '<div class="form-group"><label>Senha</label><input id="auth-password" type="password" autocomplete="current-password" placeholder="Sua senha"/></div>'
-        + '<label class="auth-check auth-signup-only" style="display:none"><input id="auth-terms" type="checkbox"/>Confirmo que li e aceito os <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'terms\')">termos de uso</a> e a <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'privacy\')">politica de privacidade</a>.</label>'
+        + '<label class="auth-check auth-signup-only" style="display:none"><input id="auth-terms" type="checkbox"/>Confirmo que li e aceito os <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'terms\')">termos de uso</a> e a <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'privacy\')">política de privacidade</a>.</label>'
         + '<div id="auth-message" class="auth-message"></div>'
         + '<button class="auth-primary" onclick="loginUsuario()">Entrar</button>'
         + '<button class="auth-secondary" id="auth-create-btn" onclick="mostrarCadastro()">Criar acesso</button>'
         + '<button class="auth-secondary auth-signup-only" style="display:none" onclick="criarUsuario()">Salvar cadastro</button>'
         + '<button class="auth-link auth-signup-only" style="display:none" onclick="mostrarLogin()">Voltar para entrar</button>'
         + '<button class="auth-link" onclick="enviarResetSenha()">Esqueci minha senha</button>'
-        + '<div class="auth-legal-links"><a href="#" onclick="event.preventDefault();openModal(\'legal\',\'terms\')">Termos de uso</a><span>·</span><a href="#" onclick="event.preventDefault();openModal(\'legal\',\'privacy\')">Politica de privacidade</a></div>'
+        + '<div class="auth-legal-links"><a href="#" onclick="event.preventDefault();openModal(\'legal\',\'terms\')">Termos de uso</a><span>·</span><a href="#" onclick="event.preventDefault();openModal(\'legal\',\'privacy\')">Política de privacidade</a></div>'
       + '</div>'
     + '</section>';
 
@@ -308,7 +308,7 @@ function mostrarCadastro() {
   var createBtn = document.getElementById('auth-create-btn');
 
   if (title) title.textContent = 'Criar acesso';
-  if (subtitle) subtitle.textContent = 'Cadastre o responsavel pela conta para acessar o Granafy com mais seguranca.';
+  if (subtitle) subtitle.textContent = 'Cadastre o responsável pela conta para acessar o Granafy com mais segurança.';
   if (loginBtn) loginBtn.style.display = 'none';
   if (createBtn) createBtn.style.display = 'none';
 
@@ -470,7 +470,7 @@ async function ensureAuthProfile(extra) {
 
   var response = await saveAuthProfilePayload(perfil);
   if (response.error) {
-    if (!isMissingProfileError(response.error)) console.warn('Nao foi possivel salvar perfil do usuario:', response.error);
+    if (!isMissingProfileError(response.error)) console.warn('Não foi possível salvar perfil do usuário:', response.error);
     authProfile = perfil;
     return authProfile;
   }
@@ -490,7 +490,7 @@ async function loadAuthProfile() {
     .maybeSingle();
 
   if (response.error) {
-    if (!isMissingProfileError(response.error)) console.warn('Nao foi possivel carregar perfil do usuario:', response.error);
+    if (!isMissingProfileError(response.error)) console.warn('Não foi possível carregar perfil do usuário:', response.error);
     authProfile = fallbackAuthProfile();
     return authProfile;
   }
@@ -520,7 +520,7 @@ async function loadAuthProfileSafe() {
       })
     ]);
   } catch (err) {
-    console.warn('Perfil indisponivel. Usando perfil temporario:', err);
+    console.warn('Perfil indisponível. Usando perfil temporário:', err);
     authProfile = fallbackAuthProfile();
     return authProfile;
   }
@@ -531,7 +531,7 @@ async function refreshAppAfterAuth() {
 
   await loadAuthProfileSafe();
   if (isBlockedUser()) {
-    alert('Seu acesso esta bloqueado. Fale com o administrador.');
+    alert('Seu acesso está bloqueado. Fale com o administrador.');
     await logoutUsuario();
     return;
   }
@@ -569,14 +569,14 @@ async function loginUsuario() {
 
     var response = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
     if (response.error) {
-      setAuthMessage(response.error.message || 'Nao foi possivel entrar.', 'error');
+      setAuthMessage(response.error.message || 'Não foi possível entrar.', 'error');
       return;
     }
 
     authUser = response.data.user;
     await loadAuthProfileSafe();
     if (isBlockedUser()) {
-      setAuthMessage('Seu acesso esta bloqueado. Fale com o administrador.', 'error');
+      setAuthMessage('Seu acesso está bloqueado. Fale com o administrador.', 'error');
       await supabaseClient.auth.signOut();
       authUser = null;
       return;
@@ -621,7 +621,7 @@ async function criarUsuario() {
     return;
   }
   if (!telefone) {
-    setAuthMessage('Informe o WhatsApp do responsavel.', 'error');
+    setAuthMessage('Informe o WhatsApp do responsável.', 'error');
     return;
   }
   if (!documento) {
@@ -629,7 +629,7 @@ async function criarUsuario() {
     return;
   }
   if ((perfilUso === 'pj' || perfilUso === 'consultor') && !empresa) {
-    setAuthMessage('Informe a empresa ou razao social para este perfil.', 'error');
+    setAuthMessage('Informe a empresa ou razão social para este perfil.', 'error');
     return;
   }
   if (!authTermsAccepted()) {
@@ -661,7 +661,7 @@ async function criarUsuario() {
     });
 
     if (response.error) {
-      setAuthMessage(response.error.message || 'Nao foi possivel criar o acesso.', 'error');
+      setAuthMessage(response.error.message || 'Não foi possível criar o acesso.', 'error');
       return;
     }
 
@@ -707,7 +707,7 @@ async function enviarResetSenha() {
   var email = authEmail();
 
   if (!email) {
-    setAuthMessage('Informe seu e-mail para receber o link de recuperacao.', 'error');
+    setAuthMessage('Informe seu e-mail para receber o link de recuperação.', 'error');
     return;
   }
 
@@ -721,11 +721,11 @@ async function enviarResetSenha() {
   setAuthLoading(false);
 
   if (response.error) {
-    setAuthMessage(response.error.message || 'Nao foi possivel enviar o link.', 'error');
+    setAuthMessage(response.error.message || 'Não foi possível enviar o link.', 'error');
     return;
   }
 
-  setAuthMessage('Link de recuperacao enviado para seu e-mail.');
+  setAuthMessage('Link de recuperação enviado para seu e-mail.');
 }
 
 async function atualizarSenha() {
@@ -745,7 +745,7 @@ async function atualizarSenha() {
   setAuthLoading(false);
 
   if (response.error) {
-    setAuthMessage(response.error.message || 'Nao foi possivel alterar a senha.', 'error');
+    setAuthMessage(response.error.message || 'Não foi possível alterar a senha.', 'error');
     return;
   }
 
