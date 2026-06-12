@@ -155,8 +155,8 @@ function tfFilteredItems() {
   }));
 }
 
-function tfSummaryValues() {
-  var items = tfTitulosCliente();
+function tfSummaryValues(items) {
+  items = Array.isArray(items) ? items : tfTitulosCliente();
   var receber = 0;
   var pagar = 0;
   var recebido = 0;
@@ -750,12 +750,12 @@ function renderFinanceiro() {
     return;
   }
 
-  var resumo = tfSummaryValues();
   var pendencias = tfPendenciasResumo();
   var tituloAtivo = tfTituloAtivoLabel();
   var pessoaLabel = _tfNatureza === 'pagar' ? 'Favorecido / fornecedor' : 'Cliente pagador';
   var btnLabel = _tfNatureza === 'pagar' ? 'Cadastrar conta a pagar' : 'Cadastrar conta a receber';
   var itens = tfFilteredItems();
+  var resumo = tfSummaryValues(itens);
   var areaHtml = buildTable('financeiro', COLS_TITULOS, itens, function(item) {
     return COLS_TITULOS.map(function(col) {
       if (col.key === '_del') {
