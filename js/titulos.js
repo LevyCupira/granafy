@@ -4,6 +4,7 @@ var _tfNatureza = 'receber';
 var _tfStatus = 'todos';
 var _tfDescricao = '';
 var _tfBusca = '';
+var TF_MIN_SEARCH_CHARS = 3;
 var _tfPanels = {
   novo: false
 };
@@ -73,6 +74,19 @@ function tfNormalizeText(value) {
     .trim();
 }
 
+function tfSearchTerm(value) {
+  var term = tfNormalizeText(value);
+  return term.length >= TF_MIN_SEARCH_CHARS ? term : '';
+}
+
+function tfSearchText(item) {
+  return tfNormalizeText([
+    item.pessoaNome,
+    item.descricao,
+    item.observacao
+  ].join(' '));
+}
+
 function tfParseAmountFromInput(id) {
   return parseMoney(document.getElementById(id));
 }
@@ -130,12 +144,12 @@ function tfFilteredItems() {
     if (item.natureza !== _tfNatureza) return false;
     if (_tfStatus !== 'todos' && tfStatusOf(item) !== _tfStatus) return false;
     if (_tfDescricao) {
-      var descricao = tfNormalizeText(item.descricao || '');
-      if (descricao.indexOf(tfNormalizeText(_tfDescricao)) === -1) return false;
+      var descricaoTerm = tfSearchTerm(_tfDescricao);
+      if (descricaoTerm && tfSearchText(item).indexOf(descricaoTerm) === -1) return false;
     }
     if (_tfBusca) {
-      var hay = tfNormalizeText([item.pessoaNome, item.observacao].join(' '));
-      if (hay.indexOf(tfNormalizeText(_tfBusca)) === -1) return false;
+      var buscaTerm = tfSearchTerm(_tfBusca);
+      if (buscaTerm && tfSearchText(item).indexOf(buscaTerm) === -1) return false;
     }
     return true;
   }));
@@ -802,8 +816,8 @@ function renderFinanceiro() {
         + '<h3>Filtros</h3>'
         + '<div class="form-row">'
           + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
-          + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Filtrar pela descrição do título" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa ou observação" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+          + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">Exportar PDF</button><button class="btn-sm" onclick="tfExportXlsx()">Exportar XLSX</button></div>'
       + '</div>'
