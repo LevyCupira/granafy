@@ -223,6 +223,30 @@ function extratoStatusEstornoValor(lanc) {
   return status;
 }
 
+function extratoValorEstorno(cliente, lanc) {
+  if (!lanc) return 0;
+  var valorSalvo = Number(lanc.estornoValor || 0);
+  if (valorSalvo > 0) return valorSalvo;
+  if (lanc.estornoLancamentoId && cliente && Array.isArray(cliente.extrato)) {
+    var destino = cliente.extrato.find(function(item) { return item.id === lanc.estornoLancamentoId; });
+    if (destino) return Number(destino.valor || 0);
+  }
+  return Number(lanc.valor || 0);
+}
+
+function extratoResumoValorEstorno(cliente, lanc) {
+  var valorOriginal = Number((lanc && lanc.valor) || 0);
+  var valorEstorno = Math.min(valorOriginal, extratoValorEstorno(cliente, lanc));
+  var saldo = Math.max(0, valorOriginal - valorEstorno);
+  var parcial = saldo >= 0.005;
+  return {
+    valor: valorEstorno,
+    saldo: saldo,
+    parcial: parcial,
+    texto: (parcial ? 'Estorno parcial ' : 'Estorno ') + fmt(valorEstorno) + (parcial ? ' - saldo pendente ' + fmt(saldo) : '')
+  };
+}
+
 function extratoLancamentoOrigemDoEstorno(cliente, lancamentoId) {
   if (!cliente || !lancamentoId) return null;
   return (cliente.extrato || []).find(function(item) {
@@ -245,21 +269,25 @@ function extratoClasseEstornoLinha(cliente, lanc) {
 function extratoResumoEstorno(cliente, lanc) {
   var origem = extratoLancamentoOrigemDoEstorno(cliente, lanc && lanc.id);
   if (origem) {
-    return '<span class="badge badge-estorno-vinculado">Lancamento de estorno</span> de ' + esc(origem.desc || origem.descOriginal || '-') + ' ' + fmt(origem.valor || 0);
+    var resumoOrigem = extratoResumoValorEstorno(cliente, origem);
+    return '<span class="badge badge-estorno-vinculado">Lancamento de estorno</span> de ' + esc(origem.desc || origem.descOriginal || '-') + ' ' + fmt(lanc.valor || 0) + (resumoOrigem.parcial ? ' - parcial' : '');
   }
 
   var status = extratoStatusEstornoValor(lanc);
   if (status === 'pendente_estorno') {
+    var resumoPendente = extratoResumoValorEstorno(cliente, lanc);
     return '<span class="badge badge-estorno-pendente">Pendente de estorno</span>'
+      + ' ' + esc(resumoPendente.texto)
       + (lanc && lanc.estornoObservacao ? ' ' + esc(lanc.estornoObservacao) : '');
   }
 
   if (status === 'estornado') {
     var destino = lanc && lanc.estornoLancamentoId ? (cliente.extrato || []).find(function(item) { return item.id === lanc.estornoLancamentoId; }) : null;
-    var texto = '<span class="badge badge-estorno-concluido">Ja estornado</span>';
+    var resumoConcluido = extratoResumoValorEstorno(cliente, lanc);
+    var texto = '<span class="badge badge-estorno-concluido">' + (resumoConcluido.parcial ? 'Estorno parcial' : 'Ja estornado') + '</span> ' + esc(resumoConcluido.texto);
     if (lanc && lanc.estornoData) texto += ' em ' + esc(formatDate(lanc.estornoData));
-    if (destino) texto += ' · vinculado a ' + esc(destino.desc || destino.descOriginal || '-') + ' ' + fmt(destino.valor || 0);
-    if (lanc && lanc.estornoObservacao) texto += ' · ' + esc(lanc.estornoObservacao);
+    if (destino) texto += ' - vinculado a ' + esc(destino.desc || destino.descOriginal || '-') + ' ' + fmt(destino.valor || 0);
+    if (lanc && lanc.estornoObservacao) texto += ' - ' + esc(lanc.estornoObservacao);
     return texto;
   }
 
@@ -292,7 +320,7 @@ function extratoEstornoOptionsHtml(cliente, lanc, selecionadoId) {
   var itens = extratoLancamentosElegiveisEstorno(cliente, lanc);
   if (!itens.length) return '<option value="">Nenhum lancamento elegivel</option>';
   return '<option value="">Selecione o estorno no extrato</option>' + itens.map(function(item) {
-    return '<option value="' + esc(item.id) + '" data-data="' + esc(item.data || '') + '"' + (item.id === selecionadoId ? ' selected' : '') + '>'
+    return '<option value="' + esc(item.id) + '" data-data="' + esc(item.data || '') + '" data-valor="' + esc(String(Number(item.valor || 0))) + '"' + (item.id === selecionadoId ? ' selected' : '') + '>'
       + esc(formatDate(item.data))
       + ' · ' + esc(item.desc || item.descOriginal || '-')
       + ' · ' + esc(extratoTipoLabel(item.tipo))
@@ -609,10 +637,16 @@ async function salvarRateioExtrato(i) {
 function syncExtratoEstornoData() {
   var select = document.getElementById('ex-estorno-lancamento');
   var dataInput = document.getElementById('ex-estorno-data');
+  var valorInput = document.getElementById('ex-estorno-valor-concluido');
   if (!select || !dataInput) return;
   var option = select.options[select.selectedIndex];
   if (option && option.dataset && option.dataset.data) {
     dataInput.value = option.dataset.data;
+  }
+  if (valorInput && option && option.dataset && option.dataset.valor) {
+    var valor = Number(option.dataset.valor || 0);
+    valorInput.dataset.cents = String(Math.round(valor * 100));
+    valorInput.value = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 }
 
@@ -649,6 +683,8 @@ function openExtratoEstornoModal(i) {
   var statusAtual = extratoStatusEstornoValor(lanc);
   var selectHtml = extratoEstornoOptionsHtml(c, lanc, lanc.estornoLancamentoId || '');
   var dataEstorno = lanc.estornoData || '';
+  var valorEstornoAtual = extratoValorEstorno(c, lanc);
+  var valorEstornoFormatado = Number(valorEstornoAtual || lanc.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   document.getElementById('modalTitle').textContent = 'Controle de devolucao';
   document.getElementById('modalBody').innerHTML =
@@ -666,7 +702,10 @@ function openExtratoEstornoModal(i) {
         + '<div class="form-group" style="max-width:220px"><label>Status da devolucao</label><select id="ex-estorno-status" onchange="atualizarCamposExtratoEstornoModal()"><option value="normal"' + (statusAtual === 'normal' ? ' selected' : '') + '>Sem devolucao</option><option value="pendente_estorno"' + (statusAtual === 'pendente_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornado"' + (statusAtual === 'estornado' ? ' selected' : '') + '>Ja estornado</option></select></div>'
       + '</div>'
       + '<div data-estorno-status-block="pendente_estorno" style="display:none">'
-        + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-estorno-obs-pendente" value="' + esc(statusAtual === 'pendente_estorno' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: valor recebido em duplicidade, cliente cancelou."/></div></div>'
+        + '<div class="form-row">'
+          + '<div class="form-group" style="max-width:180px"><label>Valor a devolver</label><input type="text" id="ex-estorno-valor-pendente" class="money-input" value="' + esc(valorEstornoFormatado) + '"/></div>'
+          + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-estorno-obs-pendente" value="' + esc(statusAtual === 'pendente_estorno' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: valor recebido em duplicidade, cliente cancelou."/></div>'
+        + '</div>'
       + '</div>'
       + '<div data-estorno-status-block="estornado" style="display:none">'
         + '<div class="form-row">'
@@ -674,6 +713,7 @@ function openExtratoEstornoModal(i) {
         + '</div>'
         + '<div class="form-row">'
           + '<div class="form-group" style="max-width:180px"><label>Data da devolucao</label><input type="date" id="ex-estorno-data" value="' + esc(dataEstorno) + '"/></div>'
+          + '<div class="form-group" style="max-width:180px"><label>Valor estornado</label><input type="text" id="ex-estorno-valor-concluido" class="money-input" value="' + esc(valorEstornoFormatado) + '"/></div>'
           + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-estorno-obs-concluido" value="' + esc(statusAtual === 'estornado' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: estorno realizado no banco."/></div>'
         + '</div>'
       + '</div>'
@@ -685,6 +725,7 @@ function openExtratoEstornoModal(i) {
 
   document.getElementById('modalOverlay').classList.add('open');
   document.addEventListener('keydown', handleMainModalEscape);
+  initMoneyInputs(document.getElementById('modalBody'));
   atualizarCamposExtratoEstornoModal();
   if (statusAtual === 'estornado') syncExtratoEstornoData();
 }
@@ -699,18 +740,31 @@ async function salvarExtratoEstorno(i) {
     status_estorno: 'normal',
     estorno_lancamento_id: null,
     estorno_data: null,
-    estorno_observacao: null
+    estorno_observacao: null,
+    estorno_valor: null
   };
+  var valorOriginal = Number(lanc.valor || 0);
 
   if (status === 'pendente_estorno') {
+    var valorPendente = parseMoney(document.getElementById('ex-estorno-valor-pendente'));
+    if (valorPendente <= 0) {
+      await appAlert('Informe um valor de estorno maior que zero.');
+      return;
+    }
+    if (valorPendente - valorOriginal > 0.005) {
+      await appAlert('O valor do estorno nao pode ser maior que o valor original do lancamento.');
+      return;
+    }
     payload.status_estorno = 'pendente_estorno';
     payload.estorno_observacao = (((document.getElementById('ex-estorno-obs-pendente') || {}).value) || '').trim() || null;
+    payload.estorno_valor = Number(valorPendente);
   }
 
   if (status === 'estornado') {
     var lancamentoEstornoId = (((document.getElementById('ex-estorno-lancamento') || {}).value) || '').trim();
     var dataEstorno = ((document.getElementById('ex-estorno-data') || {}).value || '').trim();
     var observacaoEstorno = (((document.getElementById('ex-estorno-obs-concluido') || {}).value) || '').trim();
+    var valorConcluido = parseMoney(document.getElementById('ex-estorno-valor-concluido'));
 
     if (!lancamentoEstornoId) {
       await appAlert('Selecione o lancamento do extrato que efetivou o estorno.');
@@ -734,10 +788,24 @@ async function salvarExtratoEstorno(i) {
       return;
     }
 
+    if (valorConcluido <= 0) {
+      await appAlert('Informe um valor de estorno maior que zero.');
+      return;
+    }
+    if (valorConcluido - valorOriginal > 0.005) {
+      await appAlert('O valor do estorno nao pode ser maior que o valor original do lancamento.');
+      return;
+    }
+    if (Math.abs(valorConcluido - Number(lancamentoEstorno.valor || 0)) >= 0.005) {
+      await appAlert('O valor estornado precisa ser igual ao valor do lancamento vinculado.');
+      return;
+    }
+
     payload.status_estorno = 'estornado';
     payload.estorno_lancamento_id = lancamentoEstornoId;
     payload.estorno_data = dataEstorno || lancamentoEstorno.data || null;
     payload.estorno_observacao = observacaoEstorno || null;
+    payload.estorno_valor = Number(valorConcluido);
   }
 
   var response = await applyUserScope(
@@ -751,7 +819,7 @@ async function salvarExtratoEstorno(i) {
 
   if (response.error) {
     console.error(response.error);
-    await appAlert('Nao foi possivel salvar a devolucao. Rode a migracao sql/20260602_status_devolucao_extrato.sql no Supabase.');
+    await appAlert('Nao foi possivel salvar a devolucao. Rode a migracao sql/20260611_estorno_parcial_extrato.sql no Supabase.');
     return;
   }
 
@@ -759,6 +827,7 @@ async function salvarExtratoEstorno(i) {
   lanc.estornoLancamentoId = response.data.estorno_lancamento_id || null;
   lanc.estornoData = response.data.estorno_data || null;
   lanc.estornoObservacao = response.data.estorno_observacao || '';
+  lanc.estornoValor = Number(response.data.estorno_valor || 0);
 
   closeModal();
   renderExtrato();
@@ -2802,7 +2871,8 @@ async function deleteExtrato(i) {
         .update({
           status_estorno: 'pendente_estorno',
           estorno_lancamento_id: null,
-          estorno_data: null
+          estorno_data: null,
+          estorno_valor: null
         })
         .in('id', origensEstorno.map(function(item) { return item.id; }))
     );

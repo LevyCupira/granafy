@@ -338,7 +338,8 @@ async function loadData() {
       estornoStatus: l.status_estorno || 'normal',
       estornoLancamentoId: l.estorno_lancamento_id || null,
       estornoData: l.estorno_data || null,
-      estornoObservacao: l.estorno_observacao || ''
+      estornoObservacao: l.estorno_observacao || '',
+      estornoValor: Number(l.estorno_valor || 0)
     });
   });
 
