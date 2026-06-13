@@ -117,6 +117,22 @@ async function loadData() {
     return res;
   }
 
+  async function carregarEventosComEscopo() {
+    var query = supabaseClient.from('eventos_cliente').select('*');
+    var res = await query.order('nome', { ascending: true });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('eventos_cliente')) {
+      console.warn('Tabela eventos_cliente ainda nao existe no Supabase. Rode a migracao 20260613_eventos_financeiro_pj.sql.');
+      return { data: [], error: null };
+    }
+
+    return res;
+  }
+
   async function carregarRelacionamentosComEscopo() {
     var query = supabaseClient.from('relacionamentos_cliente').select('*');
     var res = await query.order('nome', { ascending: true });
@@ -210,6 +226,11 @@ async function loadData() {
     console.warn('Nao foi possivel carregar centros de custo:', centrosCustoRes.error);
   }
   const centrosCustoRows = centrosCustoRes.data || [];
+  const eventosRes = await carregarEventosComEscopo();
+  if (eventosRes.error) {
+    console.warn('Nao foi possivel carregar eventos/projetos:', eventosRes.error);
+  }
+  const eventosRows = eventosRes.data || [];
   const relacionamentosRes = await carregarRelacionamentosComEscopo();
   if (relacionamentosRes.error) {
     console.warn('Nao foi possivel carregar relacionamentos personalizados:', relacionamentosRes.error);
@@ -250,6 +271,7 @@ async function loadData() {
   const catsFinanceiroPorCliente = {};
   const centrosCustoPorCliente = {};
   const centrosCustoMetaPorCliente = {};
+  const eventosPorCliente = {};
   (categoriasRows || []).forEach(cat => {
     if (!cat || !cat.cliente_id || !cat.nome) return;
     if (cat.escopo === 'cc') {
@@ -343,6 +365,22 @@ async function loadData() {
     });
   });
 
+  (eventosRows || []).forEach(item => {
+    if (!item || !item.cliente_id || !item.nome) return;
+    if (!eventosPorCliente[item.cliente_id]) eventosPorCliente[item.cliente_id] = [];
+    eventosPorCliente[item.cliente_id].push({
+      id: item.id,
+      nome: item.nome,
+      status: item.status || 'em_andamento',
+      dataInicio: item.data_inicio || null,
+      dataFim: item.data_fim || null,
+      orcamentoPrevisto: Number(item.orcamento_previsto || 0),
+      observacao: item.observacao || '',
+      ativo: item.ativo !== false,
+      userId: item.user_id || null
+    });
+  });
+
   const cartoesPorCliente = {};
   (cartoesRows || []).forEach(cc => {
     if (!cartoesPorCliente[cc.cliente_id]) cartoesPorCliente[cc.cliente_id] = [];
@@ -382,6 +420,8 @@ async function loadData() {
   (titulosRows || []).forEach(t => {
     if (!t || !t.cliente_id) return;
     if (!titulosPorCliente[t.cliente_id]) titulosPorCliente[t.cliente_id] = [];
+    var eventoTitulo = (eventosPorCliente[t.cliente_id] || []).find(function(ev) { return ev.id === t.evento_id; });
+    var centroTitulo = (centrosCustoMetaPorCliente[t.cliente_id] || []).find(function(cc) { return cc.id === t.centro_custo_id; });
     titulosPorCliente[t.cliente_id].push({
       id: t.id,
       natureza: t.natureza || 'receber',
@@ -389,6 +429,9 @@ async function loadData() {
       descricao: t.descricao || '',
       categoria: t.categoria || '',
       centroCustoId: t.centro_custo_id || null,
+      centroCusto: centroTitulo ? centroTitulo.nome : '',
+      eventoId: t.evento_id || null,
+      evento: eventoTitulo ? eventoTitulo.nome : '',
       vencimento: t.vencimento || null,
       valorTotal: Number(t.valor_total || 0),
       observacao: t.observacao || '',
@@ -424,6 +467,8 @@ async function loadData() {
       documento: c.documento || '',
       telefone: c.telefone || '',
       emailFinanceiro: c.email_financeiro || '',
+      eventosEnabled: c.eventos_enabled === true,
+      eventosLabel: c.eventos_label || 'Eventos',
       responsavel: c.responsavel || '',
       razaoSocial: c.razao_social || '',
       nomeFantasia: c.nome_fantasia || '',
@@ -433,6 +478,7 @@ async function loadData() {
       contas: contasPorCliente[c.id] || [],
       relacionamentos: relacionamentosPorCliente[c.id] || [],
       titulos: titulosPorCliente[c.id] || [],
+      eventos: eventosPorCliente[c.id] || [],
       acessos: acessosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],

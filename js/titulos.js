@@ -9,10 +9,14 @@ var _tfVencimentoAte = '';
 var _tfValorModo = 'todos';
 var _tfValor = 0;
 var _tfCentroCusto = '';
+var _tfEvento = '';
 var _tfBusca = '';
+var _tfEventoEditId = null;
+var _tfBulkSelected = new Set();
 var TF_MIN_SEARCH_CHARS = 3;
 var _tfPanels = {
   resumo: true,
+  eventos: true,
   pendencias: true,
   importar: false,
   filtros: true,
@@ -95,6 +99,7 @@ function tfSearchText(item) {
     item.pessoaNome,
     item.descricao,
     item.centroCusto,
+    item.evento,
     item.observacao
   ].join(' '));
 }
@@ -164,8 +169,10 @@ function tfFilteredItems() {
   return tfSortItems(tfTitulosCliente().filter(function(item) {
     if (item.natureza !== _tfNatureza) return false;
     if (_tfStatus !== 'todos' && tfStatusOf(item) !== _tfStatus) return false;
-    if (_tfCentroCusto === '__sem_centro__' && item.centroCustoId) return false;
-    if (_tfCentroCusto && _tfCentroCusto !== '__sem_centro__' && String(item.centroCustoId || '') !== _tfCentroCusto) return false;
+    if (_tfNatureza === 'pagar' && _tfCentroCusto === '__sem_centro__' && item.centroCustoId) return false;
+    if (_tfNatureza === 'pagar' && _tfCentroCusto && _tfCentroCusto !== '__sem_centro__' && String(item.centroCustoId || '') !== _tfCentroCusto) return false;
+    if (tfEventosEnabled() && _tfEvento === '__sem_evento__' && item.eventoId) return false;
+    if (tfEventosEnabled() && _tfEvento && _tfEvento !== '__sem_evento__' && String(item.eventoId || '') !== _tfEvento) return false;
     if (_tfVencimentoDe && String(item.vencimento || '') < _tfVencimentoDe) return false;
     if (_tfVencimentoAte && String(item.vencimento || '') > _tfVencimentoAte) return false;
     if (!tfValorBateFiltro(item)) return false;
@@ -298,12 +305,15 @@ function tfAbrirPendenciaFinanceiro(natureza, status) {
   _tfValorModo = 'todos';
   _tfValor = 0;
   _tfCentroCusto = '';
+  _tfEvento = '';
   _tfBusca = '';
   switchTab('financeiro');
 }
 
 function tfSetNatureza(natureza) {
   _tfNatureza = natureza === 'pagar' ? 'pagar' : 'receber';
+  if (_tfNatureza !== 'pagar') _tfCentroCusto = '';
+  _tfBulkSelected.clear();
   renderFinanceiro();
 }
 
@@ -316,6 +326,7 @@ function tfApplyFilters() {
   var valorModoEl = document.getElementById('tf-filtro-valor-modo');
   var valorEl = document.getElementById('tf-filtro-valor');
   var centroCustoEl = document.getElementById('tf-filtro-centro-custo');
+  var eventoEl = document.getElementById('tf-filtro-evento');
   var buscaEl = document.getElementById('tf-filtro-busca');
   _tfStatus = statusEl ? statusEl.value : 'todos';
   _tfPessoa = pessoaEl ? pessoaEl.value.trim() : '';
@@ -325,6 +336,7 @@ function tfApplyFilters() {
   _tfValorModo = valorModoEl ? valorModoEl.value : 'todos';
   _tfValor = valorEl ? parseMoney(valorEl) : 0;
   _tfCentroCusto = centroCustoEl ? String(centroCustoEl.value || '').trim() : '';
+  _tfEvento = eventoEl ? String(eventoEl.value || '').trim() : '';
   _tfBusca = buscaEl ? buscaEl.value.trim() : '';
   renderFinanceiro();
 }
@@ -338,6 +350,7 @@ function tfClearFilters() {
   _tfValorModo = 'todos';
   _tfValor = 0;
   _tfCentroCusto = '';
+  _tfEvento = '';
   _tfBusca = '';
   renderFinanceiro();
 }
@@ -352,6 +365,7 @@ function tfExportRows() {
       Vencimento: formatDate(item.vencimento),
       Pessoa: item.pessoaNome || '',
       Descricao: item.descricao || '',
+      Evento: item.evento || tfNomeEventoById(item.eventoId || null),
       Status: tfStatusLabel(tfStatusOf(item)),
       Total: Number(item.valorTotal || 0),
       Baixado: tfTotalBaixado(item),
@@ -376,13 +390,14 @@ function tfExportXlsx() {
     ['Vencimento ate', _tfVencimentoAte ? formatDate(_tfVencimentoAte) : ''],
     ['Valor', (_tfValorModo === 'todos' || !_tfValor) ? '' : (_tfValorModo + ' ' + fmt(_tfValor))],
     ['Centro de custo', _tfCentroCusto === '__sem_centro__' ? 'Sem centro' : (tfNomeCentroCustoById(_tfCentroCusto) || '')],
+    [tfEventosLabel(), _tfEvento === '__sem_evento__' ? 'Sem ' + tfEventosLabel().toLowerCase() : (tfNomeEventoById(_tfEvento) || '')],
     ['Busca', _tfBusca || ''],
     ['Gerado em', new Date().toLocaleString('pt-BR')]
   ];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, {
-    header: ['Vencimento', 'Pessoa', 'Descricao', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']
+    header: ['Vencimento', 'Pessoa', 'Descricao', 'Evento', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']
   }), _tfNatureza === 'pagar' ? 'A Pagar' : 'A Receber');
   XLSX.writeFile(
     wb,
@@ -398,14 +413,16 @@ function tfImportGuideHtml() {
     + '<div class="import-guide-grid">'
     + '<span class="import-guide-chip required">vencimento</span>'
     + '<span class="import-guide-chip required">pessoa</span>'
-    + '<span class="import-guide-chip required">descricao</span>'
+    + '<span class="import-guide-chip">descricao</span>'
     + '<span class="import-guide-chip required">valor</span>'
     + '<span class="import-guide-chip">observacao</span>'
     + '<span class="import-guide-chip">natureza</span>'
+    + (tfEventosEnabled() ? '<span class="import-guide-chip">' + esc(tfEventosLabel().toLowerCase()) + '</span>' : '')
     + '</div>'
     + '<ul class="import-guide-list">'
     + '<li>Sem a coluna <strong>natureza</strong>, importa para a aba aberta: A Receber ou A Pagar.</li>'
     + '<li>Use <strong>receber</strong> ou <strong>pagar</strong> na coluna natureza quando quiser misturar no mesmo arquivo.</li>'
+    + '<li>A coluna <strong>descricao</strong> e opcional; quando vazia, o sistema cria uma descricao automatica.</li>'
     + '<li>Linhas duplicadas iguais a titulos ja cadastrados serao ignoradas.</li>'
     + '</ul>'
     + '</div>';
@@ -416,11 +433,11 @@ function tfExportImportTemplate() {
   var pessoa = natureza === 'pagar' ? 'Fornecedor Exemplo' : 'Cliente Exemplo';
   var descricao = natureza === 'pagar' ? 'Aluguel' : 'Mensalidade';
   var rows = [
-    ['vencimento', 'pessoa', 'descricao', 'valor', 'observacao', 'natureza'],
-    ['15/06/2026', pessoa, descricao, 1200.00, 'Opcional', natureza]
+    ['vencimento', 'pessoa', 'descricao', 'valor', 'observacao', 'natureza'].concat(tfEventosEnabled() ? [tfEventosLabel().toLowerCase()] : []),
+    ['15/06/2026', pessoa, descricao, 1200.00, 'Opcional', natureza].concat(tfEventosEnabled() ? ['Evento Exemplo'] : [])
   ];
   var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:14},{wch:28},{wch:34},{wch:12},{wch:34},{wch:12}];
+  ws['!cols'] = [{wch:14},{wch:28},{wch:34},{wch:12},{wch:34},{wch:12},{wch:28}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, natureza === 'pagar' ? 'A Pagar' : 'A Receber');
   XLSX.writeFile(wb, 'modelo_financeiro_' + natureza + '_granafy.xlsx');
@@ -455,6 +472,16 @@ function tfValorImportadoTitulo(rawVal) {
   return parseFloat(texto) || 0;
 }
 
+function tfDescricaoTituloFallback(natureza, pessoa) {
+  var label = natureza === 'pagar' ? 'Conta a pagar' : 'Conta a receber';
+  return pessoa ? label + ' - ' + pessoa : label;
+}
+
+function tfDescricaoTitulo(descricao, natureza, pessoa) {
+  var texto = formatDescriptionTitleCase(String(descricao || '').trim());
+  return texto || tfDescricaoTituloFallback(natureza, pessoa);
+}
+
 function tfChaveDuplicidadeTitulo(item) {
   return [
     item.natureza || '',
@@ -484,9 +511,10 @@ async function importTitulosXlsx(event) {
     var iVal = tfHeaderIndex(header, ['valor', 'total', 'amount']);
     var iObs = tfHeaderIndex(header, ['observacao', 'obs', 'nota']);
     var iNat = tfHeaderIndex(header, ['natureza', 'tipo']);
+    var iEvento = tfHeaderIndex(header, ['evento', 'projeto', 'obra', 'campanha', 'contrato']);
 
-    if (iVenc < 0 || iPessoa < 0 || iDesc < 0 || iVal < 0) {
-      return alert('Planilha invalida. Colunas obrigatorias: vencimento, pessoa, descricao e valor.');
+    if (iVenc < 0 || iPessoa < 0 || iVal < 0) {
+      return alert('Planilha invalida. Colunas obrigatorias: vencimento, pessoa e valor.');
     }
 
     var cliente = tfClienteAtivo();
@@ -497,12 +525,15 @@ async function importTitulosXlsx(event) {
     rows.slice(1).forEach(function(row) {
       var vencimento = normalizarDataImportada(row[iVenc]);
       var pessoa = formatDescriptionTitleCase(String(row[iPessoa] || ''));
-      var descricao = formatDescriptionTitleCase(String(row[iDesc] || ''));
+      var descricaoBruta = iDesc >= 0 ? String(row[iDesc] || '') : '';
       var valor = Math.abs(Number(tfValorImportadoTitulo(row[iVal]) || 0));
       var observacao = iObs >= 0 ? String(row[iObs] || '').trim() : '';
       var natureza = iNat >= 0 ? tfNaturezaImportada(row[iNat]) : (_tfNatureza === 'pagar' ? 'pagar' : 'receber');
+      var descricao = tfDescricaoTitulo(descricaoBruta, natureza, pessoa);
+      var eventoNome = iEvento >= 0 ? String(row[iEvento] || '').trim() : '';
+      var evento = eventoNome ? tfEventosCliente(true).find(function(ev) { return tfNormalizeText(ev.nome) === tfNormalizeText(eventoNome); }) : null;
 
-      if (!vencimento || !pessoa || !descricao || valor <= 0) {
+      if (!vencimento || !pessoa || valor <= 0) {
         ignorados++;
         return;
       }
@@ -521,7 +552,7 @@ async function importTitulosXlsx(event) {
       }
       existentes.add(chave);
 
-      payloads.push(Object.assign({
+      var importPayload = Object.assign({
         cliente_id: activeClient,
         natureza: natureza,
         pessoa_nome: pessoa,
@@ -531,7 +562,9 @@ async function importTitulosXlsx(event) {
         vencimento: vencimento,
         valor_total: valor,
         observacao: observacao || null
-      }, getUserScopePayload()));
+      }, getUserScopePayload());
+      if (tfEventosEnabled() || evento) importPayload.evento_id = evento ? evento.id : null;
+      payloads.push(importPayload);
     });
 
     if (!payloads.length) {
@@ -654,6 +687,318 @@ function tfCentrosCustoFilterOptionsHtml(selectedId) {
     }).join('');
 }
 
+function tfEventosEnabled() {
+  var cliente = tfClienteAtivo();
+  return !!(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj' && cliente.eventosEnabled);
+}
+
+function tfEventosLabel() {
+  var cliente = tfClienteAtivo();
+  return (cliente && cliente.eventosLabel) || 'Eventos';
+}
+
+function tfEventosCliente(includeInactive) {
+  var cliente = tfClienteAtivo();
+  var eventos = cliente && Array.isArray(cliente.eventos) ? cliente.eventos : [];
+  if (includeInactive) return eventos;
+  return eventos.filter(function(evento) { return evento.ativo !== false; });
+}
+
+function tfNomeEventoById(eventoId) {
+  if (!eventoId) return '';
+  var evento = tfEventosCliente(true).find(function(item) { return item.id === eventoId; });
+  return evento ? String(evento.nome || '') : '';
+}
+
+function tfEventosOptionsHtml(selectedId, allowEmptyLabel) {
+  var atual = String(selectedId || '').trim();
+  var eventos = tfEventosCliente(false).slice().sort(function(a, b) {
+    return String(a && a.nome || '').localeCompare(String(b && b.nome || ''), 'pt-BR', { sensitivity: 'base' });
+  });
+  var emptyLabel = allowEmptyLabel || ('Sem ' + tfEventosLabel().toLowerCase());
+  return '<option value="">' + esc(emptyLabel) + '</option>' + eventos.map(function(item) {
+    return '<option value="' + esc(item.id) + '"' + (String(item.id) === atual ? ' selected' : '') + '>' + esc(item.nome || '') + '</option>';
+  }).join('');
+}
+
+function tfEventosFilterOptionsHtml(selectedId) {
+  var atual = String(selectedId || '').trim();
+  var eventos = tfEventosCliente(true).slice().sort(function(a, b) {
+    return String(a && a.nome || '').localeCompare(String(b && b.nome || ''), 'pt-BR', { sensitivity: 'base' });
+  });
+  return '<option value=""' + (!atual ? ' selected' : '') + '>Todos</option>'
+    + '<option value="__sem_evento__"' + (atual === '__sem_evento__' ? ' selected' : '') + '>Sem ' + esc(tfEventosLabel().toLowerCase()) + '</option>'
+    + eventos.map(function(item) {
+      return '<option value="' + esc(item.id) + '"' + (String(item.id) === atual ? ' selected' : '') + '>' + esc(item.nome || '') + (item.ativo === false ? ' (inativo)' : '') + '</option>';
+    }).join('');
+}
+
+function tfStatusEventoLabel(status) {
+  if (status === 'planejado') return 'Planejado';
+  if (status === 'concluido') return 'Concluido';
+  if (status === 'cancelado') return 'Cancelado';
+  return 'Em andamento';
+}
+
+async function tfEnableEventosModulo() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!tfClienteEhPJ()) return alert('O modulo de eventos/projetos esta disponivel apenas para clientes PJ.');
+
+  var label = formatDescriptionTitleCase((document.getElementById('tf-eventos-enable-label') || {}).value || 'Eventos') || 'Eventos';
+  var response = await applyUserScope(
+    supabaseClient
+      .from('clientes')
+      .update({
+        eventos_enabled: true,
+        eventos_label: label
+      })
+      .eq('id', activeClient)
+  ).select().single();
+
+  if (response.error) {
+    console.error('Erro ao habilitar eventos:', response.error);
+    alert('Nao foi possivel habilitar eventos. Rode a migracao 20260613_eventos_financeiro_pj.sql no Supabase e tente novamente.');
+    return;
+  }
+
+  var cliente = tfClienteAtivo();
+  if (cliente) {
+    cliente.eventosEnabled = true;
+    cliente.eventosLabel = response.data.eventos_label || label;
+  }
+  renderFinanceiro();
+}
+
+function tfEventoStatusClass(status) {
+  if (status === 'concluido') return 'green';
+  if (status === 'cancelado') return 'red';
+  if (status === 'planejado') return 'blue';
+  return 'yellow';
+}
+
+function tfEventoFormHtml(evento) {
+  evento = evento || {};
+  var idAttr = evento.id ? 'tf-evento-edit' : 'tf-evento-new';
+  return '<div class="tf-event-form">'
+    + '<div class="form-row">'
+      + '<div class="form-group"><label>Nome do ' + esc(tfEventosLabel().toLowerCase()) + '</label><input type="text" id="' + idAttr + '-nome" value="' + esc(evento.nome || '') + '" placeholder="Ex.: Expo Museu da Republica"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Status</label><select id="' + idAttr + '-status">'
+        + '<option value="planejado"' + (evento.status === 'planejado' ? ' selected' : '') + '>Planejado</option>'
+        + '<option value="em_andamento"' + ((!evento.status || evento.status === 'em_andamento') ? ' selected' : '') + '>Em andamento</option>'
+        + '<option value="concluido"' + (evento.status === 'concluido' ? ' selected' : '') + '>Concluido</option>'
+        + '<option value="cancelado"' + (evento.status === 'cancelado' ? ' selected' : '') + '>Cancelado</option>'
+      + '</select></div>'
+      + '<div class="form-group" style="max-width:150px"><label>Ativo</label><select id="' + idAttr + '-ativo"><option value="true"' + (evento.ativo !== false ? ' selected' : '') + '>Sim</option><option value="false"' + (evento.ativo === false ? ' selected' : '') + '>Nao</option></select></div>'
+    + '</div>'
+    + '<div class="form-row">'
+      + '<div class="form-group" style="max-width:170px"><label>Inicio</label><input type="text" id="' + idAttr + '-inicio" class="flex-date-input" value="' + esc(evento.dataInicio ? formatDate(evento.dataInicio) : '') + '" placeholder="dd/mm/aaaa"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Fim</label><input type="text" id="' + idAttr + '-fim" class="flex-date-input" value="' + esc(evento.dataFim ? formatDate(evento.dataFim) : '') + '" placeholder="dd/mm/aaaa"/></div>'
+      + '<div class="form-group" style="max-width:190px"><label>Orcamento previsto</label><input type="text" id="' + idAttr + '-orcamento" class="money-input" value="' + esc(Number(evento.orcamentoPrevisto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+    + '</div>'
+    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="' + idAttr + '-obs" value="' + esc(evento.observacao || '') + '" placeholder="Detalhes internos"/></div></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">'
+      + (evento.id ? '<button type="button" class="btn-sm red" onclick="tfCancelEventoEdit()">Cancelar</button>' : '')
+      + '<button type="button" class="btn-add" style="margin-top:0" onclick="' + (evento.id ? 'tfSaveEvento(\'' + evento.id + '\')' : 'tfAddEvento()') + '">' + (evento.id ? 'Salvar ' : 'Cadastrar ') + esc(tfEventosLabel().slice(0, -1) || 'evento') + '</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function tfReadEventoPayload(prefix) {
+  var nome = formatDescriptionTitleCase((document.getElementById(prefix + '-nome') || {}).value || '');
+  var status = ((document.getElementById(prefix + '-status') || {}).value || 'em_andamento').trim();
+  var ativo = ((document.getElementById(prefix + '-ativo') || {}).value || 'true') === 'true';
+  var inicioEl = document.getElementById(prefix + '-inicio');
+  var fimEl = document.getElementById(prefix + '-fim');
+  var dataInicio = inicioEl ? readFlexibleDateInput(inicioEl) : '';
+  var dataFim = fimEl ? readFlexibleDateInput(fimEl) : '';
+  if (inicioEl && inicioEl.value.trim() && !dataInicio) return alert('Informe uma data valida para inicio.'), null;
+  if (fimEl && fimEl.value.trim() && !dataFim) return alert('Informe uma data valida para fim.'), null;
+  return {
+    nome: nome,
+    status: status,
+    ativo: ativo,
+    data_inicio: dataInicio || null,
+    data_fim: dataFim || null,
+    orcamento_previsto: parseMoney(document.getElementById(prefix + '-orcamento')) || 0,
+    observacao: ((document.getElementById(prefix + '-obs') || {}).value || '').trim() || null
+  };
+}
+
+async function tfAddEvento() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!tfEventosEnabled()) return alert('Habilite o modulo de eventos no cadastro do cliente PJ.');
+  var payload = tfReadEventoPayload('tf-evento-new');
+  if (!payload) return;
+  if (!payload.nome) return alert('Informe o nome do ' + tfEventosLabel().toLowerCase() + '.');
+
+  var response = await supabaseClient
+    .from('eventos_cliente')
+    .insert([Object.assign({
+      cliente_id: activeClient
+    }, payload, getUserScopePayload())])
+    .select()
+    .single();
+
+  if (response.error) {
+    console.error('Erro ao cadastrar evento:', response.error);
+    alert('Nao foi possivel cadastrar o evento. Verifique se a migracao 20260613_eventos_financeiro_pj.sql foi aplicada.');
+    return;
+  }
+
+  await loadData();
+  renderFinanceiro();
+}
+
+function tfStartEventoEdit(id) {
+  _tfEventoEditId = id;
+  renderFinanceiro();
+}
+
+function tfCancelEventoEdit() {
+  _tfEventoEditId = null;
+  renderFinanceiro();
+}
+
+async function tfSaveEvento(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var payload = tfReadEventoPayload('tf-evento-edit');
+  if (!payload) return;
+  if (!payload.nome) return alert('Informe o nome do ' + tfEventosLabel().toLowerCase() + '.');
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('eventos_cliente')
+      .update(payload)
+      .eq('id', id)
+  ).select().single();
+
+  if (response.error) {
+    console.error('Erro ao salvar evento:', response.error);
+    alert('Nao foi possivel salvar o evento.');
+    return;
+  }
+
+  _tfEventoEditId = null;
+  await loadData();
+  renderFinanceiro();
+}
+
+async function tfDeleteEvento(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var usado = tfTitulosCliente().some(function(item) { return item.eventoId === id; });
+  if (usado) return alert('Este evento esta vinculado a titulos financeiros. Remova o vinculo antes de excluir.');
+  var ok = await appConfirm('Excluir este evento/projeto?', { title: 'Excluir evento', confirmText: 'Excluir' });
+  if (!ok) return;
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('eventos_cliente')
+      .delete()
+      .eq('id', id)
+  );
+
+  if (response.error) {
+    console.error('Erro ao excluir evento:', response.error);
+    alert('Nao foi possivel excluir o evento.');
+    return;
+  }
+
+  await loadData();
+  renderFinanceiro();
+}
+
+function tfEventoIndicadores(eventoId) {
+  var titulos = tfTitulosCliente().filter(function(item) { return item.eventoId === eventoId; });
+  var receber = titulos.filter(function(item) { return item.natureza === 'receber'; });
+  var pagar = titulos.filter(function(item) { return item.natureza === 'pagar'; });
+  var receitaPrevista = receber.reduce(function(s, item) { return s + Number(item.valorTotal || 0); }, 0);
+  var custoPrevisto = pagar.reduce(function(s, item) { return s + Number(item.valorTotal || 0); }, 0);
+  var recebido = receber.reduce(function(s, item) { return s + tfTotalBaixado(item); }, 0);
+  var pago = pagar.reduce(function(s, item) { return s + tfTotalBaixado(item); }, 0);
+  var emAbertoReceber = receber.reduce(function(s, item) { return s + tfSaldo(item); }, 0);
+  var emAbertoPagar = pagar.reduce(function(s, item) { return s + tfSaldo(item); }, 0);
+  return {
+    titulos: titulos,
+    receitaPrevista: receitaPrevista,
+    custoPrevisto: custoPrevisto,
+    resultadoPrevisto: receitaPrevista - custoPrevisto,
+    recebido: recebido,
+    pago: pago,
+    resultadoRealizado: recebido - pago,
+    emAbertoReceber: emAbertoReceber,
+    emAbertoPagar: emAbertoPagar
+  };
+}
+
+function tfEventoCustoCategorias(eventoId) {
+  var map = {};
+  tfTitulosCliente().filter(function(item) {
+    return item.eventoId === eventoId && item.natureza === 'pagar';
+  }).forEach(function(item) {
+    var key = item.centroCusto || tfNomeCentroCustoById(item.centroCustoId) || 'Sem centro';
+    map[key] = (map[key] || 0) + Number(item.valorTotal || 0);
+  });
+  return Object.entries(map).map(function(entry) {
+    return { nome: entry[0], valor: entry[1] };
+  }).sort(function(a, b) { return b.valor - a.valor; });
+}
+
+function tfEventosResumoHtml() {
+  if (!tfEventosEnabled()) {
+    return '<div class="settings-section-card" style="margin:0">'
+      + '<div class="settings-card-head"><div><h5>Modulo de eventos/projetos desabilitado</h5><p>Ative para separar receitas, custos, recebimentos e pagamentos por evento neste cliente PJ.</p></div></div>'
+      + '<div class="form-row">'
+        + '<div class="form-group"><label>Nome do modulo</label><input type="text" id="tf-eventos-enable-label" value="' + esc(tfEventosLabel()) + '" placeholder="Eventos, Projetos, Obras..."/></div>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">'
+        + '<button type="button" class="btn-add" style="margin-top:0" onclick="tfEnableEventosModulo()">Habilitar eventos</button>'
+      + '</div>'
+      + '</div>';
+  }
+
+  var eventos = tfEventosCliente(true);
+  var editando = eventos.find(function(item) { return item.id === _tfEventoEditId; });
+  var linhas = eventos.map(function(evento) {
+    var ind = tfEventoIndicadores(evento.id);
+    var margem = ind.receitaPrevista > 0 ? (ind.resultadoPrevisto / ind.receitaPrevista) * 100 : 0;
+    var maiorCusto = tfEventoCustoCategorias(evento.id)[0];
+    return '<div class="tf-event-card">'
+      + '<div class="tf-event-head"><div><strong>' + esc(evento.nome) + '</strong><span>' + esc(formatDate(evento.dataInicio) || '-') + (evento.dataFim ? ' ate ' + esc(formatDate(evento.dataFim)) : '') + '</span></div><span class="tf-event-status ' + tfEventoStatusClass(evento.status) + '">' + esc(tfStatusEventoLabel(evento.status)) + '</span></div>'
+      + '<div class="tf-event-metrics">'
+        + '<div><span>Receita</span><strong class="green">' + fmt(ind.receitaPrevista) + '</strong></div>'
+        + '<div><span>Custo</span><strong class="red">' + fmt(ind.custoPrevisto) + '</strong></div>'
+        + '<div><span>Resultado</span><strong class="' + (ind.resultadoPrevisto >= 0 ? 'green' : 'red') + '">' + fmt(ind.resultadoPrevisto) + '</strong></div>'
+        + '<div><span>Realizado</span><strong class="' + (ind.resultadoRealizado >= 0 ? 'green' : 'red') + '">' + fmt(ind.resultadoRealizado) + '</strong></div>'
+        + '<div><span>Margem</span><strong>' + margem.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</strong></div>'
+      + '</div>'
+      + '<div class="tf-event-meta"><span>Aberto a receber: ' + fmt(ind.emAbertoReceber) + '</span><span>Aberto a pagar: ' + fmt(ind.emAbertoPagar) + '</span><span>Maior custo: ' + esc(maiorCusto ? maiorCusto.nome : '-') + (maiorCusto ? ' (' + fmt(maiorCusto.valor) + ')' : '') + '</span></div>'
+      + '<div class="tf-event-actions"><button class="btn-sm" onclick="tfStartEventoEdit(\'' + evento.id + '\')">Editar</button><button class="btn-sm" onclick="_tfEvento=\'' + evento.id + '\';renderFinanceiro()">Ver titulos</button><button class="btn-icon danger" onclick="tfDeleteEvento(\'' + evento.id + '\')" title="Excluir evento">&#128465;</button></div>'
+      + '</div>';
+  }).join('');
+
+  var ranking = eventos.map(function(evento) {
+    var ind = tfEventoIndicadores(evento.id);
+    return Object.assign({ evento: evento }, ind);
+  }).sort(function(a, b) { return b.resultadoPrevisto - a.resultadoPrevisto; });
+  var rankingHtml = ranking.length
+    ? '<div class="tf-event-ranking">' + ranking.map(function(item) {
+        return '<div><span>' + esc(item.evento.nome) + '</span><strong class="' + (item.resultadoPrevisto >= 0 ? 'green' : 'red') + '">' + fmt(item.resultadoPrevisto) + '</strong></div>';
+      }).join('') + '</div>'
+    : '<div class="empty-state" style="padding:18px">Nenhum evento cadastrado ainda.</div>';
+
+  return '<div class="tf-event-panel-grid">'
+    + '<div>'
+      + '<h4 class="tf-event-subtitle">Cadastrar ' + esc(tfEventosLabel().toLowerCase()) + '</h4>'
+      + (editando ? tfEventoFormHtml(editando) : tfEventoFormHtml(null))
+    + '</div>'
+    + '<div>'
+      + '<h4 class="tf-event-subtitle">Mais rentaveis</h4>'
+      + rankingHtml
+    + '</div>'
+    + '</div>'
+    + '<div class="tf-event-list">' + (linhas || '<div class="empty-state" style="padding:22px">Cadastre o primeiro ' + esc(tfEventosLabel().toLowerCase()) + ' para comecar a comparar.</div>') + '</div>';
+}
+
 function tfNormalizeDateFieldValue(fieldId, label) {
   var el = document.getElementById(fieldId);
   if (!el) return '';
@@ -672,7 +1017,8 @@ function tfNormalizeDateFieldValue(fieldId, label) {
 function tfReadFormPayload(prefix) {
   var pessoa = (document.getElementById(prefix + '-pessoa') || {}).value || '';
   var descricao = (document.getElementById(prefix + '-descricao') || {}).value || '';
-  var centroCustoId = ((document.getElementById(prefix + '-centro-custo') || {}).value || '').trim() || null;
+  var centroCustoId = _tfNatureza === 'pagar' ? (((document.getElementById(prefix + '-centro-custo') || {}).value || '').trim() || null) : null;
+  var eventoId = ((document.getElementById(prefix + '-evento') || {}).value || '').trim() || null;
   var vencimento = tfNormalizeDateFieldValue(prefix + '-vencimento', 'vencimento');
   var valor = tfParseAmountFromInput(prefix + '-valor');
   var observacao = (document.getElementById(prefix + '-observacao') || {}).value || '';
@@ -682,9 +1028,10 @@ function tfReadFormPayload(prefix) {
   return {
     natureza: prefix === 'tf-pagar' ? 'pagar' : 'receber',
     pessoaNome: formatDescriptionTitleCase(pessoa),
-    descricao: formatDescriptionTitleCase(descricao),
+    descricao: tfDescricaoTitulo(descricao, prefix === 'tf-pagar' ? 'pagar' : 'receber', formatDescriptionTitleCase(pessoa)),
     categoria: null,
     centroCustoId: centroCustoId,
+    eventoId: eventoId,
     vencimento: vencimento || null,
     valorTotal: Number(valor || 0),
     observacao: observacao.trim()
@@ -692,7 +1039,7 @@ function tfReadFormPayload(prefix) {
 }
 
 function tfResetForm(prefix) {
-  ['pessoa', 'descricao', 'centro-custo', 'vencimento', 'observacao'].forEach(function(suffix) {
+  ['pessoa', 'descricao', 'centro-custo', 'evento', 'vencimento', 'observacao'].forEach(function(suffix) {
     var el = document.getElementById(prefix + '-' + suffix);
     if (el) el.value = '';
     if (el && suffix === 'vencimento') delete el.dataset.isoDate;
@@ -708,8 +1055,8 @@ async function tfAddTitulo() {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var payload = tfReadFormPayload(tfFormPrefix());
   if (!payload) return;
-  if (!payload.pessoaNome || !payload.descricao || payload.valorTotal <= 0) {
-    alert('Preencha pessoa, descrição e valor do título.');
+  if (!payload.pessoaNome || payload.valorTotal <= 0) {
+    alert('Preencha pessoa e valor do título.');
     return;
   }
 
@@ -719,11 +1066,12 @@ async function tfAddTitulo() {
     pessoa_nome: payload.pessoaNome,
     descricao: payload.descricao,
     categoria: payload.categoria || null,
-    centro_custo_id: payload.centroCustoId || null,
+    centro_custo_id: payload.natureza === 'pagar' ? (payload.centroCustoId || null) : null,
     vencimento: payload.vencimento,
     valor_total: payload.valorTotal,
     observacao: payload.observacao || null
   }, getUserScopePayload());
+  if (tfEventosEnabled() || payload.eventoId) insertPayload.evento_id = payload.eventoId || null;
 
   var response = await supabaseClient
     .from('titulos_financeiros')
@@ -746,6 +1094,8 @@ async function tfAddTitulo() {
     descricao: response.data.descricao || '',
     centroCustoId: response.data.centro_custo_id || null,
     centroCusto: tfNomeCentroCustoById(response.data.centro_custo_id || null),
+    eventoId: response.data.evento_id || null,
+    evento: tfNomeEventoById(response.data.evento_id || null),
     vencimento: response.data.vencimento || null,
     valorTotal: Number(response.data.valor_total || 0),
     observacao: response.data.observacao || '',
@@ -773,6 +1123,8 @@ function tfUpdateLocalTitulo(row) {
     descricao: row.descricao || '',
     centroCustoId: row.centro_custo_id || null,
     centroCusto: tfNomeCentroCustoById(row.centro_custo_id || null),
+    eventoId: row.evento_id || null,
+    evento: tfNomeEventoById(row.evento_id || null),
     vencimento: row.vencimento || null,
     valorTotal: Number(row.valor_total || 0),
     observacao: row.observacao || '',
@@ -818,7 +1170,12 @@ function tfTituloCardHtml(item) {
   var total = Number(item.valorTotal || 0);
   var pct = total > 0 ? Math.min(100, Math.round((baixado / total) * 100)) : 0;
   var centro = item.centroCusto || tfNomeCentroCustoById(item.centroCustoId || null);
-  return '<article class="tf-title-card ' + esc(status) + '">'
+  var evento = item.evento || tfNomeEventoById(item.eventoId || null);
+  var bulk = tfEventosEnabled()
+    ? '<label class="tf-title-select" title="Selecionar para alterar evento em lote"><input type="checkbox" value="' + esc(item.id) + '"' + (_tfBulkSelected.has(item.id) ? ' checked' : '') + ' onchange="tfToggleBulkTitulo(\'' + item.id + '\', this.checked)"/><span></span></label>'
+    : '';
+  return '<article class="tf-title-card ' + esc(status) + (bulk ? ' bulk-enabled' : '') + '">'
+    + bulk
     + '<div class="tf-title-main">'
       + '<div class="tf-title-topline">'
         + '<strong>' + esc(item.pessoaNome || '-') + '</strong>'
@@ -827,7 +1184,8 @@ function tfTituloCardHtml(item) {
       + '<div class="tf-title-desc">' + esc(item.descricao || '-') + '</div>'
       + '<div class="tf-title-meta">'
         + '<span>Vence ' + esc(formatDate(item.vencimento)) + '</span>'
-        + (centro ? '<span>' + esc(centro) + '</span>' : '<span>Sem centro</span>')
+        + (tfEventosEnabled() ? (evento ? '<span>' + esc(evento) + '</span>' : '<span>Sem ' + esc(tfEventosLabel().toLowerCase()) + '</span>') : '')
+        + (item.natureza === 'pagar' ? (centro ? '<span>' + esc(centro) + '</span>' : '<span>Sem centro</span>') : '')
         + (item.observacao ? '<span>' + esc(item.observacao) + '</span>' : '')
       + '</div>'
     + '</div>'
@@ -847,7 +1205,82 @@ function tfTituloCardHtml(item) {
 
 function tfBuildListaTitulos(items) {
   if (!items.length) return '<div class="empty-state" style="padding:26px 20px">Nenhum titulo encontrado com os filtros atuais.</div>';
-  return '<div class="tf-title-list">' + items.map(tfTituloCardHtml).join('') + '</div>';
+  return tfBulkEventosHtml(items) + '<div class="tf-title-list">' + items.map(tfTituloCardHtml).join('') + '</div>';
+}
+
+function tfVisibleBulkIds(items) {
+  return (items || []).map(function(item) { return item.id; }).filter(Boolean);
+}
+
+function tfToggleBulkTitulo(id, checked) {
+  if (!id) return;
+  if (checked) _tfBulkSelected.add(id);
+  else _tfBulkSelected.delete(id);
+  var countEl = document.getElementById('tf-bulk-count');
+  if (countEl) countEl.textContent = String(_tfBulkSelected.size);
+}
+
+function tfSelectAllBulkTitulos(ids) {
+  (ids || []).forEach(function(id) {
+    if (id) _tfBulkSelected.add(id);
+  });
+  renderFinanceiro();
+}
+
+function tfClearBulkTitulos() {
+  _tfBulkSelected.clear();
+  renderFinanceiro();
+}
+
+function tfBulkEventosHtml(items) {
+  if (!tfEventosEnabled()) return '';
+  var ids = tfVisibleBulkIds(items);
+  var idsLiteral = JSON.stringify(ids).replace(/"/g, '&quot;');
+  return '<div class="tf-bulk-event-bar">'
+    + '<div><strong>Evento em lote</strong><span><span id="tf-bulk-count">' + _tfBulkSelected.size + '</span> selecionado(s)</span></div>'
+    + '<select id="tf-bulk-evento">' + tfEventosOptionsHtml('', 'Remover evento') + '</select>'
+    + '<button class="btn-sm" type="button" onclick="tfSelectAllBulkTitulos(' + idsLiteral + ')">Selecionar filtrados</button>'
+    + '<button class="btn-sm" type="button" onclick="tfApplyBulkEvento()">Aplicar evento</button>'
+    + '<button class="btn-sm red" type="button" onclick="tfClearBulkTitulos()">Limpar</button>'
+    + '</div>';
+}
+
+async function tfApplyBulkEvento() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!tfEventosEnabled()) return alert('Habilite o modulo de eventos antes de aplicar em lote.');
+  var ids = Array.from(_tfBulkSelected).filter(function(id) {
+    return tfTitulosCliente().some(function(item) { return item.id === id; });
+  });
+  if (!ids.length) return alert('Selecione ao menos um titulo.');
+
+  var eventoId = ((document.getElementById('tf-bulk-evento') || {}).value || '').trim() || null;
+  var eventoNome = eventoId ? tfNomeEventoById(eventoId) : '';
+  var ok = await appConfirm(
+    'Aplicar ' + (eventoNome || 'sem evento') + ' em ' + ids.length + ' titulo(s) selecionado(s)?',
+    { title: 'Evento em lote', confirmText: 'Aplicar' }
+  );
+  if (!ok) return;
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('titulos_financeiros')
+      .update({ evento_id: eventoId })
+      .in('id', ids)
+  );
+
+  if (response.error) {
+    console.error('Erro ao aplicar evento em lote:', response.error);
+    alert('Nao foi possivel aplicar o evento em lote. Verifique se a migracao de eventos foi aplicada.');
+    return;
+  }
+
+  tfTitulosCliente().forEach(function(item) {
+    if (!ids.includes(item.id)) return;
+    item.eventoId = eventoId;
+    item.evento = eventoNome;
+  });
+  _tfBulkSelected.clear();
+  renderFinanceiro();
 }
 
 function tfContaDaBaixa(baixa) {
@@ -913,7 +1346,7 @@ async function tfInsertLancamentoBaixa(item, dataBaixa, valor, observacao, conta
     descricao: desc,
     descricao_original: desc,
     categoria: item.natureza === 'receber' ? 'Recebimento de titulo' : 'Pagamento de titulo',
-    centro_custo_id: item.centroCustoId || null,
+    centro_custo_id: item.natureza === 'pagar' ? (item.centroCustoId || null) : null,
     tipo: item.natureza === 'receber' ? 'credito' : 'debito',
     valor: Number(valor || 0),
     conta_id: contaId || null,
@@ -969,12 +1402,16 @@ function tfOpenTituloModal(id, foco) {
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>' + (item.natureza === 'receber' ? 'Cliente pagador' : 'Favorecido / fornecedor') + '</label><input type="text" id="tf-edit-pessoa" value="' + esc(item.pessoaNome || '') + '"/></div>'
-      + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-edit-descricao" value="' + esc(item.descricao || '') + '"/></div>'
+      + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-edit-descricao" value="' + esc(item.descricao || '') + '" placeholder="Opcional"/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="tf-edit-vencimento" class="flex-date-input" value="' + esc(item.vencimento ? formatDate(item.vencimento) : '') + '" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
       + '<div class="form-group" style="max-width:170px"><label>Valor total</label><input type="text" id="tf-edit-valor" class="money-input" value="' + esc((Number(item.valorTotal || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
     + '</div>'
+    + ((item.natureza === 'pagar' || tfEventosEnabled()) ? '<div class="form-row">'
+      + (item.natureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="tf-edit-centro-custo">' + tfCentrosCustoOptionsHtml(item.centroCustoId || '') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="tf-edit-evento">' + tfEventosOptionsHtml(item.eventoId || '') + '</select></div>' : '')
+    + '</div>' : '')
     + '<div class="form-row">'
       + '<div class="form-group"><label>Observacao</label><textarea id="tf-edit-observacao" rows="3" placeholder="Informacoes importantes deste titulo">' + esc(item.observacao || '') + '</textarea></div>'
     + '</div>'
@@ -1013,18 +1450,20 @@ async function tfSaveTitulo(id) {
   if (!item) return;
   var payload = {
     pessoa_nome: formatDescriptionTitleCase((document.getElementById('tf-edit-pessoa') || {}).value || ''),
-    descricao: formatDescriptionTitleCase((document.getElementById('tf-edit-descricao') || {}).value || ''),
+    descricao: tfDescricaoTitulo((document.getElementById('tf-edit-descricao') || {}).value || '', item.natureza, (document.getElementById('tf-edit-pessoa') || {}).value || item.pessoaNome || ''),
     categoria: null,
-    centro_custo_id: ((document.getElementById('tf-edit-centro-custo') || {}).value || '').trim() || null,
+    centro_custo_id: item.natureza === 'pagar' ? (((document.getElementById('tf-edit-centro-custo') || {}).value || '').trim() || null) : null,
+    evento_id: ((document.getElementById('tf-edit-evento') || {}).value || '').trim() || null,
     vencimento: tfNormalizeDateFieldValue('tf-edit-vencimento', 'vencimento'),
     valor_total: tfParseAmountFromInput('tf-edit-valor'),
     observacao: ((document.getElementById('tf-edit-observacao') || {}).value || '').trim() || null
   };
+  if (!tfEventosEnabled() && !payload.evento_id && !item.eventoId) delete payload.evento_id;
 
   if (payload.vencimento === null) return;
 
-  if (!payload.pessoa_nome || !payload.descricao || payload.valor_total <= 0) {
-    alert('Preencha pessoa, descrição e valor do título.');
+  if (!payload.pessoa_nome || payload.valor_total <= 0) {
+    alert('Preencha pessoa e valor do título.');
     return;
   }
 
@@ -1189,6 +1628,7 @@ function renderFinanceiro() {
   var btnLabel = _tfNatureza === 'pagar' ? 'Cadastrar conta a pagar' : 'Cadastrar conta a receber';
   var itens = tfFilteredItems();
   var resumo = tfSummaryValues(itens);
+  var eventosHtml = tfEventosResumoHtml();
   var resumoHtml =
     '<div class="summary-grid">'
       + (_tfNatureza === 'receber'
@@ -1217,20 +1657,22 @@ function renderFinanceiro() {
       + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
       + '<div class="form-group"><label>Pessoa</label><input type="text" id="tf-filtro-pessoa" value="' + esc(_tfPessoa) + '" placeholder="Cliente ou fornecedor" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
       + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao, centro ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao, evento, centro ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento de</label><input type="text" id="tf-filtro-vencimento-de" class="flex-date-input" value="' + esc(_tfVencimentoDe ? formatDate(_tfVencimentoDe) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento ate</label><input type="text" id="tf-filtro-vencimento-ate" class="flex-date-input" value="' + esc(_tfVencimentoAte ? formatDate(_tfVencimentoAte) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
       + '<div class="form-group" style="max-width:160px"><label>Valor</label><select id="tf-filtro-valor-modo"><option value="todos"' + (_tfValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="igual"' + (_tfValorModo === 'igual' ? ' selected' : '') + '>Igual a</option><option value="acima"' + (_tfValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_tfValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option></select></div>'
       + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="tf-filtro-valor" class="money-input" value="' + esc(Number(_tfValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group"><label>Centro de custo</label><select id="tf-filtro-centro-custo">' + tfCentrosCustoFilterOptionsHtml(_tfCentroCusto) + '</select></div>'
+      + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="tf-filtro-centro-custo">' + tfCentrosCustoFilterOptionsHtml(_tfCentroCusto) + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="tf-filtro-evento">' + tfEventosFilterOptionsHtml(_tfEvento) + '</select></div>' : '')
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">Exportar PDF</button><button class="btn-sm" onclick="tfExportXlsx()">Exportar XLSX</button></div>';
   var areaHtml = tfBuildListaTitulos(itens);
 
   root.innerHTML =
     financeiroPanel('resumo', 'Resumo financeiro', resumoHtml)
+    + financeiroPanel('eventos', tfEventosLabel(), eventosHtml)
     + '<div class="form-card collapsible-card financeiro-collapsible-card' + (_tfPanels.pendencias ? ' open' : '') + '">'
       + '<button type="button" class="collapse-head" onclick="toggleFinanceiroPanel(\'pendencias\')" aria-expanded="' + !!_tfPanels.pendencias + '"><span>Painel de pendencias</span><span class="collapse-chevron" aria-hidden="true">&#9662;</span></button>'
       + (_tfPanels.pendencias ? '<div class="collapse-body">'
@@ -1256,12 +1698,16 @@ function renderFinanceiro() {
     + financeiroPanel('novo', '+ Novo titulo - ' + tituloAtivo,
       '<div class="form-row">'
         + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem está envolvido neste título"/></div>'
-        + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Ex.: Mensalidade, imposto, fornecedor"/></div>'
+        + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Opcional"/></div>'
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="' + tfFormPrefix() + '-valor" class="money-input" value="0,00"/></div>'
       + '</div>'
+      + ((_tfNatureza === 'pagar' || tfEventosEnabled()) ? '<div class="form-row">'
+        + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="' + tfFormPrefix() + '-centro-custo">' + tfCentrosCustoOptionsHtml('') + '</select></div>' : '')
+        + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="' + tfFormPrefix() + '-evento">' + tfEventosOptionsHtml(_tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '') + '</select></div>' : '')
+      + '</div>' : '')
       + '<div class="form-row">'
         + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informações complementares deste título"></textarea></div>'
       + '</div>'

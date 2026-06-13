@@ -33,6 +33,8 @@ function isMissingClientProfileColumnError(error) {
     || msg.includes('email_financeiro')
     || msg.includes('razao_social')
     || msg.includes('nome_fantasia')
+    || msg.includes('eventos_enabled')
+    || msg.includes('eventos_label')
     || msg.includes('responsavel')
     || msg.includes('documento')
     || msg.includes('telefone')
@@ -151,6 +153,10 @@ function openClientFormModal(id) {
       + '<div class="form-group"><label>Razao social</label><input type="text" id="client-form-razao" value="' + esc(cliente ? (cliente.razaoSocial || '') : '') + '" placeholder="Razao social"/></div>'
       + '<div class="form-group"><label>Responsavel</label><input type="text" id="client-form-responsavel" value="' + esc(cliente ? (cliente.responsavel || '') : '') + '" placeholder="Responsavel pelo contato"/></div>'
     + '</div>'
+    + '<div class="form-row client-form-type client-form-type-pj">'
+      + '<div class="form-group" style="max-width:220px"><label>Modulo de eventos/projetos</label><select id="client-form-eventos-enabled"><option value="false"' + (!(cliente && cliente.eventosEnabled) ? ' selected' : '') + '>Desabilitado</option><option value="true"' + (cliente && cliente.eventosEnabled ? ' selected' : '') + '>Habilitado</option></select></div>'
+      + '<div class="form-group"><label>Nome do modulo</label><input type="text" id="client-form-eventos-label" value="' + esc(cliente ? (cliente.eventosLabel || 'Eventos') : 'Eventos') + '" placeholder="Eventos, Projetos, Obras..."/></div>'
+    + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>Telefone</label><input type="text" id="client-form-telefone" value="' + esc(cliente ? (cliente.telefone || '') : '') + '" placeholder="(00) 00000-0000"/></div>'
       + '<div class="form-group"><label>E-mail financeiro</label><input type="email" id="client-form-email" value="' + esc(cliente ? (cliente.emailFinanceiro || '') : '') + '" placeholder="financeiro@empresa.com"/></div>'
@@ -176,6 +182,8 @@ function buildClientPayloadFromForm() {
   var documentoPF = (document.getElementById('client-form-documento').value || '').trim();
   var documentoPJ = (document.getElementById('client-form-documento-pj').value || '').trim();
   var responsavel = (document.getElementById('client-form-responsavel').value || '').trim();
+  var eventosEnabledEl = document.getElementById('client-form-eventos-enabled');
+  var eventosLabelEl = document.getElementById('client-form-eventos-label');
   var telefone = (document.getElementById('client-form-telefone').value || '').trim();
   var email = (document.getElementById('client-form-email').value || '').trim();
   var observacoes = (document.getElementById('client-form-obs').value || '').trim();
@@ -186,6 +194,8 @@ function buildClientPayloadFromForm() {
     documento: (tipo === 'pj' ? documentoPJ : documentoPF) || null,
     telefone: telefone || null,
     email_financeiro: email || null,
+    eventos_enabled: tipo === 'pj' && eventosEnabledEl && eventosEnabledEl.value === 'true',
+    eventos_label: tipo === 'pj' ? ((eventosLabelEl && eventosLabelEl.value || '').trim() || 'Eventos') : 'Eventos',
     responsavel: tipo === 'pj' ? (responsavel || null) : null,
     razao_social: tipo === 'pj' ? (razao || null) : null,
     nome_fantasia: tipo === 'pj' ? (fantasia || null) : null,
@@ -215,7 +225,7 @@ async function saveClientForm(id) {
   if (resposta.error) {
     console.error('Erro ao salvar cliente:', resposta.error);
     if (isMissingClientProfileColumnError(resposta.error)) {
-      alert('O cadastro completo de PF/PJ precisa da migracao 20260508_cadastro_pf_pj.sql no Supabase.');
+      alert('O cadastro completo de PF/PJ precisa das migracoes mais recentes no Supabase, incluindo eventos/projetos quando habilitado.');
     } else {
       alert('Nao foi possivel salvar o cliente.');
     }
