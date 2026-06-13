@@ -3,11 +3,20 @@
 var _tfNatureza = 'receber';
 var _tfStatus = 'todos';
 var _tfDescricao = '';
+var _tfPessoa = '';
+var _tfVencimentoDe = '';
+var _tfVencimentoAte = '';
+var _tfValorModo = 'todos';
+var _tfValor = 0;
+var _tfCentroCusto = '';
 var _tfBusca = '';
 var TF_MIN_SEARCH_CHARS = 3;
 var _tfPanels = {
+  resumo: true,
   pendencias: true,
   importar: false,
+  filtros: true,
+  lista: true,
   novo: false
 };
 
@@ -85,12 +94,22 @@ function tfSearchText(item) {
   return tfNormalizeText([
     item.pessoaNome,
     item.descricao,
+    item.centroCusto,
     item.observacao
   ].join(' '));
 }
 
 function tfParseAmountFromInput(id) {
   return parseMoney(document.getElementById(id));
+}
+
+function tfValorBateFiltro(item) {
+  if (_tfValorModo === 'todos' || !_tfValor) return true;
+  var valor = Number(item.valorTotal || 0);
+  var alvo = Number(_tfValor || 0);
+  if (_tfValorModo === 'acima') return valor >= alvo;
+  if (_tfValorModo === 'abaixo') return valor <= alvo;
+  return Math.round(valor * 100) === Math.round(alvo * 100);
 }
 
 function tfTotalBaixado(item) {
@@ -145,9 +164,18 @@ function tfFilteredItems() {
   return tfSortItems(tfTitulosCliente().filter(function(item) {
     if (item.natureza !== _tfNatureza) return false;
     if (_tfStatus !== 'todos' && tfStatusOf(item) !== _tfStatus) return false;
+    if (_tfCentroCusto === '__sem_centro__' && item.centroCustoId) return false;
+    if (_tfCentroCusto && _tfCentroCusto !== '__sem_centro__' && String(item.centroCustoId || '') !== _tfCentroCusto) return false;
+    if (_tfVencimentoDe && String(item.vencimento || '') < _tfVencimentoDe) return false;
+    if (_tfVencimentoAte && String(item.vencimento || '') > _tfVencimentoAte) return false;
+    if (!tfValorBateFiltro(item)) return false;
+    if (_tfPessoa) {
+      var pessoaTerm = tfSearchTerm(_tfPessoa);
+      if (pessoaTerm && tfNormalizeText(item.pessoaNome || '').indexOf(pessoaTerm) === -1) return false;
+    }
     if (_tfDescricao) {
       var descricaoTerm = tfSearchTerm(_tfDescricao);
-      if (descricaoTerm && tfSearchText(item).indexOf(descricaoTerm) === -1) return false;
+      if (descricaoTerm && tfNormalizeText(item.descricao || '').indexOf(descricaoTerm) === -1) return false;
     }
     if (_tfBusca) {
       var buscaTerm = tfSearchTerm(_tfBusca);
@@ -264,6 +292,12 @@ function tfAbrirPendenciaFinanceiro(natureza, status) {
   _tfNatureza = natureza === 'pagar' ? 'pagar' : 'receber';
   _tfStatus = status || 'todos';
   _tfDescricao = '';
+  _tfPessoa = '';
+  _tfVencimentoDe = '';
+  _tfVencimentoAte = '';
+  _tfValorModo = 'todos';
+  _tfValor = 0;
+  _tfCentroCusto = '';
   _tfBusca = '';
   switchTab('financeiro');
 }
@@ -275,10 +309,22 @@ function tfSetNatureza(natureza) {
 
 function tfApplyFilters() {
   var statusEl = document.getElementById('tf-filtro-status');
+  var pessoaEl = document.getElementById('tf-filtro-pessoa');
   var descricaoEl = document.getElementById('tf-filtro-descricao');
+  var vencimentoDeEl = document.getElementById('tf-filtro-vencimento-de');
+  var vencimentoAteEl = document.getElementById('tf-filtro-vencimento-ate');
+  var valorModoEl = document.getElementById('tf-filtro-valor-modo');
+  var valorEl = document.getElementById('tf-filtro-valor');
+  var centroCustoEl = document.getElementById('tf-filtro-centro-custo');
   var buscaEl = document.getElementById('tf-filtro-busca');
   _tfStatus = statusEl ? statusEl.value : 'todos';
+  _tfPessoa = pessoaEl ? pessoaEl.value.trim() : '';
   _tfDescricao = descricaoEl ? descricaoEl.value.trim() : '';
+  _tfVencimentoDe = vencimentoDeEl ? readFlexibleDateInput(vencimentoDeEl) : '';
+  _tfVencimentoAte = vencimentoAteEl ? readFlexibleDateInput(vencimentoAteEl) : '';
+  _tfValorModo = valorModoEl ? valorModoEl.value : 'todos';
+  _tfValor = valorEl ? parseMoney(valorEl) : 0;
+  _tfCentroCusto = centroCustoEl ? String(centroCustoEl.value || '').trim() : '';
   _tfBusca = buscaEl ? buscaEl.value.trim() : '';
   renderFinanceiro();
 }
@@ -286,6 +332,12 @@ function tfApplyFilters() {
 function tfClearFilters() {
   _tfStatus = 'todos';
   _tfDescricao = '';
+  _tfPessoa = '';
+  _tfVencimentoDe = '';
+  _tfVencimentoAte = '';
+  _tfValorModo = 'todos';
+  _tfValor = 0;
+  _tfCentroCusto = '';
   _tfBusca = '';
   renderFinanceiro();
 }
@@ -318,7 +370,12 @@ function tfExportXlsx() {
     ['Cliente', cliente.name || ''],
     ['Tela', tfTituloAtivoLabel()],
     ['Status', _tfStatus || 'todos'],
+    ['Pessoa', _tfPessoa || ''],
     ['Descricao', _tfDescricao || ''],
+    ['Vencimento de', _tfVencimentoDe ? formatDate(_tfVencimentoDe) : ''],
+    ['Vencimento ate', _tfVencimentoAte ? formatDate(_tfVencimentoAte) : ''],
+    ['Valor', (_tfValorModo === 'todos' || !_tfValor) ? '' : (_tfValorModo + ' ' + fmt(_tfValor))],
+    ['Centro de custo', _tfCentroCusto === '__sem_centro__' ? 'Sem centro' : (tfNomeCentroCustoById(_tfCentroCusto) || '')],
     ['Busca', _tfBusca || ''],
     ['Gerado em', new Date().toLocaleString('pt-BR')]
   ];
@@ -520,7 +577,7 @@ function tfExportPDF() {
   doc.text('Gerado em ' + hoje, 283, 19, { align: 'right' });
   doc.setFontSize(9);
   doc.setTextColor(90, 96, 122);
-  doc.text('Status: ' + (_tfStatus || 'todos') + ' | Descricao: ' + (_tfDescricao || '-') + ' | Busca: ' + (_tfBusca || '-'), 14, 31);
+  doc.text('Status: ' + (_tfStatus || 'todos') + ' | Pessoa: ' + (_tfPessoa || '-') + ' | Descricao: ' + (_tfDescricao || '-') + ' | Busca: ' + (_tfBusca || '-'), 14, 31);
   doc.autoTable({
     startY: 36,
     head: [['Vencimento', 'Pessoa', 'Descricao', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']],
@@ -583,6 +640,18 @@ function tfCentrosCustoOptionsHtml(selectedId) {
   return '<option value="">Sem centro</option>' + centros.map(function(item) {
     return '<option value="' + esc(item.id) + '"' + (String(item.id) === atual ? ' selected' : '') + '>' + esc(item.nome || '') + '</option>';
   }).join('');
+}
+
+function tfCentrosCustoFilterOptionsHtml(selectedId) {
+  var atual = String(selectedId || '').trim();
+  var centros = tfCentrosCustoCliente().slice().sort(function(a, b) {
+    return String(a && a.nome || '').localeCompare(String(b && b.nome || ''), 'pt-BR', { sensitivity: 'base' });
+  });
+  return '<option value=""' + (!atual ? ' selected' : '') + '>Todos</option>'
+    + '<option value="__sem_centro__"' + (atual === '__sem_centro__' ? ' selected' : '') + '>Sem centro</option>'
+    + centros.map(function(item) {
+      return '<option value="' + esc(item.id) + '"' + (String(item.id) === atual ? ' selected' : '') + '>' + esc(item.nome || '') + '</option>';
+    }).join('');
 }
 
 function tfNormalizeDateFieldValue(fieldId, label) {
@@ -711,7 +780,170 @@ function tfUpdateLocalTitulo(row) {
   });
 }
 
-function tfOpenTituloModal(id) {
+function tfContasCliente() {
+  var cliente = tfClienteAtivo();
+  return cliente && Array.isArray(cliente.contas) ? cliente.contas : [];
+}
+
+function tfNomeConta(conta) {
+  if (!conta) return 'Sem movimentar extrato';
+  if (typeof nomeContaCliente === 'function') return nomeContaCliente(conta);
+  return String(conta.banco || 'Conta');
+}
+
+function tfNomeContaPorId(contaId) {
+  var conta = tfContasCliente().find(function(item) { return item.id === contaId; });
+  return tfNomeConta(conta);
+}
+
+function tfContaOptionsHtml(selectedId) {
+  var atual = String(selectedId || '');
+  var contas = tfContasCliente();
+  if (!contas.length) return '<option value="">Sem conta cadastrada</option>';
+  return '<option value="">Nao movimentar extrato</option>' + contas.map(function(conta) {
+    return '<option value="' + esc(conta.id) + '"' + (conta.id === atual ? ' selected' : '') + '>' + esc(tfNomeConta(conta)) + '</option>';
+  }).join('');
+}
+
+function tfStatusResumoLabel(item) {
+  var saldo = tfSaldo(item);
+  if (saldo <= 0) return 'Quitado';
+  return tfStatusLabel(tfStatusOf(item));
+}
+
+function tfTituloCardHtml(item) {
+  var status = tfStatusOf(item);
+  var saldo = tfSaldo(item);
+  var baixado = tfTotalBaixado(item);
+  var total = Number(item.valorTotal || 0);
+  var pct = total > 0 ? Math.min(100, Math.round((baixado / total) * 100)) : 0;
+  var centro = item.centroCusto || tfNomeCentroCustoById(item.centroCustoId || null);
+  return '<article class="tf-title-card ' + esc(status) + '">'
+    + '<div class="tf-title-main">'
+      + '<div class="tf-title-topline">'
+        + '<strong>' + esc(item.pessoaNome || '-') + '</strong>'
+        + '<span class="tf-status-badge ' + esc(status) + '">' + esc(tfStatusResumoLabel(item)) + '</span>'
+      + '</div>'
+      + '<div class="tf-title-desc">' + esc(item.descricao || '-') + '</div>'
+      + '<div class="tf-title-meta">'
+        + '<span>Vence ' + esc(formatDate(item.vencimento)) + '</span>'
+        + (centro ? '<span>' + esc(centro) + '</span>' : '<span>Sem centro</span>')
+        + (item.observacao ? '<span>' + esc(item.observacao) + '</span>' : '')
+      + '</div>'
+    + '</div>'
+    + '<div class="tf-title-money">'
+      + '<div><span>Total</span><strong>' + fmt(total) + '</strong></div>'
+      + '<div><span>Baixado</span><strong class="green">' + fmt(baixado) + '</strong></div>'
+      + '<div><span>Saldo</span><strong class="' + (saldo > 0 ? 'yellow' : 'green') + '">' + fmt(saldo) + '</strong></div>'
+      + '<div class="tf-title-progress"><span style="width:' + pct + '%"></span></div>'
+    + '</div>'
+    + '<div class="tf-title-actions">'
+      + '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\')" title="Ver e editar os dados do titulo">Ver/editar</button>'
+      + (saldo > 0 ? '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\', \'baixa\')" title="Registrar uma baixa neste titulo">' + (item.natureza === 'receber' ? 'Registrar recebimento' : 'Registrar pagamento') + '</button>' : '')
+      + '<button class="btn-icon danger" type="button" onclick="tfDeleteTitulo(\'' + item.id + '\')" title="Excluir titulo">&#128465;</button>'
+    + '</div>'
+    + '</article>';
+}
+
+function tfBuildListaTitulos(items) {
+  if (!items.length) return '<div class="empty-state" style="padding:26px 20px">Nenhum titulo encontrado com os filtros atuais.</div>';
+  return '<div class="tf-title-list">' + items.map(tfTituloCardHtml).join('') + '</div>';
+}
+
+function tfContaDaBaixa(baixa) {
+  var cliente = tfClienteAtivo();
+  if (!cliente || !baixa || !baixa.lancamentoId) return '';
+  var lanc = (cliente.extrato || []).find(function(item) { return item.id === baixa.lancamentoId; });
+  return lanc ? tfNomeContaPorId(lanc.contaId || '') : '';
+}
+
+function tfLancamentoDaBaixa(baixa) {
+  var cliente = tfClienteAtivo();
+  if (!cliente || !baixa || !baixa.lancamentoId) return null;
+  return (cliente.extrato || []).find(function(item) { return item.id === baixa.lancamentoId; }) || null;
+}
+
+function tfResumoBaixa(baixa) {
+  var lanc = tfLancamentoDaBaixa(baixa);
+  var partes = [];
+  partes.push(baixa.origem === 'extrato' ? 'Conciliado via Extrato' : (baixa.lancamentoId ? 'Movimentou Extrato' : 'Baixa manual'));
+  if (lanc && lanc.contaId) partes.push(tfNomeContaPorId(lanc.contaId));
+  if (lanc && (lanc.desc || lanc.descOriginal)) partes.push(lanc.desc || lanc.descOriginal);
+
+  var obs = String(baixa.observacao || '').trim();
+  var obsNorm = tfNormalizeText(obs);
+  var jaTemObs = partes.some(function(parte) { return tfNormalizeText(parte) === obsNorm; });
+  if (obs && !obsNorm.includes('conciliado com extrato') && !jaTemObs) partes.push(obs);
+
+  return partes.join(' - ');
+}
+
+async function tfCadastrarContaParaBaixa(tituloId) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (typeof abrirFormularioContaCliente !== 'function') return alert('Cadastro de conta indisponivel nesta tela.');
+  var conta = await abrirFormularioContaCliente({ tipo: 'caixa', banco: 'Carteira', saldoInicial: 0 });
+  if (!conta) return;
+
+  var result = await supabaseClient
+    .from('contas')
+    .insert([Object.assign({
+      cliente_id: activeClient,
+      tipo: conta.tipo,
+      banco: conta.banco,
+      agencia: conta.agencia || null,
+      numero: conta.numero || null,
+      saldo_inicial: Number(conta.saldoInicial || 0)
+    }, getUserScopePayload())]);
+
+  if (result.error) {
+    console.error('Erro ao cadastrar conta pelo financeiro:', result.error);
+    alert('Nao foi possivel cadastrar a conta.');
+    return;
+  }
+
+  await loadData();
+  tfOpenTituloModal(tituloId);
+}
+
+async function tfInsertLancamentoBaixa(item, dataBaixa, valor, observacao, contaId) {
+  var desc = (item.natureza === 'receber' ? 'Recebimento - ' : 'Pagamento - ') + (item.descricao || '');
+  var payload = {
+    cliente_id: activeClient,
+    data_lancamento: dataBaixa || null,
+    descricao: desc,
+    descricao_original: desc,
+    categoria: item.natureza === 'receber' ? 'Recebimento de titulo' : 'Pagamento de titulo',
+    centro_custo_id: item.centroCustoId || null,
+    tipo: item.natureza === 'receber' ? 'credito' : 'debito',
+    valor: Number(valor || 0),
+    conta_id: contaId || null,
+    relacionamento_id: null,
+    observacao: observacao || null
+  };
+
+  var response = await supabaseClient
+    .from('lancamentos')
+    .insert([Object.assign({}, payload, getUserScopePayload())])
+    .select()
+    .single();
+
+  if (!response.error) return response;
+
+  var fallback = Object.assign({}, payload);
+  if (fallback.conta_id && typeof isMissingContaSchemaError === 'function' && isMissingContaSchemaError(response.error)) delete fallback.conta_id;
+  if (fallback.centro_custo_id && typeof isMissingCentroCustoSchemaError === 'function' && isMissingCentroCustoSchemaError(response.error)) delete fallback.centro_custo_id;
+  if (fallback.conta_id !== payload.conta_id || fallback.centro_custo_id !== payload.centro_custo_id) {
+    return supabaseClient
+      .from('lancamentos')
+      .insert([Object.assign(fallback, getUserScopePayload())])
+      .select()
+      .single();
+  }
+
+  return response;
+}
+
+function tfOpenTituloModal(id, foco) {
   var item = tfFindTituloById(id);
   if (!item) return;
   var naturezaLabel = item.natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
@@ -756,6 +988,9 @@ function tfOpenTituloModal(id) {
       + '<div class="form-row" style="margin-top:16px">'
         + '<div class="form-group" style="max-width:170px"><label>Data da baixa</label><input type="text" id="tf-baixa-data" class="flex-date-input" value="' + esc(formatDate(new Date().toISOString().slice(0, 10))) + '" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor</label><input type="text" id="tf-baixa-valor" class="money-input" value="' + esc(Math.max(tfSaldo(item), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+        + '<div class="form-group"><label>Conta movimentada <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="tfCadastrarContaParaBaixa(\'' + id + '\')">(+ caixa/carteira)</span></label><select id="tf-baixa-conta">' + tfContaOptionsHtml('') + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="margin-top:8px">'
         + '<div class="form-group"><label>Observacao</label><input type="text" id="tf-baixa-observacao" placeholder="Ex.: Pix, TED, boleto"/></div>'
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end"><button class="btn-add" type="button" style="margin-top:6px" onclick="tfRegistrarBaixa(\'' + id + '\')">' + baixarLabel + '</button></div>'
@@ -765,6 +1000,12 @@ function tfOpenTituloModal(id) {
   document.addEventListener('keydown', handleMainModalEscape);
   initMoneyInputs(document.getElementById('modalBody'));
   initFlexibleDateInputs(document.getElementById('modalBody'));
+  if (foco === 'baixa') {
+    var campoValor = document.getElementById('tf-baixa-valor');
+    var secaoBaixa = campoValor ? campoValor.closest('.settings-section-card') : null;
+    if (secaoBaixa && typeof secaoBaixa.scrollIntoView === 'function') secaoBaixa.scrollIntoView({ block: 'start' });
+    if (campoValor && typeof campoValor.focus === 'function') campoValor.focus();
+  }
 }
 
 async function tfSaveTitulo(id) {
@@ -831,10 +1072,12 @@ async function tfDeleteTitulo(id) {
 }
 
 async function tfRegistrarBaixa(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var item = tfFindTituloById(id);
   if (!item) return;
   var dataBaixa = tfNormalizeDateFieldValue('tf-baixa-data', 'data da baixa');
   var valor = tfParseAmountFromInput('tf-baixa-valor');
+  var contaId = ((document.getElementById('tf-baixa-conta') || {}).value || '').trim();
   var observacao = ((document.getElementById('tf-baixa-observacao') || {}).value || '').trim();
 
   if (dataBaixa === null) return;
@@ -845,6 +1088,17 @@ async function tfRegistrarBaixa(id) {
     return;
   }
 
+  var lancamentoId = null;
+  if (contaId) {
+    var lancamentoResponse = await tfInsertLancamentoBaixa(item, dataBaixa, valor, observacao, contaId);
+    if (lancamentoResponse.error) {
+      console.error(lancamentoResponse.error);
+      alert('Nao foi possivel registrar a movimentacao no Extrato.');
+      return;
+    }
+    lancamentoId = lancamentoResponse.data && lancamentoResponse.data.id;
+  }
+
   var response = await supabaseClient
     .from('titulos_financeiros_baixas')
     .insert([Object.assign({
@@ -853,28 +1107,34 @@ async function tfRegistrarBaixa(id) {
       data_baixa: dataBaixa,
       valor: valor,
       observacao: observacao || null,
-      origem: 'manual'
+      origem: 'manual',
+      extrato_lancamento_id: lancamentoId || null
     }, getUserScopePayload())])
     .select()
     .single();
 
   if (response.error) {
     console.error(response.error);
+    if (lancamentoId) {
+      await applyUserScope(supabaseClient.from('lancamentos').delete().eq('id', lancamentoId));
+    }
     alert('Nao foi possivel registrar a baixa.');
     return;
   }
 
-  if (!Array.isArray(item.baixas)) item.baixas = [];
-  item.baixas.push({
-    id: response.data.id,
-    data: response.data.data_baixa || null,
-    valor: Number(response.data.valor || 0),
-    observacao: response.data.observacao || '',
-    origem: response.data.origem || 'manual',
-    lancamentoId: response.data.extrato_lancamento_id || null,
-    userId: response.data.user_id || null
-  });
-
+  if (lancamentoId) await loadData();
+  else {
+    if (!Array.isArray(item.baixas)) item.baixas = [];
+    item.baixas.push({
+      id: response.data.id,
+      data: response.data.data_baixa || null,
+      valor: Number(response.data.valor || 0),
+      observacao: response.data.observacao || '',
+      origem: response.data.origem || 'manual',
+      lancamentoId: response.data.extrato_lancamento_id || null,
+      userId: response.data.user_id || null
+    });
+  }
   tfOpenTituloModal(id);
   renderFinanceiro();
 }
@@ -882,6 +1142,8 @@ async function tfRegistrarBaixa(id) {
 async function tfDeleteBaixa(tituloId, baixaId) {
   var ok = await appConfirm('Excluir esta baixa registrada?', { title: 'Excluir baixa', confirmText: 'Excluir' });
   if (!ok) return;
+  var titulo = tfFindTituloById(tituloId);
+  var baixaAtual = titulo && (titulo.baixas || []).find(function(baixa) { return baixa.id === baixaId; });
 
   var response = await applyUserScope(
     supabaseClient
@@ -896,8 +1158,13 @@ async function tfDeleteBaixa(tituloId, baixaId) {
     return;
   }
 
+  if (baixaAtual && baixaAtual.lancamentoId && baixaAtual.origem !== 'extrato') {
+    await applyUserScope(supabaseClient.from('lancamentos').delete().eq('id', baixaAtual.lancamentoId));
+  }
+
   var item = tfFindTituloById(tituloId);
   if (item) item.baixas = (item.baixas || []).filter(function(baixa) { return baixa.id !== baixaId; });
+  if (baixaAtual && baixaAtual.lancamentoId) await loadData();
   tfOpenTituloModal(tituloId);
   renderFinanceiro();
 }
@@ -922,6 +1189,16 @@ function renderFinanceiro() {
   var btnLabel = _tfNatureza === 'pagar' ? 'Cadastrar conta a pagar' : 'Cadastrar conta a receber';
   var itens = tfFilteredItems();
   var resumo = tfSummaryValues(itens);
+  var resumoHtml =
+    '<div class="summary-grid">'
+      + (_tfNatureza === 'receber'
+        ? '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
+        : '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
+      + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
+    + '</div>';
   var pendenciasHtml =
     '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p>'
       + '<div class="summary-grid pending-grid">'
@@ -935,27 +1212,25 @@ function renderFinanceiro() {
       + '</div>';
   var importPanelBody = tfImportGuideHtml()
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfExportImportTemplate()">Baixar modelo (.xlsx)</button><button class="btn-sm" onclick="tfAbrirImportacaoTitulos()">Importar planilha</button></div>';
-  var areaHtml = buildTable('financeiro', COLS_TITULOS, itens, function(item) {
-    return COLS_TITULOS.map(function(col) {
-      if (col.key === '_del') {
-        return '<td><div class="row-actions"><button class="btn-icon" onclick="tfOpenTituloModal(\'' + item.id + '\')" title="Abrir titulo">&#9998;</button><button class="btn-icon danger" onclick="tfDeleteTitulo(\'' + item.id + '\')" title="Excluir titulo">&#128465;</button></div></td>';
-      }
-      return '<td>' + col.render(item) + '</td>';
-    }).join('');
-  }, function(item) {
-    return tfStatusOf(item) === 'atrasado' ? 'row-overdue' : '';
-  });
+  var filtrosHtml =
+    '<div class="form-row">'
+      + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
+      + '<div class="form-group"><label>Pessoa</label><input type="text" id="tf-filtro-pessoa" value="' + esc(_tfPessoa) + '" placeholder="Cliente ou fornecedor" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao, centro ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+    + '</div>'
+    + '<div class="form-row">'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento de</label><input type="text" id="tf-filtro-vencimento-de" class="flex-date-input" value="' + esc(_tfVencimentoDe ? formatDate(_tfVencimentoDe) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento ate</label><input type="text" id="tf-filtro-vencimento-ate" class="flex-date-input" value="' + esc(_tfVencimentoAte ? formatDate(_tfVencimentoAte) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group" style="max-width:160px"><label>Valor</label><select id="tf-filtro-valor-modo"><option value="todos"' + (_tfValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="igual"' + (_tfValorModo === 'igual' ? ' selected' : '') + '>Igual a</option><option value="acima"' + (_tfValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_tfValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option></select></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="tf-filtro-valor" class="money-input" value="' + esc(Number(_tfValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Centro de custo</label><select id="tf-filtro-centro-custo">' + tfCentrosCustoFilterOptionsHtml(_tfCentroCusto) + '</select></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">Exportar PDF</button><button class="btn-sm" onclick="tfExportXlsx()">Exportar XLSX</button></div>';
+  var areaHtml = tfBuildListaTitulos(itens);
 
   root.innerHTML =
-    '<div class="summary-grid">'
-      + (_tfNatureza === 'receber'
-        ? '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
-        : '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
-      + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
-    + '</div>'
+    financeiroPanel('resumo', 'Resumo financeiro', resumoHtml)
     + '<div class="form-card collapsible-card financeiro-collapsible-card' + (_tfPanels.pendencias ? ' open' : '') + '">'
       + '<button type="button" class="collapse-head" onclick="toggleFinanceiroPanel(\'pendencias\')" aria-expanded="' + !!_tfPanels.pendencias + '"><span>Painel de pendencias</span><span class="collapse-chevron" aria-hidden="true">&#9662;</span></button>'
       + (_tfPanels.pendencias ? '<div class="collapse-body">'
@@ -993,17 +1268,8 @@ function renderFinanceiro() {
       + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>'
     )
     + financeiroPanel('importar', 'Importar titulos via planilha', importPanelBody)
-      + '<div class="form-card">'
-        + '<h3>Filtros</h3>'
-        + '<div class="form-row">'
-          + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
-          + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-          + '<div class="form-group"><label>Busca</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-        + '</div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar filtros</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">Exportar PDF</button><button class="btn-sm" onclick="tfExportXlsx()">Exportar XLSX</button></div>'
-      + '</div>'
-    + '<p class="section-title">' + tituloAtivo + '</p>'
-    + areaHtml;
+    + financeiroPanel('filtros', 'Filtros', filtrosHtml)
+    + financeiroPanel('lista', tituloAtivo, areaHtml);
 
   initMoneyInputs(root);
   initFlexibleDateInputs(root);

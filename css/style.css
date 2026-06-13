@@ -305,6 +305,25 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .tf-baixa-item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
 .tf-baixa-item:last-child{border-bottom:none}
 .tf-baixa-item small{display:block;color:var(--muted);font-size:.74rem;margin-top:3px}
+.tf-baixa-account{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent)}
+.tf-title-list{display:flex;flex-direction:column;gap:10px}
+.tf-title-card{display:grid;grid-template-columns:minmax(240px,1fr) minmax(280px,.8fr) auto;gap:16px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:13px 14px;box-shadow:inset 3px 0 0 transparent}
+.tf-title-card.atrasado{box-shadow:inset 3px 0 0 rgba(255,107,107,.7)}
+.tf-title-card.parcial{box-shadow:inset 3px 0 0 rgba(255,198,107,.75)}
+.tf-title-card.quitado{box-shadow:inset 3px 0 0 rgba(62,207,176,.65)}
+.tf-title-main{min-width:0}
+.tf-title-topline{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:4px}
+.tf-title-topline strong{font-size:.92rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tf-title-desc{font-size:.82rem;color:var(--text);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tf-title-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;color:var(--muted);font-size:.72rem}
+.tf-title-meta span{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tf-title-money{display:grid;grid-template-columns:repeat(3,minmax(82px,1fr));gap:8px;align-items:end}
+.tf-title-money div span{display:block;color:var(--muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.7px;margin-bottom:2px}
+.tf-title-money div strong{font-size:.84rem;color:var(--text);white-space:nowrap}
+.tf-title-money strong.green{color:var(--success)}.tf-title-money strong.yellow{color:var(--warning)}
+.tf-title-progress{grid-column:1/-1;height:5px;background:var(--border);border-radius:4px;overflow:hidden}
+.tf-title-progress span{display:block;height:100%;background:var(--accent3);border-radius:4px}
+.tf-title-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
 .row-overdue td{box-shadow:inset 3px 0 0 rgba(255,107,107,.55)}
 .val{font-weight:600;font-variant-numeric:tabular-nums}
 .val-neg{color:var(--danger)}
@@ -555,6 +574,11 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .btn-sm{padding:9px 12px}
   .tipo-toggle{width:100%;display:grid;grid-template-columns:1fr 1fr}
   .tipo-btn{padding:11px 10px}
+  .tf-title-card{grid-template-columns:1fr;gap:11px}
+  .tf-title-topline{align-items:flex-start}
+  .tf-title-money{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tf-title-actions{justify-content:flex-start}
+  .tf-title-actions .btn-sm{width:auto}
   .cards-grid{grid-template-columns:1fr;gap:10px}
   .cc-filter-row{align-items:flex-start;gap:7px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
   .cc-filter-label{flex:0 0 auto;padding-top:6px}
