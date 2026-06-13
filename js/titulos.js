@@ -6,6 +6,8 @@ var _tfDescricao = '';
 var _tfBusca = '';
 var TF_MIN_SEARCH_CHARS = 3;
 var _tfPanels = {
+  pendencias: true,
+  importar: false,
   novo: false
 };
 
@@ -331,6 +333,170 @@ function tfExportXlsx() {
       + String(cliente.name || 'cliente').toLowerCase().replace(/\s+/g, '_')
       + '_' + new Date().toISOString().slice(0, 10) + '.xlsx'
   );
+}
+
+function tfImportGuideHtml() {
+  return '<div class="import-guide">'
+    + '<div class="import-guide-head">Formato da planilha</div>'
+    + '<div class="import-guide-grid">'
+    + '<span class="import-guide-chip required">vencimento</span>'
+    + '<span class="import-guide-chip required">pessoa</span>'
+    + '<span class="import-guide-chip required">descricao</span>'
+    + '<span class="import-guide-chip required">valor</span>'
+    + '<span class="import-guide-chip">observacao</span>'
+    + '<span class="import-guide-chip">natureza</span>'
+    + '</div>'
+    + '<ul class="import-guide-list">'
+    + '<li>Sem a coluna <strong>natureza</strong>, importa para a aba aberta: A Receber ou A Pagar.</li>'
+    + '<li>Use <strong>receber</strong> ou <strong>pagar</strong> na coluna natureza quando quiser misturar no mesmo arquivo.</li>'
+    + '<li>Linhas duplicadas iguais a titulos ja cadastrados serao ignoradas.</li>'
+    + '</ul>'
+    + '</div>';
+}
+
+function tfExportImportTemplate() {
+  var natureza = _tfNatureza === 'pagar' ? 'pagar' : 'receber';
+  var pessoa = natureza === 'pagar' ? 'Fornecedor Exemplo' : 'Cliente Exemplo';
+  var descricao = natureza === 'pagar' ? 'Aluguel' : 'Mensalidade';
+  var rows = [
+    ['vencimento', 'pessoa', 'descricao', 'valor', 'observacao', 'natureza'],
+    ['15/06/2026', pessoa, descricao, 1200.00, 'Opcional', natureza]
+  ];
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:28},{wch:34},{wch:12},{wch:34},{wch:12}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, natureza === 'pagar' ? 'A Pagar' : 'A Receber');
+  XLSX.writeFile(wb, 'modelo_financeiro_' + natureza + '_granafy.xlsx');
+}
+
+function tfAbrirImportacaoTitulos() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente primeiro.');
+  var input = document.getElementById('importTitulosXlsxInput');
+  if (input) input.click();
+}
+
+function tfHeaderIndex(header, termos) {
+  return header.findIndex(function(h) {
+    return termos.some(function(termo) { return h.includes(termo); });
+  });
+}
+
+function tfNaturezaImportada(value) {
+  var txt = tfNormalizeText(value);
+  if (txt.includes('pagar') || txt.includes('fornecedor') || txt.includes('despesa') || txt.includes('debito')) return 'pagar';
+  if (txt.includes('receber') || txt.includes('cliente') || txt.includes('receita') || txt.includes('credito')) return 'receber';
+  return _tfNatureza === 'pagar' ? 'pagar' : 'receber';
+}
+
+function tfValorImportadoTitulo(rawVal) {
+  if (typeof rawVal === 'number') return rawVal;
+  var texto = String(rawVal || '').replace(/[^0-9,.-]/g, '').trim();
+  if (!texto) return 0;
+  if (texto.includes(',') && texto.includes('.')) texto = texto.replace(/\./g, '').replace(',', '.');
+  else if (texto.includes(',')) texto = texto.replace(',', '.');
+  return parseFloat(texto) || 0;
+}
+
+function tfChaveDuplicidadeTitulo(item) {
+  return [
+    item.natureza || '',
+    item.vencimento || '',
+    tfNormalizeText(item.pessoaNome || item.pessoa_nome || ''),
+    tfNormalizeText(item.descricao || ''),
+    Math.round(Number(item.valorTotal || item.valor_total || 0) * 100)
+  ].join('|');
+}
+
+async function importTitulosXlsx(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (!activeClient) return alert('Selecione um cliente primeiro.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    var header = (rows[0] || []).map(function(h) { return tfNormalizeText(h); });
+    var iVenc = tfHeaderIndex(header, ['vencimento', 'data', 'due']);
+    var iPessoa = tfHeaderIndex(header, ['pessoa', 'cliente', 'fornecedor', 'favorecido', 'pagador']);
+    var iDesc = tfHeaderIndex(header, ['descricao', 'desc', 'titulo']);
+    var iVal = tfHeaderIndex(header, ['valor', 'total', 'amount']);
+    var iObs = tfHeaderIndex(header, ['observacao', 'obs', 'nota']);
+    var iNat = tfHeaderIndex(header, ['natureza', 'tipo']);
+
+    if (iVenc < 0 || iPessoa < 0 || iDesc < 0 || iVal < 0) {
+      return alert('Planilha invalida. Colunas obrigatorias: vencimento, pessoa, descricao e valor.');
+    }
+
+    var cliente = tfClienteAtivo();
+    var existentes = new Set((cliente.titulos || []).map(tfChaveDuplicidadeTitulo));
+    var payloads = [];
+    var ignorados = 0;
+
+    rows.slice(1).forEach(function(row) {
+      var vencimento = normalizarDataImportada(row[iVenc]);
+      var pessoa = formatDescriptionTitleCase(String(row[iPessoa] || ''));
+      var descricao = formatDescriptionTitleCase(String(row[iDesc] || ''));
+      var valor = Math.abs(Number(tfValorImportadoTitulo(row[iVal]) || 0));
+      var observacao = iObs >= 0 ? String(row[iObs] || '').trim() : '';
+      var natureza = iNat >= 0 ? tfNaturezaImportada(row[iNat]) : (_tfNatureza === 'pagar' ? 'pagar' : 'receber');
+
+      if (!vencimento || !pessoa || !descricao || valor <= 0) {
+        ignorados++;
+        return;
+      }
+
+      var item = {
+        natureza: natureza,
+        pessoaNome: pessoa,
+        descricao: descricao,
+        vencimento: vencimento,
+        valorTotal: valor
+      };
+      var chave = tfChaveDuplicidadeTitulo(item);
+      if (existentes.has(chave)) {
+        ignorados++;
+        return;
+      }
+      existentes.add(chave);
+
+      payloads.push(Object.assign({
+        cliente_id: activeClient,
+        natureza: natureza,
+        pessoa_nome: pessoa,
+        descricao: descricao,
+        categoria: null,
+        centro_custo_id: null,
+        vencimento: vencimento,
+        valor_total: valor,
+        observacao: observacao || null
+      }, getUserScopePayload()));
+    });
+
+    if (!payloads.length) {
+      return alert('Nenhum titulo valido para importar.' + (ignorados ? ' ' + ignorados + ' linha(s) ignorada(s).' : ''));
+    }
+
+    var response = await supabaseClient
+      .from('titulos_financeiros')
+      .insert(payloads);
+
+    if (response.error) {
+      console.error('Erro ao importar titulos financeiros:', response.error);
+      return alert('Nao foi possivel importar os titulos. Verifique a planilha e a migracao do Financeiro PJ.');
+    }
+
+    await loadData();
+    renderFinanceiro();
+    alert(payloads.length + ' titulo(s) importado(s) com sucesso!' + (ignorados ? ' ' + ignorados + ' linha(s) ignorada(s).' : ''));
+  };
+
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
 }
 
 function tfExportPDF() {
@@ -756,6 +922,19 @@ function renderFinanceiro() {
   var btnLabel = _tfNatureza === 'pagar' ? 'Cadastrar conta a pagar' : 'Cadastrar conta a receber';
   var itens = tfFilteredItems();
   var resumo = tfSummaryValues(itens);
+  var pendenciasHtml =
+    '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p>'
+      + '<div class="summary-grid pending-grid">'
+        + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Pendentes de estorno</div><div class="s-val red">' + pendencias.extratoPendentesEstorno.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoPendentesEstorno.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'pendentes_estorno\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Lancamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">A receber vencido</div><div class="s-val red">' + pendencias.receberVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.receberVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'atrasado\')">Abrir no Financeiro</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">A pagar vencido</div><div class="s-val red">' + pendencias.pagarVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'atrasado\')">Abrir no Financeiro</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Receber parcial</div><div class="s-val yellow">' + pendencias.receberParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.receberParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'parcial\')">Abrir no Financeiro</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Pagar parcial</div><div class="s-val yellow">' + pendencias.pagarParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'parcial\')">Abrir no Financeiro</button></div>'
+      + '</div>';
+  var importPanelBody = tfImportGuideHtml()
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfExportImportTemplate()">Baixar modelo (.xlsx)</button><button class="btn-sm" onclick="tfAbrirImportacaoTitulos()">Importar planilha</button></div>';
   var areaHtml = buildTable('financeiro', COLS_TITULOS, itens, function(item) {
     return COLS_TITULOS.map(function(col) {
       if (col.key === '_del') {
@@ -777,8 +956,9 @@ function renderFinanceiro() {
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
     + '</div>'
-    + '<div class="form-card">'
-      + '<h3>Painel de pendencias</h3>'
+    + '<div class="form-card collapsible-card financeiro-collapsible-card' + (_tfPanels.pendencias ? ' open' : '') + '">'
+      + '<button type="button" class="collapse-head" onclick="toggleFinanceiroPanel(\'pendencias\')" aria-expanded="' + !!_tfPanels.pendencias + '"><span>Painel de pendencias</span><span class="collapse-chevron" aria-hidden="true">&#9662;</span></button>'
+      + (_tfPanels.pendencias ? '<div class="collapse-body">'
       + '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p>'
       + '<div class="summary-grid pending-grid">'
         + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
@@ -788,7 +968,7 @@ function renderFinanceiro() {
         + '<div class="summary-card pending-card"><div class="s-label">A pagar vencido</div><div class="s-val red">' + pendencias.pagarVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'atrasado\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Receber parcial</div><div class="s-val yellow">' + pendencias.receberParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.receberParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'parcial\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Pagar parcial</div><div class="s-val yellow">' + pendencias.pagarParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'parcial\')">Abrir no Financeiro</button></div>'
-      + '</div>'
+      + '</div></div>' : '')
     + '</div>'
     + '<div class="form-card">'
       + '<h3>Financeiro PJ</h3>'
@@ -812,6 +992,7 @@ function renderFinanceiro() {
       + '</div>'
       + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>'
     )
+    + financeiroPanel('importar', 'Importar titulos via planilha', importPanelBody)
       + '<div class="form-card">'
         + '<h3>Filtros</h3>'
         + '<div class="form-row">'
