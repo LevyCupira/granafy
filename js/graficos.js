@@ -1,5 +1,7 @@
 var _chartInstances = {};
 var _graficosPeriodos = null;
+var _graficosFluxoModo = 'barras';
+var _graficosCategoriaModo = 'despesas';
 
 function destroyChart(id) {
   if (_chartInstances[id]) {
@@ -8,129 +10,288 @@ function destroyChart(id) {
   }
 }
 
+function graficosSetFluxoModo(valor) {
+  _graficosFluxoModo = valor || 'barras';
+  renderGraficos();
+}
+
+function graficosSetCategoriaModo(valor) {
+  _graficosCategoriaModo = valor || 'despesas';
+  renderGraficos();
+}
+
+function graficosLabelPeriodo(mes) {
+  var parts = String(mes || '').split('-');
+  return parts.length === 2 ? parts[1] + '/' + parts[0].slice(2) : mes;
+}
+
+function graficosValorCompacto(valor) {
+  return 'R$' + Number(valor || 0).toLocaleString('pt-BR', {
+    notation: 'compact',
+    maximumFractionDigits: 1
+  });
+}
+
+function graficosChartBaseOptions(gridColor) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            return ' ' + ctx.dataset.label + ': ' + fmt(ctx.raw);
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { font: { size: 10 } } },
+      y: {
+        grid: { color: gridColor },
+        ticks: {
+          font: { size: 10 },
+          callback: function(v) { return graficosValorCompacto(v); }
+        }
+      }
+    }
+  };
+}
+
+function graficosMesesDisponiveis(cliente, transacoes) {
+  return Array.from(new Set(
+    transacoes.map(function(l) { return (l.data || '').slice(0, 7); }).filter(Boolean)
+      .concat((cliente.cartao || []).map(function(l) { return (l.data || '').slice(0, 7); }).filter(Boolean))
+  )).sort().reverse();
+}
+
+function graficosAgruparPorPeriodo(transacoes, periodos) {
+  var periodoSet = new Set(periodos || []);
+  var grupos = {};
+
+  (transacoes || []).forEach(function(l) {
+    var periodo = (l.data || '').slice(0, 7);
+    if (!periodoSet.has(periodo)) return;
+    if (!grupos[periodo]) grupos[periodo] = [];
+    grupos[periodo].push(l);
+  });
+
+  return (periodos || []).slice().sort().map(function(periodo) {
+    var consolidado = consolidarTransacoesAnaliticas(grupos[periodo] || []);
+    return {
+      periodo: periodo,
+      label: graficosLabelPeriodo(periodo),
+      receitas: consolidado.totalReceitas,
+      despesas: consolidado.totalDespesas,
+      resultado: consolidado.totalReceitas - consolidado.totalDespesas,
+      consolidado: consolidado
+    };
+  });
+}
+
+function graficosSomarCategorias(lista, limite) {
+  var total = (lista || []).reduce(function(s, item) { return s + Number(item.valor || 0); }, 0);
+  var principais = (lista || []).slice().sort(function(a, b) { return b.valor - a.valor; }).slice(0, limite || 8);
+  var usados = principais.reduce(function(s, item) { return s + Number(item.valor || 0); }, 0);
+
+  if (total - usados > 0.009) principais.push({ cat: 'Outros', valor: total - usados });
+  return { total: total, itens: principais };
+}
+
+function graficosFaturasPorPeriodo(cliente, periodos, colors) {
+  var cartoes = (cliente.cartoes || []).slice();
+  var lancamentos = cliente.cartao || [];
+
+  if (lancamentos.some(function(it) { return !it.cartaoId; })) {
+    cartoes.push({ id: '__sem_cartao', nome: 'Sem cartao' });
+  }
+
+  return cartoes.map(function(cartao, i) {
+    return {
+      label: cartao.nome,
+      data: periodos.map(function(periodo) {
+        return lancamentos
+          .filter(function(it) {
+            var mesmoCartao = cartao.id === '__sem_cartao' ? !it.cartaoId : it.cartaoId === cartao.id;
+            return mesmoCartao && (it.data || '').startsWith(periodo);
+          })
+          .reduce(function(s, it) { return s + (it.tipo === 'estorno' ? -Number(it.valor || 0) : Number(it.valor || 0)); }, 0);
+      }),
+      backgroundColor: colors[i % colors.length] + 'cc',
+      borderColor: colors[i % colors.length],
+      borderWidth: 1.5,
+      borderRadius: 5
+    };
+  }).filter(function(ds) {
+    return ds.data.some(function(v) { return Math.abs(v) > 0.009; });
+  });
+}
+
+function graficosResumoHtml(totalReceitas, totalDespesas, resultado, transacoes, faturaTotal) {
+  var margem = totalReceitas > 0 ? (resultado / totalReceitas) * 100 : 0;
+  return '<div class="charts-kpi-grid">'
+    + '<div class="summary-card"><div class="s-label">Receitas</div><div class="s-val green">' + fmt(totalReceitas) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Despesas</div><div class="s-val red">' + fmt(totalDespesas) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Resultado</div><div class="s-val ' + (resultado >= 0 ? 'green' : 'red') + '">' + fmt(resultado) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Margem</div><div class="s-val ' + (margem >= 0 ? 'green' : 'red') + '">' + margem.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</div></div>'
+    + '<div class="summary-card"><div class="s-label">Transacoes</div><div class="s-val blue">' + transacoes + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Fatura cartao</div><div class="s-val yellow">' + fmt(faturaTotal) + '</div></div>'
+    + '</div>';
+}
+
+function graficosRankingHtml(categorias, total, tipo) {
+  if (!categorias.length) {
+    return '<div class="empty-state" style="padding:24px 12px">Nenhuma categoria no periodo.</div>';
+  }
+
+  return '<div class="charts-ranking">'
+    + categorias.map(function(item) {
+      var pct = total > 0 ? Math.round((Number(item.valor || 0) / total) * 100) : 0;
+      return '<div class="charts-ranking-row">'
+        + '<div><strong>' + esc(item.cat || 'Outros') + '</strong><span>' + pct + '% de ' + (tipo === 'receitas' ? 'receitas' : 'despesas') + '</span></div>'
+        + '<div class="charts-ranking-bar"><span class="' + (tipo === 'receitas' ? 'income' : 'expense') + '" style="width:' + pct + '%"></span></div>'
+        + '<strong>' + fmt(item.valor) + '</strong>'
+        + '</div>';
+    }).join('')
+    + '</div>';
+}
+
 function renderGraficos() {
   var c = data.clients[activeClient];
+  if (!c) return;
+
   var todasBase = getTransacoes(activeClient);
   var todas = todasBase.filter(function(l) { return !l.ehMovConta; });
-  var mesesSet = Array.from(new Set(
-    todas.map(function(l) { return (l.data || '').slice(0, 7); }).filter(Boolean)
-      .concat((c.cartao || []).map(function(l) { return (l.data || '').slice(0, 7); }).filter(Boolean))
-  )).sort().reverse();
-
+  var mesesSet = graficosMesesDisponiveis(c, todas);
   var periodos = lerPeriodosSelecionados('graficos-periodos-sel', mesesSet, _graficosPeriodos);
   _graficosPeriodos = periodos;
 
   var periodoSet = new Set(periodos);
-  var periodosGrafico = periodos.slice().sort();
-  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
-  var mesFiltro = periodos.length === 1 ? periodos[0] : '';
+  var transacoesPeriodo = periodos.length
+    ? todas.filter(function(l) { return periodoSet.has((l.data || '').slice(0, 7)); })
+    : [];
+  var consolidadoPeriodo = consolidarTransacoesAnaliticas(transacoesPeriodo);
+  var series = graficosAgruparPorPeriodo(todas, periodos);
+  var periodosGrafico = series.map(function(item) { return item.periodo; });
+  var labels = series.map(function(item) { return item.label; });
+  var receitas = series.map(function(item) { return item.receitas; });
+  var despesas = series.map(function(item) { return item.despesas; });
+  var resultado = series.map(function(item) { return item.resultado; });
+  var acumulado = [];
 
-  document.getElementById('graficos-content').innerHTML =
-    '<div class="charts-filter-row">'
-    + '<span class="period-label">Selecionar periodo:</span>'
-    + buildPeriodoMultiSelect('graficos-periodos-sel', mesesSet, periodos, 'renderGraficos()')
-    + '<span class="period-help">' + esc(periodoTexto) + ' &bull; escolha um ou mais meses.</span>'
-    + '<button class="btn-pdf" onclick="exportPDF()">&#128196; Exportar PDF</button>'
-    + '</div>'
-    + '<div class="charts-grid-top">'
-    + '<div class="chart-card"><h4>&#128202; Receitas vs Despesas por mes</h4><div class="chart-wrap"><canvas id="chart-recdesp"></canvas></div></div>'
-    + '<div class="chart-card"><h4>Gastos por categoria' + (mesFiltro ? ' (mes selecionado)' : ' (todos os meses)') + '</h4><div class="chart-wrap"><canvas id="chart-pizza"></canvas></div></div>'
-    + '</div>'
-    + '<div class="charts-grid-bottom"><div class="chart-card"><h4>Fatura do cartao por mes</h4><div class="chart-wrap-tall"><canvas id="chart-fatura"></canvas></div></div></div>';
+  resultado.reduce(function(s, valor) {
+    var novo = s + valor;
+    acumulado.push(novo);
+    return novo;
+  }, 0);
 
+  var COLORS = ['#5b8cff', '#3ecfb0', '#ff6b6b', '#ffc86b', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#60a5fa', '#e879f9'];
   var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   var gridColor = isDark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.07)';
   var tickColor = isDark ? '#7a80a0' : '#5a607a';
-  var COLORS = ['#5b8cff','#3ecfb0','#ff6b6b','#ffc86b','#a78bfa','#f472b6','#34d399','#fb923c','#60a5fa','#e879f9'];
+  var categoriaBase = _graficosCategoriaModo === 'receitas' ? consolidadoPeriodo.receitas : consolidadoPeriodo.despesas;
+  var categorias = graficosSomarCategorias(categoriaBase, 8);
+  var faturaDatasets = graficosFaturasPorPeriodo(c, periodosGrafico, COLORS);
+  var faturaTotal = faturaDatasets.reduce(function(total, ds) {
+    return total + ds.data.reduce(function(s, valor) { return s + Number(valor || 0); }, 0);
+  }, 0);
+  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
+
+  document.getElementById('graficos-content').innerHTML =
+    '<div class="charts-filter-row charts-toolbar">'
+      + '<span class="period-label">Periodo:</span>'
+      + buildPeriodoMultiSelect('graficos-periodos-sel', mesesSet, periodos, 'renderGraficos()')
+      + '<label class="charts-control"><span>Fluxo</span><select onchange="graficosSetFluxoModo(this.value)">'
+        + '<option value="barras"' + (_graficosFluxoModo === 'barras' ? ' selected' : '') + '>Barras</option>'
+        + '<option value="linha"' + (_graficosFluxoModo === 'linha' ? ' selected' : '') + '>Linha</option>'
+        + '<option value="acumulado"' + (_graficosFluxoModo === 'acumulado' ? ' selected' : '') + '>Resultado acumulado</option>'
+      + '</select></label>'
+      + '<label class="charts-control"><span>Categorias</span><select onchange="graficosSetCategoriaModo(this.value)">'
+        + '<option value="despesas"' + (_graficosCategoriaModo === 'despesas' ? ' selected' : '') + '>Despesas</option>'
+        + '<option value="receitas"' + (_graficosCategoriaModo === 'receitas' ? ' selected' : '') + '>Receitas</option>'
+      + '</select></label>'
+      + '<span class="period-help">' + esc(periodoTexto) + '</span>'
+      + '<button class="btn-pdf" onclick="exportPDF()">Exportar PDF</button>'
+    + '</div>'
+    + graficosResumoHtml(consolidadoPeriodo.totalReceitas, consolidadoPeriodo.totalDespesas, consolidadoPeriodo.totalReceitas - consolidadoPeriodo.totalDespesas, transacoesPeriodo.length, faturaTotal)
+    + '<div class="charts-grid-main">'
+      + '<div class="chart-card chart-card-wide"><h4>Fluxo financeiro</h4><div class="chart-wrap"><canvas id="chart-recdesp"></canvas></div></div>'
+      + '<div class="chart-card"><h4>Ranking de categorias</h4><div class="chart-wrap"><canvas id="chart-categorias"></canvas></div></div>'
+    + '</div>'
+    + '<div class="charts-grid-main">'
+      + '<div class="chart-card"><h4>Detalhe do ranking</h4>' + graficosRankingHtml(categorias.itens, categorias.total, _graficosCategoriaModo) + '</div>'
+      + '<div class="chart-card"><h4>Fatura do cartao por mes</h4><div class="chart-wrap"><canvas id="chart-fatura"></canvas></div></div>'
+    + '</div>';
 
   Chart.defaults.font.family = "'DM Sans', sans-serif";
   Chart.defaults.color = tickColor;
 
   destroyChart('recdesp');
-  var labels1 = periodosGrafico.map(function(m) { var parts = m.split('-'); return parts[1] + '/' + parts[0].slice(2); });
-  var receitas1 = periodosGrafico.map(function(m) {
-    return consolidarTransacoesAnaliticas(todas.filter(function(l) { return (l.data || '').startsWith(m); })).totalReceitas;
-  });
-  var despesas1 = periodosGrafico.map(function(m) {
-    return consolidarTransacoesAnaliticas(todas.filter(function(l) { return (l.data || '').startsWith(m); })).totalDespesas;
-  });
-  _chartInstances.recdesp = new Chart(document.getElementById('chart-recdesp'), {
-    type: 'bar',
-    data: {
-      labels: labels1,
-      datasets: [
-        { label: 'Receitas', data: receitas1, backgroundColor: 'rgba(62,207,176,.75)', borderColor: 'rgba(62,207,176,1)', borderWidth: 1.5, borderRadius: 5 },
-        { label: 'Despesas', data: despesas1, backgroundColor: 'rgba(255,107,107,.75)', borderColor: 'rgba(255,107,107,1)', borderWidth: 1.5, borderRadius: 5 }
+  var fluxoDatasets = _graficosFluxoModo === 'acumulado'
+    ? [
+        { label: 'Resultado acumulado', data: acumulado, borderColor: COLORS[0], backgroundColor: 'rgba(91,140,255,.16)', borderWidth: 2, tension: .32, fill: true },
+        { label: 'Resultado mensal', data: resultado, borderColor: COLORS[3], backgroundColor: 'rgba(255,200,107,.22)', borderWidth: 2, tension: .32 }
       ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: function(ctx) { return ' ' + fmt(ctx.raw); } } } },
-      scales: {
-        x: { grid: { color: gridColor }, ticks: { font: { size: 10 } } },
-        y: { grid: { color: gridColor }, ticks: { font: { size: 10 }, callback: function(v) { return 'R$' + Number(v).toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }); } } }
-      }
-    }
+    : [
+        { label: 'Receitas', data: receitas, backgroundColor: 'rgba(62,207,176,.72)', borderColor: 'rgba(62,207,176,1)', borderWidth: 1.5, borderRadius: 5, tension: .32 },
+        { label: 'Despesas', data: despesas, backgroundColor: 'rgba(255,107,107,.72)', borderColor: 'rgba(255,107,107,1)', borderWidth: 1.5, borderRadius: 5, tension: .32 },
+        { label: 'Resultado', data: resultado, backgroundColor: 'rgba(255,200,107,.22)', borderColor: 'rgba(255,200,107,1)', borderWidth: 2, type: 'line', tension: .32 }
+      ];
+  _chartInstances.recdesp = new Chart(document.getElementById('chart-recdesp'), {
+    type: _graficosFluxoModo === 'barras' ? 'bar' : 'line',
+    data: { labels: labels, datasets: fluxoDatasets },
+    options: graficosChartBaseOptions(gridColor)
   });
 
-  destroyChart('pizza');
-  var filtradas = consolidarTransacoesAnaliticas(todas.filter(function(l) {
-    return periodoSet.has((l.data || '').slice(0, 7));
-  })).despesas;
-  var catMap = {};
-  filtradas.forEach(function(l) { var k = l.cat || 'Outros'; catMap[k] = (catMap[k] || 0) + l.valor; });
-  var pizzaEntries = Object.entries(catMap).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 10);
-  if (pizzaEntries.length === 0) {
-    document.getElementById('chart-pizza').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0"><div class="icon">&#128172;</div>Nenhuma despesa no periodo.</div>';
+  destroyChart('categorias');
+  if (!categorias.itens.length) {
+    document.getElementById('chart-categorias').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma categoria no periodo.</div>';
   } else {
-    _chartInstances.pizza = new Chart(document.getElementById('chart-pizza'), {
-      type: 'doughnut',
-      data: { labels: pizzaEntries.map(function(e) { return e[0]; }), datasets: [{ data: pizzaEntries.map(function(e) { return e[1]; }), backgroundColor: COLORS, borderColor: isDark ? '#1e2336' : '#e8eaf4', borderWidth: 2, hoverOffset: 6 }] },
-      options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { boxWidth: 11, font: { size: 10 }, padding: 10 } }, tooltip: { callbacks: { label: function(ctx) { return ' ' + fmt(ctx.raw) + ' (' + Math.round(ctx.parsed / pizzaEntries.reduce(function(s, e) { return s + e[1]; }, 0) * 100) + '%)'; } } } } }
+    _chartInstances.categorias = new Chart(document.getElementById('chart-categorias'), {
+      type: 'bar',
+      data: {
+        labels: categorias.itens.map(function(item) { return item.cat; }),
+        datasets: [{
+          label: _graficosCategoriaModo === 'receitas' ? 'Receitas' : 'Despesas',
+          data: categorias.itens.map(function(item) { return item.valor; }),
+          backgroundColor: categorias.itens.map(function(_, i) { return COLORS[i % COLORS.length] + 'cc'; }),
+          borderColor: categorias.itens.map(function(_, i) { return COLORS[i % COLORS.length]; }),
+          borderWidth: 1.5,
+          borderRadius: 5
+        }]
+      },
+      options: Object.assign(graficosChartBaseOptions(gridColor), {
+        indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(ctx) { return ' ' + fmt(ctx.raw); } } }
+        }
+      })
     });
   }
 
   destroyChart('fatura');
-  var cartoes = c.cartoes || [];
-  if (cartoes.length === 0 || !c.cartao || c.cartao.length === 0) {
-    document.getElementById('chart-fatura').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0"><div class="icon">&#128179;</div>Nenhum lancamento de cartao.</div>';
+  if (!faturaDatasets.length) {
+    document.getElementById('chart-fatura').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma fatura no periodo.</div>';
   } else {
-    var mesesFatura = periodosGrafico;
-    var labels3 = mesesFatura.map(function(m) { var parts = m.split('-'); return parts[1] + '/' + parts[0].slice(2); });
-    var cartoesComSemVinculo = cartoes.slice();
-    if ((c.cartao || []).some(function(it) { return !it.cartaoId; })) cartoesComSemVinculo.push({ id: '__sem_cartao', nome: 'Sem cartao' });
-    var datasets3 = cartoesComSemVinculo.map(function(cc, i) {
-      return {
-        label: cc.nome,
-        data: mesesFatura.map(function(m) {
-          return c.cartao
-            .filter(function(it) { return (cc.id === '__sem_cartao' ? !it.cartaoId : it.cartaoId === cc.id) && (it.data || '').startsWith(m); })
-            .reduce(function(s, it) { return s + (it.tipo === 'estorno' ? -Number(it.valor || 0) : Number(it.valor || 0)); }, 0);
-        }),
-        backgroundColor: COLORS[i % COLORS.length] + 'cc',
-        borderColor: COLORS[i % COLORS.length],
-        borderWidth: 1.5,
-        borderRadius: 5
-      };
-    }).filter(function(ds) { return ds.data.some(function(v) { return v !== 0; }); });
-
-    if (datasets3.every(function(d) { return d.data.every(function(v) { return v === 0; }); })) {
-      document.getElementById('chart-fatura').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0"><div class="icon">&#128172;</div>Sem dados de fatura no periodo.</div>';
-    } else {
-      _chartInstances.fatura = new Chart(document.getElementById('chart-fatura'), {
-        type: 'bar',
-        data: { labels: labels3, datasets: datasets3 },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: function(ctx) { return ' ' + fmt(ctx.raw); } } } },
-          scales: {
-            x: { stacked: false, grid: { color: gridColor }, ticks: { font: { size: 10 } } },
-            y: { stacked: false, grid: { color: gridColor }, ticks: { font: { size: 10 }, callback: function(v) { return 'R$' + Number(v).toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }); } } }
+    _chartInstances.fatura = new Chart(document.getElementById('chart-fatura'), {
+      type: 'bar',
+      data: { labels: labels, datasets: faturaDatasets },
+      options: Object.assign(graficosChartBaseOptions(gridColor), {
+        scales: {
+          x: { stacked: true, grid: { color: gridColor }, ticks: { font: { size: 10 } } },
+          y: {
+            stacked: true,
+            grid: { color: gridColor },
+            ticks: {
+              font: { size: 10 },
+              callback: function(v) { return graficosValorCompacto(v); }
+            }
           }
         }
-      });
-    }
+      })
+    });
   }
 }
