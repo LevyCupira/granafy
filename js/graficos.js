@@ -4,6 +4,7 @@ var _graficosFluxoModo = 'barras';
 var _graficosCategoriaModo = 'despesas';
 var _graficosEventos = [];
 var _graficosCategoriaDetalhes = {};
+var _graficosView = 'geral';
 
 function destroyChart(id) {
   if (_chartInstances[id]) {
@@ -19,6 +20,12 @@ function graficosSetFluxoModo(valor) {
 
 function graficosSetCategoriaModo(valor) {
   _graficosCategoriaModo = valor || 'despesas';
+  renderGraficos();
+}
+
+function graficosSetView(view) {
+  var views = ['geral', 'eventos', 'categorias', 'cartao', 'comparacoes'];
+  _graficosView = views.includes(view) ? view : 'geral';
   renderGraficos();
 }
 
@@ -610,10 +617,10 @@ function renderGraficos() {
   }, 0);
   var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
 
-  document.getElementById('graficos-content').innerHTML =
-    '<div class="charts-filter-row charts-toolbar">'
-      + '<span class="period-label">Periodo:</span>'
-      + buildPeriodoMultiSelect('graficos-periodos-sel', mesesSet, periodos, 'renderGraficos()')
+  if (_graficosView === 'eventos' && !eventosDisponiveis.length) _graficosView = 'geral';
+  var controlsHtml =
+    '<div class="charts-workbench-controls">'
+      + '<label class="charts-control"><span>Periodo</span>' + buildPeriodoMultiSelect('graficos-periodos-sel', mesesSet, periodos, 'renderGraficos()') + '</label>'
       + (eventosDisponiveis.length ? '<label class="charts-control"><span>' + esc((c.eventosLabel || 'Eventos')) + '</span>' + graficosBuildEventoMultiSelect('graficos-eventos-sel', eventosDisponiveis, eventosSelecionados) + '</label>' : '')
       + '<label class="charts-control"><span>Fluxo</span><select onchange="graficosSetFluxoModo(this.value)">'
         + '<option value="barras"' + (_graficosFluxoModo === 'barras' ? ' selected' : '') + '>Barras</option>'
@@ -624,32 +631,69 @@ function renderGraficos() {
         + '<option value="despesas"' + (_graficosCategoriaModo === 'despesas' ? ' selected' : '') + '>Despesas</option>'
         + '<option value="receitas"' + (_graficosCategoriaModo === 'receitas' ? ' selected' : '') + '>Receitas</option>'
       + '</select></label>'
-      + '<span class="period-help">' + esc(periodoTexto) + '</span>'
       + '<button class="btn-pdf" onclick="exportPDF()">Exportar PDF</button>'
-    + '</div>'
-    + graficosResumoHtml(eventosDisponiveis.length ? eventosReceita : consolidadoPeriodo.totalReceitas, eventosDisponiveis.length ? eventosCusto : consolidadoPeriodo.totalDespesas, eventosDisponiveis.length ? eventosResultado : (consolidadoPeriodo.totalReceitas - consolidadoPeriodo.totalDespesas), eventosDisponiveis.length ? eventosTitulos : transacoesPeriodo.length, faturaTotal)
-    + (eventosDisponiveis.length ? '<div class="charts-grid-main">'
-      + '<div class="chart-card chart-card-wide"><h4>Comparacao de eventos</h4><div class="chart-wrap"><canvas id="chart-eventos"></canvas></div></div>'
-      + '<div class="chart-card"><h4>Resultado por evento</h4>' + graficosEventosDetalheHtml(eventosResumo) + '</div>'
-    + '</div>' : '')
-    + '<div class="charts-grid-main">'
+    + '</div>';
+  var headerHtml =
+    '<div class="charts-workbench-hero">'
+      + '<div class="charts-workbench-head">'
+        + '<div><h3>Graficos</h3><p class="cartao-helper-text">Analise fluxo, categorias, eventos e cartoes por periodo.</p></div>'
+        + controlsHtml
+      + '</div>'
+      + '<div class="charts-period-note">' + esc(periodoTexto) + '</div>'
+    + '</div>';
+  var tabsHtml =
+    '<div class="charts-workbench-tabs">'
+      + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'geral' ? ' active' : '') + '" onclick="graficosSetView(\'geral\')"><span>Geral</span><strong>' + transacoesPeriodo.length + '</strong></button>'
+      + (eventosDisponiveis.length ? '<button type="button" class="charts-workbench-tab' + (_graficosView === 'eventos' ? ' active' : '') + '" onclick="graficosSetView(\'eventos\')"><span>' + esc(c.eventosLabel || 'Eventos') + '</span><strong>' + eventosResumo.length + '</strong></button>' : '')
+      + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'categorias' ? ' active' : '') + '" onclick="graficosSetView(\'categorias\')"><span>Categorias</span><strong>' + (eventosDisponiveis.length ? categoriasEventos.itens.length : categorias.itens.length) + '</strong></button>'
+      + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'cartao' ? ' active' : '') + '" onclick="graficosSetView(\'cartao\')"><span>Cartao</span><strong>' + faturaDatasets.length + '</strong></button>'
+      + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'comparacoes' ? ' active' : '') + '" onclick="graficosSetView(\'comparacoes\')"><span>Comparacoes</span><strong>' + periodosGrafico.length + '</strong></button>'
+    + '</div>';
+  var rankingHtml = graficosRankingHtml(eventosDisponiveis.length ? categoriasEventos.itens : categorias.itens, eventosDisponiveis.length ? categoriasEventos.total : categorias.total, eventosDisponiveis.length ? 'despesas' : _graficosCategoriaModo);
+  var activeHtml =
+    '<div class="charts-grid-main">'
       + '<div class="chart-card chart-card-wide"><h4>Fluxo financeiro</h4><div class="chart-wrap"><canvas id="chart-recdesp"></canvas></div></div>'
       + '<div class="chart-card"><h4>Ranking de categorias</h4><div class="chart-wrap"><canvas id="chart-categorias"></canvas></div></div>'
+    + '</div>';
+  if (_graficosView === 'eventos') {
+    activeHtml = '<div class="charts-grid-main">'
+      + '<div class="chart-card chart-card-wide"><h4>Comparacao de eventos</h4><div class="chart-wrap"><canvas id="chart-eventos"></canvas></div></div>'
+      + '<div class="chart-card"><h4>Resultado por evento</h4>' + graficosEventosDetalheHtml(eventosResumo) + '</div>'
     + '</div>'
     + '<div class="charts-grid-main">'
-      + '<div class="chart-card"><h4>Detalhe do ranking</h4>' + graficosRankingHtml(eventosDisponiveis.length ? categoriasEventos.itens : categorias.itens, eventosDisponiveis.length ? categoriasEventos.total : categorias.total, eventosDisponiveis.length ? 'despesas' : _graficosCategoriaModo) + '</div>'
-      + '<div class="chart-card"><h4>Fatura do cartao por mes</h4><div class="chart-wrap"><canvas id="chart-fatura"></canvas></div></div>'
+      + '<div class="chart-card chart-card-wide"><h4>Custos por categoria nos eventos</h4><div class="chart-wrap"><canvas id="chart-categorias"></canvas></div></div>'
+      + '<div class="chart-card"><h4>Detalhe do ranking</h4>' + rankingHtml + '</div>'
     + '</div>';
+  } else if (_graficosView === 'categorias') {
+    activeHtml = '<div class="charts-grid-main">'
+      + '<div class="chart-card chart-card-wide"><h4>Ranking de categorias</h4><div class="chart-wrap-tall"><canvas id="chart-categorias"></canvas></div></div>'
+      + '<div class="chart-card"><h4>Detalhe do ranking</h4>' + rankingHtml + '</div>'
+    + '</div>';
+  } else if (_graficosView === 'cartao') {
+    activeHtml = '<div class="chart-card"><h4>Fatura do cartao por mes</h4><div class="chart-wrap-tall"><canvas id="chart-fatura"></canvas></div></div>';
+  } else if (_graficosView === 'comparacoes') {
+    activeHtml = '<div class="charts-grid-main">'
+      + '<div class="chart-card chart-card-wide"><h4>Fluxo financeiro</h4><div class="chart-wrap"><canvas id="chart-recdesp"></canvas></div></div>'
+      + (eventosDisponiveis.length ? '<div class="chart-card"><h4>Comparacao de eventos</h4><div class="chart-wrap"><canvas id="chart-eventos"></canvas></div></div>' : '<div class="chart-card"><h4>Comparacoes</h4><div class="empty-state" style="padding:40px 0">Habilite eventos para comparar resultados por evento.</div></div>')
+    + '</div>';
+  }
+
+  document.getElementById('graficos-content').innerHTML =
+    headerHtml
+    + graficosResumoHtml(eventosDisponiveis.length ? eventosReceita : consolidadoPeriodo.totalReceitas, eventosDisponiveis.length ? eventosCusto : consolidadoPeriodo.totalDespesas, eventosDisponiveis.length ? eventosResultado : (consolidadoPeriodo.totalReceitas - consolidadoPeriodo.totalDespesas), eventosDisponiveis.length ? eventosTitulos : transacoesPeriodo.length, faturaTotal)
+    + tabsHtml
+    + '<div class="charts-workbench-view">' + activeHtml + '</div>';
 
   Chart.defaults.font.family = "'DM Sans', sans-serif";
   Chart.defaults.color = tickColor;
 
   destroyChart('eventos');
-  if (eventosDisponiveis.length) {
+  var eventosCanvas = document.getElementById('chart-eventos');
+  if (eventosDisponiveis.length && eventosCanvas) {
     if (!eventosResumo.length) {
-      document.getElementById('chart-eventos').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhum titulo vinculado aos eventos no periodo.</div>';
+      eventosCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhum titulo vinculado aos eventos no periodo.</div>';
     } else {
-      _chartInstances.eventos = new Chart(document.getElementById('chart-eventos'), {
+      _chartInstances.eventos = new Chart(eventosCanvas, {
         type: 'bar',
         data: {
           labels: eventosResumo.map(function(item) { return item.nome; }),
@@ -680,21 +724,25 @@ function renderGraficos() {
         { label: 'Despesas', data: despesas, backgroundColor: 'rgba(255,107,107,.72)', borderColor: 'rgba(255,107,107,1)', borderWidth: 1.5, borderRadius: 5, tension: .32 },
         { label: 'Resultado', data: resultado, backgroundColor: 'rgba(255,200,107,.22)', borderColor: 'rgba(255,200,107,1)', borderWidth: 2, type: 'line', tension: .32 }
       ];
-  _chartInstances.recdesp = new Chart(document.getElementById('chart-recdesp'), {
-    type: _graficosFluxoModo === 'barras' ? 'bar' : 'line',
-    data: { labels: labels, datasets: fluxoDatasets },
-    options: graficosChartBaseOptions(gridColor)
-  });
+  var recdespCanvas = document.getElementById('chart-recdesp');
+  if (recdespCanvas) {
+    _chartInstances.recdesp = new Chart(recdespCanvas, {
+      type: _graficosFluxoModo === 'barras' ? 'bar' : 'line',
+      data: { labels: labels, datasets: fluxoDatasets },
+      options: graficosChartBaseOptions(gridColor)
+    });
+  }
 
   destroyChart('categorias');
   var categoriasGrafico = eventosDisponiveis.length ? categoriasEventos : categorias;
   _graficosCategoriaDetalhes = eventosDisponiveis.length
     ? graficosMontarDetalhesCategoriaEventos(c, periodos, eventosCategoriaIds, categoriasGrafico, incluirExtratoSemEvento)
     : graficosMontarDetalhesCategoriaGeral(transacoesPeriodo, categoriasGrafico, _graficosCategoriaModo);
-  if (!categoriasGrafico.itens.length) {
-    document.getElementById('chart-categorias').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma categoria no periodo.</div>';
-  } else {
-    _chartInstances.categorias = new Chart(document.getElementById('chart-categorias'), {
+  var categoriasCanvas = document.getElementById('chart-categorias');
+  if (categoriasCanvas && !categoriasGrafico.itens.length) {
+    categoriasCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma categoria no periodo.</div>';
+  } else if (categoriasCanvas) {
+    _chartInstances.categorias = new Chart(categoriasCanvas, {
       type: 'bar',
       data: {
         labels: categoriasGrafico.itens.map(function(item) { return item.cat; }),
@@ -719,10 +767,11 @@ function renderGraficos() {
   }
 
   destroyChart('fatura');
-  if (!faturaDatasets.length) {
-    document.getElementById('chart-fatura').parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma fatura no periodo.</div>';
-  } else {
-    _chartInstances.fatura = new Chart(document.getElementById('chart-fatura'), {
+  var faturaCanvas = document.getElementById('chart-fatura');
+  if (faturaCanvas && !faturaDatasets.length) {
+    faturaCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma fatura no periodo.</div>';
+  } else if (faturaCanvas) {
+    _chartInstances.fatura = new Chart(faturaCanvas, {
       type: 'bar',
       data: { labels: labels, datasets: faturaDatasets },
       options: Object.assign(graficosChartBaseOptions(gridColor), {

@@ -17,6 +17,7 @@ var _exSelecionados = new Set();
 var _exMostrarDuplicados = false;
 var _exManterDuplicado = {};
 var _exDuplicadosResolvidos = carregarDuplicadosResolvidosExtrato();
+var _exView = 'lancamentos';
 var _exPanels = {
   contas: false,
   relacionamentos: false,
@@ -27,6 +28,12 @@ var _exPanels = {
 
 function toggleExtratoPanel(key) {
   _exPanels[key] = !_exPanels[key];
+  renderExtrato();
+}
+
+function setExtratoView(view) {
+  var views = ['lancamentos', 'novo', 'importar', 'contas', 'relacionamentos'];
+  _exView = views.includes(view) ? view : 'lancamentos';
   renderExtrato();
 }
 
@@ -2211,22 +2218,69 @@ function renderExtrato() {
       : '')
     + '</div>';
 
-  var html =
+  if (_exView === 'relacionamentos' && !relacionamentoAtivo) _exView = 'lancamentos';
+  var resumoHtml =
     '<div class="summary-grid">'
-    + '<div class="summary-card"><div class="s-label">Saldo</div><div class="s-val ' + (saldo >= 0 ? 'green' : 'red') + '">' + fmt(saldo) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Saldo inicial</div><div class="s-val blue">' + fmt(saldoInicialBase) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Creditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Debitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + filtradosFinanceiros.length + '</div></div>'
-    + '</div>'
-    + '<div class="extrato-panels-grid">'
-    + extratoPanel('contas', 'Contas do cliente', contasPanelBody)
-    + (relacionamentoAtivo ? extratoPanel('relacionamentos', 'Relacionamentos', relacionamentosPanelBody) : '')
-    + extratoPanel('importar', 'Importar extrato via planilha', importarPanelBody)
-    + extratoPanel('novo', '+ Novo lancamento', novoPanelBody)
-    + extratoPanel('filtros', 'Filtros', filtrosPanelBody)
-    + '</div>'
-    + (qtdDuplicadosPendentes
+      + '<div class="summary-card"><div class="s-label">Saldo</div><div class="s-val ' + (saldo >= 0 ? 'green' : 'red') + '">' + fmt(saldo) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Saldo inicial</div><div class="s-val blue">' + fmt(saldoInicialBase) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Creditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Debitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + filtradosFinanceiros.length + '</div></div>'
+    + '</div>';
+  var headerHtml =
+    '<div class="ex-workbench-hero">'
+      + '<div class="ex-workbench-head">'
+        + '<div><h3>Extrato</h3><p class="cartao-helper-text">Importe, classifique, concilie e acompanhe os movimentos bancarios do cliente.</p></div>'
+        + '<div class="ex-workbench-actions">'
+          + '<button class="btn-sm" onclick="setExtratoView(\'novo\')">Novo lancamento</button>'
+          + '<button class="btn-sm" onclick="setExtratoView(\'importar\')">Importar planilha</button>'
+          + '<button class="btn-sm" onclick="setExtratoView(\'contas\')">Contas</button>'
+          + '<button class="btn-sm" onclick="exportExtratoXlsx()">Exportar XLSX</button>'
+        + '</div>'
+      + '</div>'
+    + '</div>';
+  var tabsHtml =
+    '<div class="ex-workbench-tabs">'
+      + '<button type="button" class="ex-workbench-tab' + (_exView === 'lancamentos' ? ' active' : '') + '" onclick="setExtratoView(\'lancamentos\')"><span>Lancamentos</span><strong>' + filtradosFinanceiros.length + '</strong></button>'
+      + '<button type="button" class="ex-workbench-tab' + (_exView === 'novo' ? ' active' : '') + '" onclick="setExtratoView(\'novo\')"><span>Novo</span><strong>+</strong></button>'
+      + '<button type="button" class="ex-workbench-tab' + (_exView === 'importar' ? ' active' : '') + '" onclick="setExtratoView(\'importar\')"><span>Importar</span><strong>XLSX</strong></button>'
+      + '<button type="button" class="ex-workbench-tab' + (_exView === 'contas' ? ' active' : '') + '" onclick="setExtratoView(\'contas\')"><span>Contas</span><strong>' + contas.length + '</strong></button>'
+      + (relacionamentoAtivo ? '<button type="button" class="ex-workbench-tab' + (_exView === 'relacionamentos' ? ' active' : '') + '" onclick="setExtratoView(\'relacionamentos\')"><span>Relacionamentos</span><strong>' + relacionamentos.length + '</strong></button>' : '')
+    + '</div>';
+  var activePanelHtml = '';
+  if (_exView === 'novo') {
+    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Novo lancamento</h3><p class="cartao-helper-text">Inclua movimentos avulsos no extrato do cliente.</p></div></div>' + novoPanelBody + '</div>';
+  } else if (_exView === 'importar') {
+    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Importar extrato via planilha</h3><p class="cartao-helper-text">Baixe o modelo, selecione a conta e importe os lancamentos em lote.</p></div></div>' + importarPanelBody + '</div>';
+  } else if (_exView === 'contas') {
+    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Contas do cliente</h3><p class="cartao-helper-text">Gerencie as contas usadas para separar saldos e importacoes.</p></div></div>' + contasPanelBody + '</div>';
+  } else if (_exView === 'relacionamentos') {
+    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Relacionamentos</h3><p class="cartao-helper-text">Identifique a origem ou o destino real do valor sem perder a descricao original do banco.</p></div></div>' + relacionamentosPanelBody + '</div>';
+  }
+  var html = headerHtml + resumoHtml + tabsHtml + activePanelHtml;
+
+  if (_exView === 'lancamentos') {
+    html += '<div class="form-card ex-filter-strip"><div class="ex-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">Filtre por periodo, conta, categoria, conciliacao, valor e busca textual.</p></div><div class="ex-export-actions"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button><button class="btn-sm" onclick="exportExtratoPDF()">PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">XLSX</button></div></div>' + filtrosPanelBody + '</div>';
+  } else {
+    area.innerHTML = html;
+    atualizarPlaceholdersFiltrosExtrato();
+    var dataInputAux = document.getElementById('ex-data');
+    if (dataInputAux) dataInputAux.value = new Date().toISOString().slice(0, 10);
+    setTipoExtrato(_exTipo);
+    initMoneyInputs(area);
+    if (financeiroPJAtivo && relacionamentoAtivo) {
+      var descInputAux = document.getElementById('ex-desc');
+      var relInputAux = document.getElementById('ex-relacionamento');
+      if (descInputAux && relInputAux) {
+        descInputAux.addEventListener('input', atualizarSugestaoRelacionamentoExtrato);
+        relInputAux.addEventListener('change', atualizarSugestaoRelacionamentoExtrato);
+        atualizarSugestaoRelacionamentoExtrato();
+      }
+    }
+    return;
+  }
+
+  html += (qtdDuplicadosPendentes
       ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-2px 0 12px;color:var(--warning);font-size:.78rem"><span>' + qtdDuplicadosPendentes + ' duplicado(s) pendente(s) de conferencia. Eles continuam aparecendo no extrato e nos totais.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="toggleDuplicadosExtrato()">' + (_exMostrarDuplicados ? 'Ocultar duplicados' : 'Ver duplicados') + '</button></span></div>'
       : '');
   if (_exMostrarDuplicados && gruposDuplicados.length) {
@@ -2679,6 +2733,24 @@ function extratoSelecionarSugestaoConciliacao(tituloId, restante) {
   syncExtratoConciliacaoValor(restante);
 }
 
+function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
+  if (!sugestoes.length) return '';
+  return '<div class="conciliation-section">'
+    + '<div class="conciliation-section-head"><div><h5>Sugestoes de conciliacao</h5><p>Titulos mais provaveis pelo valor, nome e descricao.</p></div></div>'
+    + '<div class="conciliation-suggestions">'
+    + sugestoes.map(function(item) {
+      var pct = Math.min(100, Math.max(8, Math.round(Number(item.score || 0) * 18)));
+      return '<button type="button" class="conciliation-suggestion" onclick="extratoSelecionarSugestaoConciliacao(\'' + esc(item.id) + '\',' + Number(restante || 0) + ')">'
+        + '<span class="conciliation-suggestion-main"><strong>' + esc(item.pessoaNome) + '</strong><em>' + esc(item.descricao) + '</em></span>'
+        + '<span class="conciliation-suggestion-meta"><span>Saldo ' + fmt(item.saldo) + '</span><span>' + esc(item.motivos.join(' - ')) + '</span></span>'
+        + '<span class="conciliation-score"><i style="width:' + pct + '%"></i></span>'
+        + '<span class="btn-sm">Usar</span>'
+      + '</button>';
+    }).join('')
+    + '</div>'
+  + '</div>';
+}
+
 function syncExtratoConciliacaoValor(lancamentoValor) {
   var select = document.getElementById('ex-conciliar-titulo');
   var valorInput = document.getElementById('ex-conciliar-valor');
@@ -2752,6 +2824,74 @@ function openExtratoConciliacaoModal(i) {
       + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
         + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
         + '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLancamento(' + i + ')">' + acaoLabel + '</button>'
+      + '</div>'
+    + '</div>';
+
+  document.getElementById('modalOverlay').classList.add('open');
+  document.addEventListener('keydown', handleMainModalEscape);
+  initMoneyInputs(document.getElementById('modalBody'));
+  syncExtratoConciliacaoValor(restante);
+}
+
+function openExtratoConciliacaoModal(i) {
+  if (!clienteAtivoEhPJ()) return alert('A conciliacao financeira esta disponivel apenas para clientes PJ.');
+  var c = data.clients[activeClient];
+  var lanc = c && c.extrato ? c.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
+  var naturezaLabel = natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
+  var acaoLabel = natureza === 'receber' ? 'Conciliar recebimento' : 'Conciliar pagamento';
+  var conciliado = valorConciliadoDoLancamento(lanc);
+  var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var sugestoes = extratoSugestoesConciliacao(lanc, natureza, restante);
+  var tituloSugeridoId = sugestoes.length ? sugestoes[0].id : '';
+  var baixas = baixasFinanceirasDoLancamento(lanc);
+  var baixasHtml = baixas.length
+    ? '<div class="conciliation-baixas">' + baixas.map(function(item) {
+        return '<div class="tf-baixa-item">'
+          + '<div><strong>' + esc(item.tituloPessoa || '-') + '</strong><small>' + esc(item.tituloDescricao || '-') + ' - ' + esc(formatDate(item.baixa.data)) + '</small></div>'
+          + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.baixa.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoBaixa(\'' + esc(lanc.id) + '\',\'' + esc(item.tituloId) + '\',\'' + esc(item.baixa.id) + '\',' + i + ')" title="Desconciliar">&#128465;</button></div>'
+          + '</div>';
+      }).join('') + '</div>'
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliacao registrada neste lancamento.</div>';
+
+  document.getElementById('modalTitle').textContent = acaoLabel;
+  document.getElementById('modalBody').innerHTML =
+    '<div class="conciliation-modal">'
+      + '<div class="conciliation-hero">'
+        + '<div class="conciliation-hero-main">'
+          + '<span class="settings-card-badge">' + esc(naturezaLabel) + '</span>'
+          + '<h4>' + esc(lanc.descOriginal || lanc.desc || 'Lancamento do extrato') + '</h4>'
+          + '<div class="conciliation-meta">'
+            + '<span>' + esc(formatDate(lanc.data)) + '</span>'
+            + '<span>' + esc(nomeContaPorId(c, lanc.contaId)) + '</span>'
+            + '<span>' + esc(extratoEhCredito(lanc.tipo) ? 'Credito' : 'Debito') + '</span>'
+            + (extratoRelacionamentoAtivo() && lanc.relacionamentoId ? '<span>' + esc(nomeRelacionamentoPorId(c, lanc.relacionamentoId)) + '</span>' : '')
+          + '</div>'
+        + '</div>'
+        + '<div class="conciliation-amount-box"><span>Valor do banco</span><strong>' + fmt(lanc.valor || 0) + '</strong></div>'
+      + '</div>'
+      + '<div class="conciliation-progress-grid">'
+        + '<div><span>Lancamento</span><strong>' + fmt(lanc.valor || 0) + '</strong></div>'
+        + '<div><span>Conciliado</span><strong class="green">' + fmt(conciliado) + '</strong></div>'
+        + '<div><span>Restante</span><strong class="' + (restante > 0 ? 'yellow' : 'green') + '">' + fmt(restante) + '</strong></div>'
+      + '</div>'
+      + extratoSugestoesConciliacaoHtml(sugestoes, restante)
+      + '<div class="conciliation-section">'
+        + '<div class="conciliation-section-head"><div><h5>Baixas conciliadas</h5><p>Vincule este lancamento a um ou mais titulos financeiros.</p></div></div>'
+        + baixasHtml
+        + '<div class="form-row" style="margin-top:16px">'
+          + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+        + '</div>'
+        + '<div class="form-row">'
+          + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+          + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: recebimento parcial, pagamento fornecedor"/></div>'
+        + '</div>'
+        + '<div class="conciliation-actions">'
+          + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
+          + '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLancamento(' + i + ')">' + acaoLabel + '</button>'
+        + '</div>'
       + '</div>'
     + '</div>';
 

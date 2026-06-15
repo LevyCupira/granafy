@@ -1,4 +1,11 @@
 var _resumoPeriodos = null;
+var _resumoView = 'geral';
+
+function setResumoView(view) {
+  var views = ['geral', 'categorias', 'lancamentos', 'observacoes'];
+  _resumoView = views.includes(view) ? view : 'geral';
+  renderResumo();
+}
 
 function resumoTipoNormalizado(tipo) {
   return String(tipo || '')
@@ -295,21 +302,50 @@ function renderResumo() {
       + '</div></div>'
     : '';
 
-  document.getElementById('resumo-content').innerHTML =
-    '<div class="period-filter-row">'
-    + '<span class="period-label">Selecionar periodo:</span>'
-    + buildPeriodoMultiSelect('resumo-periodos-sel', meses, periodos, 'renderResumo()')
-    + '<span class="period-help">' + esc(periodoTexto) + ' &bull; escolha um ou mais meses.</span></div>'
-    + '<div class="summary-grid">'
-    + '<div class="summary-card"><div class="s-label">Total receitas</div><div class="s-val green">' + fmt(tR) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Total despesas</div><div class="s-val red">' + fmt(tD) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Resultado</div><div class="s-val ' + (resultado >= 0 ? 'green' : 'red') + '">' + fmt(resultado) + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Transacoes</div><div class="s-val blue">' + filtered.length + '</div></div>'
+  if (_resumoView === 'observacoes' && !movContas.length) _resumoView = 'geral';
+
+  var resumoHeader =
+    '<div class="resumo-workbench-hero">'
+      + '<div class="resumo-workbench-head">'
+        + '<div><h3>Resumo</h3><p class="cartao-helper-text">Consolide receitas, despesas, resultado e movimentos do periodo selecionado.</p></div>'
+        + '<div class="resumo-period-control">'
+          + '<span class="period-label">Periodo</span>'
+          + buildPeriodoMultiSelect('resumo-periodos-sel', meses, periodos, 'renderResumo()')
+        + '</div>'
+      + '</div>'
+      + '<div class="resumo-period-note">' + esc(periodoTexto) + ' - escolha um ou mais meses.</div>'
+    + '</div>';
+  var resumoCards =
+    '<div class="summary-grid">'
+      + '<div class="summary-card"><div class="s-label">Total receitas</div><div class="s-val green">' + fmt(tR) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Total despesas</div><div class="s-val red">' + fmt(tD) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Resultado</div><div class="s-val ' + (resultado >= 0 ? 'green' : 'red') + '">' + fmt(resultado) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Transacoes</div><div class="s-val blue">' + filtered.length + '</div></div>'
+    + '</div>';
+  var tabs =
+    '<div class="resumo-workbench-tabs">'
+      + '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'geral' ? ' active' : '') + '" onclick="setResumoView(\'geral\')"><span>Visao geral</span><strong>' + periodos.length + '</strong></button>'
+      + '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'categorias' ? ' active' : '') + '" onclick="setResumoView(\'categorias\')"><span>Categorias</span><strong>' + (receitas.length + despesas.length) + '</strong></button>'
+      + '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'lancamentos' ? ' active' : '') + '" onclick="setResumoView(\'lancamentos\')"><span>Lancamentos</span><strong>' + transacoesTabela.length + '</strong></button>'
+      + (movContas.length ? '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'observacoes' ? ' active' : '') + '" onclick="setResumoView(\'observacoes\')"><span>Observacoes</span><strong>' + movContas.length + '</strong></button>' : '')
+    + '</div>';
+  var categoriasView =
+    '<div class="cat-breakdown resumo-cat-breakdown">'
+      + '<div class="cat-block"><h4>Receitas por categoria</h4>' + barR + '</div>'
+      + '<div class="cat-block"><h4>Despesas por categoria</h4>' + barD + '</div>'
+    + '</div>';
+  var geralView =
+    '<div class="resumo-panel-grid">'
+      + '<div class="form-card resumo-insight-card"><h3>Resultado do periodo</h3><strong class="' + (resultado >= 0 ? 'val-pos' : 'val-neg') + '">' + fmt(resultado) + '</strong><p class="cartao-helper-text">Receitas menos despesas no periodo selecionado.</p></div>'
+      + '<div class="form-card resumo-insight-card"><h3>Margem</h3><strong class="' + (resultado >= 0 ? 'val-pos' : 'val-neg') + '">' + (tR > 0 ? Math.round((resultado / tR) * 1000) / 10 : 0).toLocaleString('pt-BR') + '%</strong><p class="cartao-helper-text">Quanto do faturamento virou resultado.</p></div>'
+      + '<div class="form-card resumo-insight-card"><h3>Maior receita</h3><strong class="val-pos">' + (receitas[0] ? fmt(receitas[0].valor) : fmt(0)) + '</strong><p class="cartao-helper-text">' + esc(receitas[0] ? receitas[0].cat : 'Sem receitas') + '</p></div>'
+      + '<div class="form-card resumo-insight-card"><h3>Maior despesa</h3><strong class="val-neg">' + (despesas[0] ? fmt(despesas[0].valor) : fmt(0)) + '</strong><p class="cartao-helper-text">' + esc(despesas[0] ? despesas[0].cat : 'Sem despesas') + '</p></div>'
     + '</div>'
-    + observacoes
-    + '<div class="cat-breakdown">'
-    + '<div class="cat-block"><h4>&#128200; Receitas por categoria</h4>' + barR + '</div>'
-    + '<div class="cat-block"><h4>&#128201; Despesas por categoria</h4>' + barD + '</div>'
-    + '</div>'
-    + '<p class="section-title" style="margin-top:22px">Lancamentos do periodo</p>' + tabela;
+    + categoriasView;
+  var activeView = geralView;
+  if (_resumoView === 'categorias') activeView = categoriasView;
+  if (_resumoView === 'lancamentos') activeView = '<div class="form-card resumo-table-card"><div class="resumo-section-head"><div><h3>Lancamentos do periodo</h3><p class="cartao-helper-text">Movimentos considerados no resumo consolidado.</p></div></div>' + tabela + '</div>';
+  if (_resumoView === 'observacoes') activeView = observacoes || '';
+
+  document.getElementById('resumo-content').innerHTML = resumoHeader + resumoCards + tabs + '<div class="resumo-workbench-view">' + activeView + '</div>';
 }

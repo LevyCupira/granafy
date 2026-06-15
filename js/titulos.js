@@ -13,6 +13,7 @@ var _tfEvento = '';
 var _tfBusca = '';
 var _tfEventoEditId = null;
 var _tfBulkSelected = new Set();
+var _tfFinanceiroView = 'titulos';
 var TF_MIN_SEARCH_CHARS = 3;
 var _tfPanels = {
   resumo: true,
@@ -314,6 +315,18 @@ function tfSetNatureza(natureza) {
   _tfNatureza = natureza === 'pagar' ? 'pagar' : 'receber';
   if (_tfNatureza !== 'pagar') _tfCentroCusto = '';
   _tfBulkSelected.clear();
+  renderFinanceiro();
+}
+
+function tfSetFinanceiroView(view) {
+  var views = ['titulos', 'eventos', 'pendencias', 'importar'];
+  _tfFinanceiroView = views.includes(view) ? view : 'titulos';
+  renderFinanceiro();
+}
+
+function tfOpenNovoTitulo() {
+  _tfPanels.novo = true;
+  _tfFinanceiroView = 'titulos';
   renderFinanceiro();
 }
 
@@ -1608,9 +1621,140 @@ async function tfDeleteBaixa(tituloId, baixaId) {
   renderFinanceiro();
 }
 
+function renderFinanceiroNovo(root) {
+  if (!activeClient || !tfClienteAtivo()) {
+    root.innerHTML = '<div class="empty-state"><div class="icon">v</div>Selecione um cliente.</div>';
+    return;
+  }
+
+  if (!tfClienteEhPJ()) {
+    root.innerHTML = '<div class="empty-state"><div class="icon">PJ</div>O modulo Financeiro esta disponivel apenas para clientes PJ.</div>';
+    return;
+  }
+
+  var pendencias = tfPendenciasResumo();
+  var tituloAtivo = tfTituloAtivoLabel();
+  var pessoaLabel = _tfNatureza === 'pagar' ? 'Favorecido / fornecedor' : 'Cliente pagador';
+  var btnLabel = _tfNatureza === 'pagar' ? 'Cadastrar conta a pagar' : 'Cadastrar conta a receber';
+  var itens = tfFilteredItems();
+  var resumo = tfSummaryValues(itens);
+  if (_tfFinanceiroView === 'eventos' && !tfEventosEnabled()) _tfFinanceiroView = 'titulos';
+
+  var resumoHtml =
+    '<div class="summary-grid">'
+      + (_tfNatureza === 'receber'
+        ? '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
+        : '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
+      + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
+    + '</div>';
+
+  var pendenciasHtml =
+    '<div class="summary-grid pending-grid">'
+      + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">Pendentes de estorno</div><div class="s-val red">' + pendencias.extratoPendentesEstorno.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoPendentesEstorno.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'pendentes_estorno\')">Abrir no Extrato</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">Lancamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">A receber vencido</div><div class="s-val red">' + pendencias.receberVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.receberVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'atrasado\')">Abrir no Financeiro</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">A pagar vencido</div><div class="s-val red">' + pendencias.pagarVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'atrasado\')">Abrir no Financeiro</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">Receber parcial</div><div class="s-val yellow">' + pendencias.receberParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.receberParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'parcial\')">Abrir no Financeiro</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">Pagar parcial</div><div class="s-val yellow">' + pendencias.pagarParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'parcial\')">Abrir no Financeiro</button></div>'
+    + '</div>';
+
+  var filtrosHtml =
+    '<div class="form-row">'
+      + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
+      + '<div class="form-group"><label>Pessoa</label><input type="text" id="tf-filtro-pessoa" value="' + esc(_tfPessoa) + '" placeholder="Cliente ou fornecedor" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao, evento, centro ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+    + '</div>'
+    + '<div class="form-row">'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento de</label><input type="text" id="tf-filtro-vencimento-de" class="flex-date-input" value="' + esc(_tfVencimentoDe ? formatDate(_tfVencimentoDe) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento ate</label><input type="text" id="tf-filtro-vencimento-ate" class="flex-date-input" value="' + esc(_tfVencimentoAte ? formatDate(_tfVencimentoAte) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group" style="max-width:160px"><label>Valor</label><select id="tf-filtro-valor-modo"><option value="todos"' + (_tfValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="igual"' + (_tfValorModo === 'igual' ? ' selected' : '') + '>Igual a</option><option value="acima"' + (_tfValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_tfValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option></select></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="tf-filtro-valor" class="money-input" value="' + esc(Number(_tfValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="tf-filtro-centro-custo">' + tfCentrosCustoFilterOptionsHtml(_tfCentroCusto) + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="tf-filtro-evento">' + tfEventosFilterOptionsHtml(_tfEvento) + '</select></div>' : '')
+    + '</div>';
+
+  var novoFormHtml =
+    '<div class="form-row">'
+      + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem esta envolvido neste titulo"/></div>'
+      + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Opcional"/></div>'
+    + '</div>'
+    + '<div class="form-row">'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="' + tfFormPrefix() + '-valor" class="money-input" value="0,00"/></div>'
+    + '</div>'
+    + ((_tfNatureza === 'pagar' || tfEventosEnabled()) ? '<div class="form-row">'
+      + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="' + tfFormPrefix() + '-centro-custo">' + tfCentrosCustoOptionsHtml('') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="' + tfFormPrefix() + '-evento">' + tfEventosOptionsHtml(_tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '') + '</select></div>' : '')
+    + '</div>' : '')
+    + '<div class="form-row">'
+      + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informacoes complementares deste titulo"></textarea></div>'
+    + '</div>'
+    + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>';
+
+  var importPanelBody = tfImportGuideHtml()
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="tfExportImportTemplate()">Baixar modelo (.xlsx)</button><button class="btn-sm" onclick="tfAbrirImportacaoTitulos()">Importar planilha</button></div>';
+  var pendenciasCount = pendencias.extratoNaoConciliados.count + pendencias.extratoPendentesEstorno.count
+    + pendencias.receberVencido.count + pendencias.pagarVencido.count
+    + pendencias.receberParcial.count + pendencias.pagarParcial.count;
+  var areaHtml = tfBuildListaTitulos(itens);
+  var eventosHtml = tfEventosResumoHtml();
+
+  var headerHtml =
+    '<div class="tf-finance-hero">'
+      + '<div class="tf-finance-hero-head">'
+        + '<div><h3>Financeiro PJ</h3><p class="cartao-helper-text">Controle os titulos, baixas, eventos e pendencias da empresa em areas separadas.</p></div>'
+        + '<div class="tipo-toggle">'
+          + '<button type="button" class="tipo-btn credito' + (_tfNatureza === 'receber' ? ' active' : '') + '" onclick="tfSetNatureza(\'receber\')">A Receber</button>'
+          + '<button type="button" class="tipo-btn debito' + (_tfNatureza === 'pagar' ? ' active' : '') + '" onclick="tfSetNatureza(\'pagar\')">A Pagar</button>'
+        + '</div>'
+      + '</div>'
+      + '<div class="tf-finance-actions">'
+        + '<button class="btn-sm" onclick="tfOpenNovoTitulo()">Novo titulo</button>'
+        + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'importar\')">Importar planilha</button>'
+        + (tfEventosEnabled() ? '<button class="btn-sm" onclick="tfSetFinanceiroView(\'eventos\')">' + esc(tfEventosLabel()) + '</button>' : '')
+        + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'pendencias\')">Ver pendencias</button>'
+      + '</div>'
+    + '</div>';
+  var tabsHtml =
+    '<div class="tf-finance-tabs">'
+      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'titulos' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'titulos\')"><span>Titulos</span><strong>' + resumo.total + '</strong></button>'
+      + (tfEventosEnabled() ? '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'eventos' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'eventos\')"><span>' + esc(tfEventosLabel()) + '</span><strong>' + tfEventosCliente(false).length + '</strong></button>' : '')
+      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'pendencias' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'pendencias\')"><span>Pendencias</span><strong>' + pendenciasCount + '</strong></button>'
+      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'importar' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'importar\')"><span>Importar</span><strong>XLSX</strong></button>'
+    + '</div>';
+  var titulosViewHtml =
+    '<div class="tf-view-head">'
+      + '<div><h3>' + esc(tituloAtivo) + '</h3><p class="cartao-helper-text">Filtre, acompanhe saldos e registre baixas sem sair da lista.</p></div>'
+      + '<button class="btn-add" onclick="tfOpenNovoTitulo()">+ Novo titulo</button>'
+    + '</div>'
+    + (_tfPanels.novo ? '<div class="form-card tf-inline-form"><div class="tf-section-head"><div><h3>Novo titulo</h3><p class="cartao-helper-text">' + esc(tituloAtivo) + '</p></div><button class="btn-sm red" onclick="_tfPanels.novo=false;renderFinanceiro()">Fechar</button></div>' + novoFormHtml + '</div>' : '')
+    + '<div class="form-card tf-filter-strip"><div class="tf-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">A busca considera pessoa, descricao, observacao, centro e ' + esc(tfEventosLabel().toLowerCase()) + '.</p></div><div class="tf-export-actions"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">PDF</button><button class="btn-sm" onclick="tfExportXlsx()">XLSX</button></div></div>' + filtrosHtml + '</div>'
+    + '<div class="tf-list-shell"><div class="section-title">' + esc(tituloAtivo) + '</div>' + areaHtml + '</div>';
+  var activeViewHtml = titulosViewHtml;
+  if (_tfFinanceiroView === 'eventos') {
+    activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>' + esc(tfEventosLabel()) + '</h3><p class="cartao-helper-text">Cadastre e compare receitas, custos e resultados por evento.</p></div></div>' + eventosHtml + '</div>';
+  } else if (_tfFinanceiroView === 'pendencias') {
+    activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>Painel de pendencias</h3><p class="cartao-helper-text">Atalhos para o que ainda precisa de atencao no Extrato e no Financeiro.</p></div></div>' + pendenciasHtml + '</div>';
+  } else if (_tfFinanceiroView === 'importar') {
+    activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>Importar titulos via planilha</h3><p class="cartao-helper-text">Use o modelo para importar contas a receber e contas a pagar em lote.</p></div></div>' + importPanelBody + '</div>';
+  }
+
+  root.innerHTML = headerHtml + resumoHtml + tabsHtml + '<div class="tf-finance-view">' + activeViewHtml + '</div>';
+  initMoneyInputs(root);
+  initFlexibleDateInputs(root);
+  initDrag('financeiro', COLS_TITULOS, renderFinanceiro);
+}
+
 function renderFinanceiro() {
   var root = document.getElementById('financeiro-content');
   if (!root) return;
+  renderFinanceiroNovo(root);
+  return;
 
   if (!activeClient || !tfClienteAtivo()) {
     root.innerHTML = '<div class="empty-state"><div class="icon">👇</div>Selecione um cliente.</div>';
@@ -1629,6 +1773,7 @@ function renderFinanceiro() {
   var itens = tfFilteredItems();
   var resumo = tfSummaryValues(itens);
   var eventosHtml = tfEventosResumoHtml();
+  if (_tfFinanceiroView === 'eventos' && !tfEventosEnabled()) _tfFinanceiroView = 'titulos';
   var resumoHtml =
     '<div class="summary-grid">'
       + (_tfNatureza === 'receber'
