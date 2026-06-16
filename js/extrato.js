@@ -454,8 +454,7 @@ function exportExtratoXlsx() {
           Conta: nomeContaCliente(conta || null),
           Descricao: l.desc || '',
           Categoria: extratoTemRateio(l) ? 'Rateado' : (l.cat || ''),
-          Tipo: extratoTipoLabel(l.tipo),
-          Valor: Number(l.valor || 0),
+          Valor: extratoEhDebito(l.tipo) ? -Math.abs(Number(l.valor || 0)) : Math.abs(Number(l.valor || 0)),
           Conciliacao: resumoConciliacaoLancamento(l),
           Devolucao: extratoResumoEstorno(cliente, l).replace(/<[^>]+>/g, ''),
           Rateio: resumoRateioExtrato(l).replace(/^Rateio:\s*/, ''),
@@ -474,9 +473,16 @@ function exportExtratoXlsx() {
     ['Busca', _exFiltroBusca || ''],
     ['Gerado em', new Date().toLocaleString('pt-BR')]
   ]), 'Resumo');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, {
-    header: ['Data', 'Conta', 'Descricao', 'Categoria', 'Tipo', 'Valor', 'Conciliacao', 'Devolucao', 'Rateio', 'Observacao']
-  }), 'Extrato');
+  var extratoSheet = XLSX.utils.json_to_sheet(rows, {
+    header: ['Data', 'Conta', 'Descricao', 'Categoria', 'Valor', 'Conciliacao', 'Devolucao', 'Rateio', 'Observacao']
+  });
+  Object.keys(extratoSheet).forEach(function(addr) {
+    if (addr[0] === '!') return;
+    if (addr.replace(/\d+/g, '') === 'E' && extratoSheet[addr] && typeof extratoSheet[addr].v === 'number') {
+      extratoSheet[addr].z = '#,##0.00;[Red]-#,##0.00';
+    }
+  });
+  XLSX.utils.book_append_sheet(wb, extratoSheet, 'Extrato');
   XLSX.writeFile(
     wb,
     'granafy_extrato_' + String(cliente.name || 'cliente').toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.xlsx'
@@ -507,7 +513,7 @@ function exportExtratoPDF() {
   doc.text('Filtros: tipo ' + (_exFiltroTipo || 'todos') + ' | categoria ' + (_exFiltroCat || 'todas') + ' | periodo ' + (_exFiltroPeriodoValor ? (_exFiltroPeriodoModo + ' ' + extratoPeriodoDisplayValue()) : 'todos') + ' | valor ' + ((_exFiltroValorModo === 'todos' || !_exFiltroValor) ? 'todos' : (_exFiltroValorModo + ' ' + fmt(_exFiltroValor))) + ' | busca ' + (_exFiltroBusca || '-'), 14, 31);
   doc.autoTable({
     startY: 36,
-    head: [['Data', 'Conta', 'Descricao', 'Categoria', 'Tipo', 'Valor', 'Conciliacao/Rateio']],
+    head: [['Data', 'Conta', 'Descricao', 'Categoria', 'Valor', 'Conciliacao/Rateio']],
     body: filtrados
       .slice()
       .sort(function(a, b) { return String(b.data || '').localeCompare(String(a.data || '')); })
@@ -525,7 +531,6 @@ function exportExtratoPDF() {
           nomeContaCliente(conta || null),
           l.desc || '',
           extratoTemRateio(l) ? 'Rateado' : (l.cat || '-'),
-          extratoTipoLabel(l.tipo),
           (extratoEhCredito(l.tipo) ? fmt(l.valor || 0) : ('- ' + fmt(l.valor || 0))),
           detalhes.join(' | ')
         ];
@@ -533,7 +538,7 @@ function exportExtratoPDF() {
     styles: { fontSize: 8, cellPadding: 2.2 },
     headStyles: { fillColor: [91, 140, 255], textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [245, 246, 250] },
-    columnStyles: { 5: { halign: 'right' } },
+    columnStyles: { 4: { halign: 'right' } },
     margin: { left: 14, right: 14 }
   });
   doc.save(
@@ -595,13 +600,23 @@ function coletarRateioExtratoModal() {
   }).filter(function(item) { return item.categoria && Number(item.valor || 0) > 0; });
 }
 
+function extratoRateioValorBase(valorOriginal) {
+  if (typeof valorOriginal === 'number' && Number.isFinite(valorOriginal)) return Math.abs(valorOriginal);
+  if (typeof valorOriginal === 'string' && valorOriginal.trim()) {
+    var parsedString = Number(valorOriginal.replace(',', '.'));
+    if (Number.isFinite(parsedString)) return Math.abs(parsedString);
+  }
+  var modalBody = document.getElementById('modalBody');
+  var datasetValue = modalBody && modalBody.dataset ? Number(String(modalBody.dataset.rateioValor || '0').replace(',', '.')) : 0;
+  return Number.isFinite(datasetValue) ? Math.abs(datasetValue) : 0;
+}
+
 function atualizarResumoRateioExtrato(valorOriginal) {
   var info = document.getElementById('ex-rateio-resumo');
   if (!info) return;
   var rows = coletarRateioExtratoModal();
   var total = rows.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
-  var modalBody = document.getElementById('modalBody');
-  var base = Number(typeof valorOriginal !== 'undefined' ? valorOriginal : ((modalBody && modalBody.dataset && modalBody.dataset.rateioValor) || 0));
+  var base = extratoRateioValorBase(valorOriginal);
   var diff = Math.abs(total - base);
   info.innerHTML = 'Rateado: <strong>' + fmt(total) + '</strong> · Total do lancamento: <strong>' + fmt(base) + '</strong>'
     + (diff < 0.005 ? ' <span style="color:var(--success)">· Conferido</span>' : ' <span style="color:var(--danger)">· Diferenca ' + fmt(diff) + '</span>');
@@ -2232,7 +2247,6 @@ function renderExtrato() {
       + '<div class="ex-workbench-head">'
         + '<div><h3>Extrato</h3><p class="cartao-helper-text">Importe, classifique, concilie e acompanhe os movimentos bancarios do cliente.</p></div>'
         + '<div class="ex-workbench-actions">'
-          + '<button class="btn-sm" onclick="setExtratoView(\'novo\')">Novo lancamento</button>'
           + '<button class="btn-sm" onclick="setExtratoView(\'importar\')">Importar planilha</button>'
           + '<button class="btn-sm" onclick="setExtratoView(\'contas\')">Contas</button>'
           + '<button class="btn-sm" onclick="exportExtratoXlsx()">Exportar XLSX</button>'
@@ -2242,7 +2256,6 @@ function renderExtrato() {
   var tabsHtml =
     '<div class="ex-workbench-tabs">'
       + '<button type="button" class="ex-workbench-tab' + (_exView === 'lancamentos' ? ' active' : '') + '" onclick="setExtratoView(\'lancamentos\')"><span>Lancamentos</span><strong>' + filtradosFinanceiros.length + '</strong></button>'
-      + '<button type="button" class="ex-workbench-tab' + (_exView === 'novo' ? ' active' : '') + '" onclick="setExtratoView(\'novo\')"><span>Novo</span><strong>+</strong></button>'
       + '<button type="button" class="ex-workbench-tab' + (_exView === 'importar' ? ' active' : '') + '" onclick="setExtratoView(\'importar\')"><span>Importar</span><strong>XLSX</strong></button>'
       + '<button type="button" class="ex-workbench-tab' + (_exView === 'contas' ? ' active' : '') + '" onclick="setExtratoView(\'contas\')"><span>Contas</span><strong>' + contas.length + '</strong></button>'
       + (relacionamentoAtivo ? '<button type="button" class="ex-workbench-tab' + (_exView === 'relacionamentos' ? ' active' : '') + '" onclick="setExtratoView(\'relacionamentos\')"><span>Relacionamentos</span><strong>' + relacionamentos.length + '</strong></button>' : '')
@@ -2400,6 +2413,8 @@ function renderExtrato() {
 
     html += '</tbody></table>';
   }
+
+  html += '<div class="ex-new-fab-wrap"><button type="button" class="ex-new-fab" onclick="setExtratoView(\'novo\')" title="Novo lancamento" aria-label="Novo lancamento">+</button></div>';
 
   area.innerHTML = html;
   aplicarAjustesVisuaisExtrato(area, lncs);
@@ -2879,10 +2894,10 @@ function openExtratoConciliacaoModal(i) {
       + '</div>'
       + extratoSugestoesConciliacaoHtml(sugestoes, restante)
       + '<div class="conciliation-section">'
-        + '<div class="conciliation-section-head"><div><h5>Baixas conciliadas</h5><p>Vincule este lancamento a um ou mais titulos financeiros.</p></div></div>'
+        + '<div class="conciliation-section-head"><div><h5>Baixas conciliadas</h5><p>Vincule este lancamento a uma conta financeira ja gerada ou vinculada ao orcamento.</p></div></div>'
         + baixasHtml
         + '<div class="form-row" style="margin-top:16px">'
-          + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+          + '<div class="form-group"><label>Conta para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
         + '</div>'
         + '<div class="form-row">'
           + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
@@ -2911,8 +2926,11 @@ async function conciliarExtratoLancamento(i) {
   var valor = parseMoney(document.getElementById('ex-conciliar-valor'));
   var observacao = ((document.getElementById('ex-conciliar-obs') || {}).value || '').trim();
 
-  if (!tituloId) return alert('Selecione um título para conciliar.');
+  if (!tituloId) return alert('Selecione uma conta para conciliar. Se ela veio do orcamento, gere a conta pela linha do orcamento primeiro.');
   if (!valor || valor <= 0) return alert('Informe um valor de baixa maior que zero.');
+
+  var restanteLancAntes = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
+  if (valor > restanteLancAntes) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
 
   if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
   var titulo = tfFindTituloById(tituloId);

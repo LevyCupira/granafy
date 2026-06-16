@@ -322,10 +322,33 @@ function graficosDetalheItemHtml(item) {
   return '<tr>'
     + '<td>' + esc(item.data ? formatDate(item.data) : '-') + '</td>'
     + '<td>' + esc(item.origem || '-') + '</td>'
+    + '<td><span class="settings-card-badge subtle">' + esc(item.categoria || 'Outros') + '</span></td>'
     + '<td><strong>' + esc(item.pessoa || item.descricao || '-') + '</strong>' + (item.descricao && item.pessoa ? '<div class="installment-note">' + esc(item.descricao) + '</div>' : '') + '</td>'
     + '<td>' + esc(item.evento || '') + '</td>'
     + '<td><span class="val ' + valorClass + '">' + fmt(Math.abs(Number(item.valor || 0))) + '</span></td>'
     + '</tr>';
+}
+
+function graficosCategoriasDoDetalheHtml(detalhe) {
+  var map = {};
+  (detalhe.itens || []).forEach(function(item) {
+    var cat = item.categoria || 'Outros';
+    map[cat] = (map[cat] || 0) + Math.abs(Number(item.valor || 0));
+  });
+  var categorias = Object.keys(map).map(function(cat) {
+    return { cat: cat, valor: map[cat] };
+  }).sort(function(a, b) { return b.valor - a.valor; });
+
+  if (detalhe.nome !== 'Demais Cat.' || categorias.length <= 1) return '';
+
+  return '<div class="charts-minor-categories">'
+    + '<div class="charts-minor-title">Categorias minoritarias neste grupo</div>'
+    + '<div class="charts-minor-list">'
+      + categorias.map(function(item) {
+        return '<span><strong>' + esc(item.cat) + '</strong>' + fmt(item.valor) + '</span>';
+      }).join('')
+    + '</div>'
+    + '</div>';
 }
 
 function graficosAbrirCategoriaDetalhes(key) {
@@ -341,8 +364,9 @@ function graficosAbrirCategoriaDetalhes(key) {
       + '<span class="settings-card-badge subtle">' + itens.length + ' lancamento(s)</span>'
       + '<span class="settings-card-badge subtle">Total ' + fmt(detalhe.total || 0) + '</span>'
     + '</div>'
+    + graficosCategoriasDoDetalheHtml(detalhe)
     + (itens.length
-      ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>Data transacao</th><th>Origem</th><th>Descricao</th><th>Evento</th><th>Valor</th></tr></thead><tbody>' + itens.map(graficosDetalheItemHtml).join('') + '</tbody></table></div>'
+      ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>Data transacao</th><th>Origem</th><th>Categoria</th><th>Descricao</th><th>Evento</th><th>Valor</th></tr></thead><tbody>' + itens.map(graficosDetalheItemHtml).join('') + '</tbody></table></div>'
       : '<div class="empty-state" style="padding:24px">Nenhum lancamento encontrado.</div>')
     + '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button></div>';
   document.getElementById('modalOverlay').classList.add('open');
@@ -532,6 +556,7 @@ function graficosMontarDetalhesCategoriaGeral(transacoes, categoriasGrafico, tip
     if (!detalhes[key]) detalhes[key] = { nome: destino, tipo: ehReceita ? 'Receitas' : 'Despesas', total: 0, itens: [] };
     detalhes[key].total += Number(l.valor || 0);
     detalhes[key].itens.push({
+      categoria: cat,
       data: l.data || '',
       origem: l.fonte || '',
       pessoa: '',
@@ -553,6 +578,7 @@ function graficosMontarDetalhesCategoriaEventos(cliente, periodos, eventoIds, ca
     if (!detalhes[key]) detalhes[key] = { nome: destino, tipo: 'Categoria do Extrato', total: 0, itens: [] };
     detalhes[key].total += Number(item.valor || 0);
     detalhes[key].itens.push({
+      categoria: cat,
       data: item.data || '',
       origem: item.origem || 'Extrato',
       pessoa: item.pessoa || '',

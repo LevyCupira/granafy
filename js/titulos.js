@@ -12,6 +12,8 @@ var _tfCentroCusto = '';
 var _tfEvento = '';
 var _tfBusca = '';
 var _tfEventoEditId = null;
+var _tfOrcamentoEventoId = '';
+var _tfOrcamentoLinhaEditId = null;
 var _tfBulkSelected = new Set();
 var _tfFinanceiroView = 'titulos';
 var TF_MIN_SEARCH_CHARS = 3;
@@ -746,6 +748,118 @@ function tfEventosFilterOptionsHtml(selectedId) {
     }).join('');
 }
 
+function tfNaturezaOrcamentoLabel(natureza) {
+  return natureza === 'receita' ? 'Receita' : 'Despesa';
+}
+
+function tfOrcamentoStatusLabel(status) {
+  if (status === 'contratado') return 'Contratado';
+  if (status === 'realizado') return 'Realizado';
+  if (status === 'cancelado') return 'Cancelado';
+  return 'Previsto';
+}
+
+function tfOrcamentoLinhasCliente() {
+  var cliente = tfClienteAtivo();
+  return cliente && Array.isArray(cliente.orcamentoEventos) ? cliente.orcamentoEventos : [];
+}
+
+function tfOrcamentoLinhasEvento(eventoId) {
+  return tfOrcamentoLinhasCliente().filter(function(item) { return item.eventoId === eventoId; });
+}
+
+function tfOrcamentoLinhaById(id) {
+  return tfOrcamentoLinhasCliente().find(function(item) { return item.id === id; }) || null;
+}
+
+function tfTitulosPorOrcamentoLinha(linhaId) {
+  if (!linhaId) return [];
+  return tfTitulosCliente().filter(function(item) { return item.orcamentoLinhaId === linhaId; });
+}
+
+function tfNaturezaTituloParaOrcamento(naturezaTitulo) {
+  return naturezaTitulo === 'receber' ? 'receita' : 'despesa';
+}
+
+function tfOrcamentoLabelLinha(linha) {
+  if (!linha) return '';
+  var evento = tfNomeEventoById(linha.eventoId || '') || 'Sem evento';
+  var valor = tfOrcamentoPrevistoLinha(linha) || Number(linha.valorOrcado || 0);
+  return evento + ' - ' + (linha.categoria || '-') + ' (' + fmt(valor) + ')';
+}
+
+function tfOrcamentoOptionsHtml(naturezaTitulo, eventoId, selectedId, includeEmptyLabel) {
+  var naturezaOrcamento = tfNaturezaTituloParaOrcamento(naturezaTitulo);
+  var atual = String(selectedId || '').trim();
+  var linhas = tfOrcamentoLinhasCliente().filter(function(linha) {
+    if (!linha || linha.natureza !== naturezaOrcamento) return false;
+    if (eventoId && linha.eventoId !== eventoId) return false;
+    return true;
+  }).sort(function(a, b) {
+    var evComp = String(tfNomeEventoById(a.eventoId) || '').localeCompare(String(tfNomeEventoById(b.eventoId) || ''), 'pt-BR', { sensitivity: 'base' });
+    if (evComp) return evComp;
+    return String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
+  });
+  return '<option value="">' + esc(includeEmptyLabel || 'Sem vinculo com orcamento') + '</option>' + linhas.map(function(linha) {
+    return '<option value="' + esc(linha.id) + '"' + (linha.id === atual ? ' selected' : '') + '>' + esc(tfOrcamentoLabelLinha(linha)) + '</option>';
+  }).join('');
+}
+
+function tfSyncOrcamentoOptions(prefix, naturezaTitulo) {
+  var eventoEl = document.getElementById(prefix + '-evento');
+  var orcEl = document.getElementById(prefix + '-orcamento-linha');
+  if (!orcEl) return;
+  var eventoId = eventoEl ? ((eventoEl.value || '').trim()) : '';
+  orcEl.innerHTML = tfOrcamentoOptionsHtml(naturezaTitulo, eventoId, '');
+}
+
+function tfOrcamentoLinhaCompativelComTitulo(linha, titulo) {
+  if (!linha || !titulo) return false;
+  if (linha.eventoId !== titulo.eventoId) return false;
+  return linha.natureza === tfNaturezaTituloParaOrcamento(titulo.natureza);
+}
+
+function tfOrcamentoRealizadoLinha(linha) {
+  return tfTitulosPorOrcamentoLinha(linha && linha.id).reduce(function(sum, titulo) {
+    return sum + tfTotalBaixado(titulo);
+  }, 0);
+}
+
+function tfOrcamentoPrevistoLinha(linha) {
+  return Number(linha && (linha.valorPrevisto || linha.valorOrcado) || 0);
+}
+
+function tfOrcamentoEventoResumo(eventoId) {
+  var linhas = tfOrcamentoLinhasEvento(eventoId);
+  var resumo = {
+    receitasOrcadas: 0,
+    receitasPrevistas: 0,
+    receitasRealizadas: 0,
+    despesasOrcadas: 0,
+    despesasPrevistas: 0,
+    despesasRealizadas: 0,
+    linhas: linhas.length
+  };
+  linhas.forEach(function(linha) {
+    var orcado = Number(linha.valorOrcado || 0);
+    var previsto = tfOrcamentoPrevistoLinha(linha);
+    var realizado = tfOrcamentoRealizadoLinha(linha);
+    if (linha.natureza === 'receita') {
+      resumo.receitasOrcadas += orcado;
+      resumo.receitasPrevistas += previsto;
+      resumo.receitasRealizadas += realizado;
+    } else {
+      resumo.despesasOrcadas += orcado;
+      resumo.despesasPrevistas += previsto;
+      resumo.despesasRealizadas += realizado;
+    }
+  });
+  resumo.resultadoOrcado = resumo.receitasOrcadas - resumo.despesasOrcadas;
+  resumo.resultadoPrevisto = resumo.receitasPrevistas - resumo.despesasPrevistas;
+  resumo.resultadoRealizado = resumo.receitasRealizadas - resumo.despesasRealizadas;
+  return resumo;
+}
+
 function tfStatusEventoLabel(status) {
   if (status === 'planejado') return 'Planejado';
   if (status === 'concluido') return 'Concluido';
@@ -900,6 +1014,8 @@ async function tfDeleteEvento(id) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   var usado = tfTitulosCliente().some(function(item) { return item.eventoId === id; });
   if (usado) return alert('Este evento esta vinculado a titulos financeiros. Remova o vinculo antes de excluir.');
+  var temOrcamento = tfOrcamentoLinhasEvento(id).length > 0;
+  if (temOrcamento) return alert('Este evento tem linhas de orcamento. Exclua o orcamento antes de remover o evento.');
   var ok = await appConfirm('Excluir este evento/projeto?', { title: 'Excluir evento', confirmText: 'Excluir' });
   if (!ok) return;
 
@@ -920,12 +1036,287 @@ async function tfDeleteEvento(id) {
   renderFinanceiro();
 }
 
+function tfReadOrcamentoLinhaPayload(prefix) {
+  var eventoId = ((document.getElementById(prefix + '-evento') || {}).value || '').trim();
+  var natureza = ((document.getElementById(prefix + '-natureza') || {}).value || 'despesa').trim();
+  var categoria = formatDescriptionTitleCase((document.getElementById(prefix + '-categoria') || {}).value || '');
+  var descricao = ((document.getElementById(prefix + '-descricao') || {}).value || '').trim();
+  var pessoaNome = formatDescriptionTitleCase((document.getElementById(prefix + '-pessoa') || {}).value || '');
+  var valorOrcado = parseMoney(document.getElementById(prefix + '-orcado')) || 0;
+  var valorPrevisto = parseMoney(document.getElementById(prefix + '-previsto')) || 0;
+  var status = ((document.getElementById(prefix + '-status') || {}).value || 'previsto').trim();
+  var observacao = ((document.getElementById(prefix + '-obs') || {}).value || '').trim();
+
+  return {
+    evento_id: eventoId || null,
+    natureza: natureza === 'receita' ? 'receita' : 'despesa',
+    categoria: categoria,
+    descricao: descricao || null,
+    pessoa_nome: pessoaNome || null,
+    valor_orcado: Number(valorOrcado || 0),
+    valor_previsto: Number(valorPrevisto || 0),
+    status: status,
+    observacao: observacao || null
+  };
+}
+
+function tfUpdateLocalOrcamentoLinha(row) {
+  var cliente = tfClienteAtivo();
+  if (!cliente) return;
+  if (!Array.isArray(cliente.orcamentoEventos)) cliente.orcamentoEventos = [];
+  var normalized = {
+    id: row.id,
+    eventoId: row.evento_id || null,
+    natureza: row.natureza || 'despesa',
+    categoria: row.categoria || '',
+    descricao: row.descricao || '',
+    pessoaNome: row.pessoa_nome || '',
+    valorOrcado: Number(row.valor_orcado || 0),
+    valorPrevisto: Number(row.valor_previsto || 0),
+    status: row.status || 'previsto',
+    observacao: row.observacao || '',
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null,
+    userId: row.user_id || null
+  };
+  var idx = cliente.orcamentoEventos.findIndex(function(item) { return item.id === row.id; });
+  if (idx >= 0) cliente.orcamentoEventos[idx] = Object.assign({}, cliente.orcamentoEventos[idx], normalized);
+  else cliente.orcamentoEventos.push(normalized);
+}
+
+async function tfAddOrcamentoLinha() {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!tfEventosEnabled()) return alert('Habilite o modulo de eventos antes de cadastrar orcamento.');
+  var payload = tfReadOrcamentoLinhaPayload('tf-orc-new');
+  if (!payload.evento_id) return alert('Selecione o evento.');
+  if (!payload.categoria) return alert('Informe a categoria do orcamento.');
+  if (payload.valor_orcado <= 0 && payload.valor_previsto <= 0) return alert('Informe ao menos o valor orcado ou previsto.');
+
+  var response = await supabaseClient
+    .from('orcamento_eventos_linhas')
+    .insert([Object.assign({
+      cliente_id: activeClient
+    }, payload, getUserScopePayload())])
+    .select()
+    .single();
+
+  if (response.error) {
+    console.error('Erro ao cadastrar linha de orcamento:', response.error);
+    alert('Nao foi possivel cadastrar a linha. Rode a migracao 20260615_orcamento_eventos.sql no Supabase.');
+    return;
+  }
+
+  tfUpdateLocalOrcamentoLinha(response.data);
+  _tfOrcamentoEventoId = response.data.evento_id || _tfOrcamentoEventoId;
+  renderFinanceiro();
+}
+
+function tfStartOrcamentoLinhaEdit(id) {
+  _tfOrcamentoLinhaEditId = id;
+  renderFinanceiro();
+}
+
+function tfCancelOrcamentoLinhaEdit() {
+  _tfOrcamentoLinhaEditId = null;
+  renderFinanceiro();
+}
+
+async function tfSaveOrcamentoLinha(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var payload = tfReadOrcamentoLinhaPayload('tf-orc-edit');
+  if (!payload.evento_id) return alert('Selecione o evento.');
+  if (!payload.categoria) return alert('Informe a categoria do orcamento.');
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('orcamento_eventos_linhas')
+      .update(payload)
+      .eq('id', id)
+  ).select().single();
+
+  if (response.error) {
+    console.error('Erro ao salvar linha de orcamento:', response.error);
+    alert('Nao foi possivel salvar a linha de orcamento.');
+    return;
+  }
+
+  _tfOrcamentoLinhaEditId = null;
+  tfUpdateLocalOrcamentoLinha(response.data);
+  renderFinanceiro();
+}
+
+async function tfDeleteOrcamentoLinha(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (tfTitulosPorOrcamentoLinha(id).length) return alert('Esta linha ja tem titulos financeiros vinculados. Remova o vinculo antes de excluir.');
+  var ok = await appConfirm('Excluir esta linha de orcamento?', { title: 'Excluir orcamento', confirmText: 'Excluir' });
+  if (!ok) return;
+
+  var response = await applyUserScope(
+    supabaseClient
+      .from('orcamento_eventos_linhas')
+      .delete()
+      .eq('id', id)
+  );
+
+  if (response.error) {
+    console.error('Erro ao excluir linha de orcamento:', response.error);
+    alert('Nao foi possivel excluir a linha.');
+    return;
+  }
+
+  var cliente = tfClienteAtivo();
+  if (cliente) cliente.orcamentoEventos = (cliente.orcamentoEventos || []).filter(function(item) { return item.id !== id; });
+  renderFinanceiro();
+}
+
+async function tfGerarTituloDoOrcamento(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var linha = tfOrcamentoLinhaById(id);
+  if (!linha) return;
+  if (tfTitulosPorOrcamentoLinha(linha.id).length) return alert('Esta linha do orcamento ja tem conta vinculada. Use a conta existente para registrar novas baixas.');
+  var naturezaTitulo = linha.natureza === 'receita' ? 'receber' : 'pagar';
+  var valor = tfOrcamentoPrevistoLinha(linha);
+  if (valor <= 0) return alert('Informe um valor previsto antes de gerar o titulo.');
+  var pessoa = linha.pessoaNome || (naturezaTitulo === 'receber' ? 'Cliente do evento' : 'Fornecedor do evento');
+  var descricao = linha.descricao || linha.categoria || tfNomeEventoById(linha.eventoId);
+
+  var ok = await appConfirm(
+    'Gerar conta a ' + (naturezaTitulo === 'receber' ? 'receber' : 'pagar') + ' de ' + fmt(valor) + ' para esta linha?',
+    { title: 'Gerar titulo financeiro', confirmText: 'Gerar' }
+  );
+  if (!ok) return;
+
+  var insertPayload = Object.assign({
+    cliente_id: activeClient,
+    natureza: naturezaTitulo,
+    pessoa_nome: pessoa,
+    descricao: tfDescricaoTitulo(descricao, naturezaTitulo, pessoa),
+    categoria: linha.categoria || null,
+    centro_custo_id: null,
+    evento_id: linha.eventoId || null,
+    orcamento_linha_id: linha.id,
+    vencimento: null,
+    valor_total: valor,
+    observacao: linha.observacao || null
+  }, getUserScopePayload());
+
+  var response = await supabaseClient
+    .from('titulos_financeiros')
+    .insert([insertPayload])
+    .select()
+    .single();
+
+  if (response.error) {
+    console.error('Erro ao gerar titulo pelo orcamento:', response.error);
+    alert('Nao foi possivel gerar o titulo. Rode a migracao 20260615_orcamento_eventos.sql no Supabase.');
+    return;
+  }
+
+  await loadData();
+  _tfNatureza = naturezaTitulo;
+  _tfEvento = linha.eventoId || '';
+  _tfFinanceiroView = 'titulos';
+  renderFinanceiro();
+}
+
+function tfTitulosVinculaveisOrcamento(linha) {
+  if (!linha) return [];
+  var naturezaTitulo = linha.natureza === 'receita' ? 'receber' : 'pagar';
+  return tfTitulosCliente().filter(function(titulo) {
+    if (!titulo || titulo.natureza !== naturezaTitulo) return false;
+    if (titulo.eventoId && titulo.eventoId !== linha.eventoId) return false;
+    return !titulo.orcamentoLinhaId || titulo.orcamentoLinhaId === linha.id;
+  }).sort(function(a, b) {
+    return String(b.vencimento || '').localeCompare(String(a.vencimento || ''));
+  });
+}
+
+function tfOpenVincularTituloOrcamentoModal(linhaId) {
+  var linha = tfOrcamentoLinhaById(linhaId);
+  if (!linha) return;
+  var titulos = tfTitulosVinculaveisOrcamento(linha);
+  var jaVinculados = tfTitulosPorOrcamentoLinha(linha.id);
+  document.getElementById('modalTitle').textContent = 'Vincular conta ao orcamento';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="settings-card-badges" style="margin:0 0 14px 0">'
+      + '<span class="settings-card-badge">' + esc(tfNaturezaOrcamentoLabel(linha.natureza)) + '</span>'
+      + '<span class="settings-card-badge subtle">' + esc(tfNomeEventoById(linha.eventoId) || '-') + '</span>'
+      + '<span class="settings-card-badge subtle">' + esc(linha.categoria || '-') + '</span>'
+      + '<span class="settings-card-badge subtle">' + jaVinculados.length + ' vinculada(s)</span>'
+    + '</div>'
+    + (titulos.length
+      ? '<div class="tf-link-title-list">' + titulos.map(function(titulo) {
+          var vinculado = titulo.orcamentoLinhaId === linha.id;
+          return '<label class="tf-link-title-item">'
+            + '<input type="checkbox" value="' + esc(titulo.id) + '"' + (vinculado ? ' checked' : '') + '/>'
+            + '<span><strong>' + esc(titulo.pessoaNome || '-') + '</strong><small>' + esc([titulo.descricao, formatDate(titulo.vencimento)].filter(Boolean).join(' - ')) + '</small></span>'
+            + '<b>' + fmt(titulo.valorTotal || 0) + '</b>'
+            + '</label>';
+        }).join('') + '</div>'
+      : '<div class="empty-state" style="padding:22px">Nenhuma conta compativel encontrada neste evento.</div>')
+    + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
+      + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
+      + (titulos.length ? '<button class="btn-add" type="button" style="margin-top:0" onclick="tfSalvarVinculosOrcamento(\'' + linha.id + '\')">Salvar vinculos</button>' : '')
+    + '</div>';
+  document.getElementById('modalOverlay').classList.add('open');
+  document.addEventListener('keydown', handleMainModalEscape);
+}
+
+async function tfSalvarVinculosOrcamento(linhaId) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var linha = tfOrcamentoLinhaById(linhaId);
+  if (!linha) return;
+  var selecionados = Array.from(document.querySelectorAll('.tf-link-title-item input[type="checkbox"]:checked')).map(function(input) {
+    return input.value;
+  }).filter(Boolean);
+  var candidatos = tfTitulosVinculaveisOrcamento(linha);
+  var candidatoIds = candidatos.map(function(item) { return item.id; });
+  var atuais = candidatos.filter(function(item) { return item.orcamentoLinhaId === linha.id; }).map(function(item) { return item.id; });
+  var paraVincular = selecionados.filter(function(id) { return candidatoIds.includes(id) && !atuais.includes(id); });
+  var paraDesvincular = atuais.filter(function(id) { return !selecionados.includes(id); });
+
+  if (paraVincular.length) {
+    var vincularRes = await applyUserScope(
+      supabaseClient
+        .from('titulos_financeiros')
+        .update({ orcamento_linha_id: linha.id, evento_id: linha.eventoId || null })
+        .in('id', paraVincular)
+    );
+    if (vincularRes.error) {
+      console.error('Erro ao vincular titulos ao orcamento:', vincularRes.error);
+      alert('Nao foi possivel vincular as contas ao orcamento.');
+      return;
+    }
+  }
+
+  if (paraDesvincular.length) {
+    var desvincularRes = await applyUserScope(
+      supabaseClient
+        .from('titulos_financeiros')
+        .update({ orcamento_linha_id: null })
+        .in('id', paraDesvincular)
+    );
+    if (desvincularRes.error) {
+      console.error('Erro ao desvincular titulos do orcamento:', desvincularRes.error);
+      alert('Nao foi possivel remover alguns vinculos.');
+      return;
+    }
+  }
+
+  await loadData();
+  closeModal();
+  renderFinanceiro();
+}
+
 function tfEventoIndicadores(eventoId) {
   var titulos = tfTitulosCliente().filter(function(item) { return item.eventoId === eventoId; });
   var receber = titulos.filter(function(item) { return item.natureza === 'receber'; });
   var pagar = titulos.filter(function(item) { return item.natureza === 'pagar'; });
-  var receitaPrevista = receber.reduce(function(s, item) { return s + Number(item.valorTotal || 0); }, 0);
-  var custoPrevisto = pagar.reduce(function(s, item) { return s + Number(item.valorTotal || 0); }, 0);
+  var orcamento = tfOrcamentoEventoResumo(eventoId);
+  var receitaPrevistaTitulos = receber.reduce(function(s, item) { return s + Number(item.valorTotal || 0); }, 0);
+  var custoPrevistoTitulos = pagar.reduce(function(s, item) { return s + Number(item.valorTotal || 0); }, 0);
+  var receitaPrevista = Math.max(orcamento.receitasPrevistas, receitaPrevistaTitulos);
+  var custoPrevisto = Math.max(orcamento.despesasPrevistas, custoPrevistoTitulos);
   var recebido = receber.reduce(function(s, item) { return s + tfTotalBaixado(item); }, 0);
   var pago = pagar.reduce(function(s, item) { return s + tfTotalBaixado(item); }, 0);
   var emAbertoReceber = receber.reduce(function(s, item) { return s + tfSaldo(item); }, 0);
@@ -939,7 +1330,8 @@ function tfEventoIndicadores(eventoId) {
     pago: pago,
     resultadoRealizado: recebido - pago,
     emAbertoReceber: emAbertoReceber,
-    emAbertoPagar: emAbertoPagar
+    emAbertoPagar: emAbertoPagar,
+    orcamento: orcamento
   };
 }
 
@@ -954,6 +1346,105 @@ function tfEventoCustoCategorias(eventoId) {
   return Object.entries(map).map(function(entry) {
     return { nome: entry[0], valor: entry[1] };
   }).sort(function(a, b) { return b.valor - a.valor; });
+}
+
+function tfOrcamentoFormHtml(linha) {
+  linha = linha || {};
+  var prefix = linha.id ? 'tf-orc-edit' : 'tf-orc-new';
+  var eventoSelecionado = linha.eventoId || _tfOrcamentoEventoId || (tfEventosCliente(false)[0] || {}).id || '';
+  return '<div class="tf-budget-form">'
+    + '<div class="form-row">'
+      + '<div class="form-group"><label>' + esc(tfEventosLabel().slice(0, -1) || 'Evento') + '</label><select id="' + prefix + '-evento">' + tfEventosOptionsHtml(eventoSelecionado, 'Selecione') + '</select></div>'
+      + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="' + prefix + '-natureza"><option value="receita"' + (linha.natureza === 'receita' ? ' selected' : '') + '>Receita</option><option value="despesa"' + (linha.natureza !== 'receita' ? ' selected' : '') + '>Despesa</option></select></div>'
+      + '<div class="form-group"><label>Categoria</label><input type="text" id="' + prefix + '-categoria" value="' + esc(linha.categoria || '') + '" placeholder="Ex.: Gerador, Patrocinio, Bilheteria"/></div>'
+    + '</div>'
+    + '<div class="form-row">'
+      + '<div class="form-group"><label>Fornecedor / pagador</label><input type="text" id="' + prefix + '-pessoa" value="' + esc(linha.pessoaNome || '') + '" placeholder="Opcional"/></div>'
+      + '<div class="form-group"><label>Descricao</label><input type="text" id="' + prefix + '-descricao" value="' + esc(linha.descricao || '') + '" placeholder="Opcional"/></div>'
+    + '</div>'
+    + '<div class="form-row">'
+      + '<div class="form-group" style="max-width:170px"><label>Valor orcado</label><input type="text" id="' + prefix + '-orcado" class="money-input" value="' + esc(Number(linha.valorOrcado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Valor previsto</label><input type="text" id="' + prefix + '-previsto" class="money-input" value="' + esc(Number(linha.valorPrevisto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Status</label><select id="' + prefix + '-status"><option value="previsto"' + ((!linha.status || linha.status === 'previsto') ? ' selected' : '') + '>Previsto</option><option value="contratado"' + (linha.status === 'contratado' ? ' selected' : '') + '>Contratado</option><option value="realizado"' + (linha.status === 'realizado' ? ' selected' : '') + '>Realizado</option><option value="cancelado"' + (linha.status === 'cancelado' ? ' selected' : '') + '>Cancelado</option></select></div>'
+    + '</div>'
+    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="' + prefix + '-obs" value="' + esc(linha.observacao || '') + '" placeholder="Detalhes internos"/></div></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">'
+      + (linha.id ? '<button type="button" class="btn-sm red" onclick="tfCancelOrcamentoLinhaEdit()">Cancelar</button>' : '')
+      + '<button type="button" class="btn-add" style="margin-top:0" onclick="' + (linha.id ? 'tfSaveOrcamentoLinha(\'' + linha.id + '\')' : 'tfAddOrcamentoLinha()') + '">' + (linha.id ? 'Salvar linha' : 'Adicionar linha') + '</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function tfOrcamentoEventoResumoCardsHtml(eventoId) {
+  var resumo = tfOrcamentoEventoResumo(eventoId);
+  var diffReceita = resumo.receitasRealizadas - resumo.receitasOrcadas;
+  var diffDespesa = resumo.despesasOrcadas - resumo.despesasRealizadas;
+  return '<div class="tf-budget-summary">'
+    + '<div><span>Receita orcada</span><strong class="green">' + fmt(resumo.receitasOrcadas) + '</strong></div>'
+    + '<div><span>Receita realizada</span><strong class="green">' + fmt(resumo.receitasRealizadas) + '</strong><small class="' + (diffReceita >= 0 ? 'green' : 'red') + '">' + fmt(diffReceita) + '</small></div>'
+    + '<div><span>Custo orcado</span><strong class="red">' + fmt(resumo.despesasOrcadas) + '</strong></div>'
+    + '<div><span>Custo realizado</span><strong class="red">' + fmt(resumo.despesasRealizadas) + '</strong><small class="' + (diffDespesa >= 0 ? 'green' : 'red') + '">' + fmt(diffDespesa) + '</small></div>'
+    + '<div><span>Resultado previsto</span><strong class="' + (resumo.resultadoPrevisto >= 0 ? 'green' : 'red') + '">' + fmt(resumo.resultadoPrevisto) + '</strong></div>'
+    + '<div><span>Resultado realizado</span><strong class="' + (resumo.resultadoRealizado >= 0 ? 'green' : 'red') + '">' + fmt(resumo.resultadoRealizado) + '</strong></div>'
+    + '</div>';
+}
+
+function tfOrcamentoLinhasHtml(eventoId) {
+  var linhas = tfOrcamentoLinhasEvento(eventoId).slice().sort(function(a, b) {
+    if (a.natureza !== b.natureza) return a.natureza === 'receita' ? -1 : 1;
+    return String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
+  });
+  if (!linhas.length) return '<div class="empty-state" style="padding:22px">Nenhuma linha de orcamento cadastrada para este evento.</div>';
+  return '<div class="tf-budget-table">'
+    + linhas.map(function(linha) {
+        var previsto = tfOrcamentoPrevistoLinha(linha);
+        var realizado = tfOrcamentoRealizadoLinha(linha);
+        var diff = linha.natureza === 'receita' ? realizado - Number(linha.valorOrcado || 0) : Number(linha.valorOrcado || 0) - realizado;
+        var titulos = tfTitulosPorOrcamentoLinha(linha.id);
+        var editando = _tfOrcamentoLinhaEditId === linha.id;
+        var vinculoResumo = titulos.length ? titulos.length + ' conta(s) vinculada(s)' : 'Sem conta vinculada';
+        var descricaoCompleta = [linha.pessoaNome, linha.descricao].filter(Boolean).join(' - ') || 'Sem descricao complementar';
+        return (editando ? '<div class="tf-budget-edit-row">' + tfOrcamentoFormHtml(linha) + '</div>' : '')
+          + '<article class="tf-budget-item">'
+            + '<div class="tf-budget-item-main">'
+              + '<div><span class="tf-budget-type ' + (linha.natureza === 'receita' ? 'green' : 'red') + '">' + esc(tfNaturezaOrcamentoLabel(linha.natureza)) + '</span><span class="tf-budget-status">' + esc(tfOrcamentoStatusLabel(linha.status)) + '</span></div>'
+              + '<div><strong>' + esc(linha.categoria || '-') + '</strong><p>' + esc(descricaoCompleta) + '</p><small>' + esc(vinculoResumo) + '</small></div>'
+            + '</div>'
+            + '<div class="tf-budget-values">'
+              + '<div><span>Orcado</span><strong>' + fmt(linha.valorOrcado || 0) + '</strong></div>'
+              + '<div><span>Previsto</span><strong>' + fmt(previsto) + '</strong></div>'
+              + '<div><span>Realizado</span><strong class="' + (linha.natureza === 'receita' ? 'green' : 'red') + '">' + fmt(realizado) + '</strong></div>'
+              + '<div><span>Dif.</span><strong class="' + (diff >= 0 ? 'green' : 'red') + '">' + fmt(diff) + '</strong></div>'
+            + '</div>'
+            + '<div class="tf-budget-actions">'
+              + (titulos.length ? '<button class="btn-sm" type="button" onclick="_tfFinanceiroView=\'titulos\';_tfEvento=\'' + esc(linha.eventoId || '') + '\';renderFinanceiro()">Ver contas</button>' : '<button class="btn-sm" type="button" onclick="tfGerarTituloDoOrcamento(\'' + linha.id + '\')">Gerar conta</button>')
+              + '<button class="btn-sm" type="button" onclick="tfOpenVincularTituloOrcamentoModal(\'' + linha.id + '\')">Vincular conta</button>'
+              + '<button class="btn-sm" type="button" onclick="tfStartOrcamentoLinhaEdit(\'' + linha.id + '\')">Editar</button>'
+              + '<button class="btn-icon danger" type="button" onclick="tfDeleteOrcamentoLinha(\'' + linha.id + '\')" title="Excluir">&#128465;</button>'
+            + '</div>'
+          + '</article>';
+      }).join('')
+    + '</div>';
+}
+
+function tfOrcamentoEventosHtml() {
+  var eventos = tfEventosCliente(true);
+  if (!eventos.length) return '<div class="empty-state" style="padding:22px">Cadastre um evento antes de criar o orcamento.</div>';
+  if (!_tfOrcamentoEventoId || !eventos.some(function(ev) { return ev.id === _tfOrcamentoEventoId; })) {
+    _tfOrcamentoEventoId = (eventos.find(function(ev) { return ev.ativo !== false; }) || eventos[0]).id;
+  }
+  var eventoAtual = eventos.find(function(ev) { return ev.id === _tfOrcamentoEventoId; }) || eventos[0];
+  return '<div class="tf-budget-shell">'
+    + '<div class="tf-section-head">'
+      + '<div><h3>Orcamento e resultado</h3><p class="cartao-helper-text">Planeje receitas e custos sem criar contas ate o valor ficar real.</p></div>'
+      + '<div class="form-group" style="max-width:320px;margin:0"><label>' + esc(tfEventosLabel()) + '</label><select onchange="_tfOrcamentoEventoId=this.value;_tfOrcamentoLinhaEditId=null;renderFinanceiro()">' + eventos.map(function(ev) { return '<option value="' + esc(ev.id) + '"' + (ev.id === eventoAtual.id ? ' selected' : '') + '>' + esc(ev.nome) + (ev.ativo === false ? ' (inativo)' : '') + '</option>'; }).join('') + '</select></div>'
+    + '</div>'
+    + tfOrcamentoEventoResumoCardsHtml(eventoAtual.id)
+    + '<div class="tf-budget-layout">'
+      + '<div><h4 class="tf-event-subtitle">Nova linha</h4>' + tfOrcamentoFormHtml(null) + '</div>'
+      + '<div><h4 class="tf-event-subtitle">Linhas do evento</h4>' + tfOrcamentoLinhasHtml(eventoAtual.id) + '</div>'
+    + '</div>'
+    + '</div>';
 }
 
 function tfEventosResumoHtml() {
@@ -1009,7 +1500,8 @@ function tfEventosResumoHtml() {
       + rankingHtml
     + '</div>'
     + '</div>'
-    + '<div class="tf-event-list">' + (linhas || '<div class="empty-state" style="padding:22px">Cadastre o primeiro ' + esc(tfEventosLabel().toLowerCase()) + ' para comecar a comparar.</div>') + '</div>';
+    + '<div class="tf-event-list">' + (linhas || '<div class="empty-state" style="padding:22px">Cadastre o primeiro ' + esc(tfEventosLabel().toLowerCase()) + ' para comecar a comparar.</div>') + '</div>'
+    + tfOrcamentoEventosHtml();
 }
 
 function tfNormalizeDateFieldValue(fieldId, label) {
@@ -1032,6 +1524,9 @@ function tfReadFormPayload(prefix) {
   var descricao = (document.getElementById(prefix + '-descricao') || {}).value || '';
   var centroCustoId = _tfNatureza === 'pagar' ? (((document.getElementById(prefix + '-centro-custo') || {}).value || '').trim() || null) : null;
   var eventoId = ((document.getElementById(prefix + '-evento') || {}).value || '').trim() || null;
+  var orcamentoLinhaId = ((document.getElementById(prefix + '-orcamento-linha') || {}).value || '').trim() || null;
+  var orcamentoLinha = tfOrcamentoLinhaById(orcamentoLinhaId);
+  if (orcamentoLinha) eventoId = orcamentoLinha.eventoId || eventoId;
   var vencimento = tfNormalizeDateFieldValue(prefix + '-vencimento', 'vencimento');
   var valor = tfParseAmountFromInput(prefix + '-valor');
   var observacao = (document.getElementById(prefix + '-observacao') || {}).value || '';
@@ -1045,6 +1540,7 @@ function tfReadFormPayload(prefix) {
     categoria: null,
     centroCustoId: centroCustoId,
     eventoId: eventoId,
+    orcamentoLinhaId: orcamentoLinhaId,
     vencimento: vencimento || null,
     valorTotal: Number(valor || 0),
     observacao: observacao.trim()
@@ -1052,7 +1548,7 @@ function tfReadFormPayload(prefix) {
 }
 
 function tfResetForm(prefix) {
-  ['pessoa', 'descricao', 'centro-custo', 'evento', 'vencimento', 'observacao'].forEach(function(suffix) {
+  ['pessoa', 'descricao', 'centro-custo', 'evento', 'orcamento-linha', 'vencimento', 'observacao'].forEach(function(suffix) {
     var el = document.getElementById(prefix + '-' + suffix);
     if (el) el.value = '';
     if (el && suffix === 'vencimento') delete el.dataset.isoDate;
@@ -1085,6 +1581,7 @@ async function tfAddTitulo() {
     observacao: payload.observacao || null
   }, getUserScopePayload());
   if (tfEventosEnabled() || payload.eventoId) insertPayload.evento_id = payload.eventoId || null;
+  if (payload.orcamentoLinhaId) insertPayload.orcamento_linha_id = payload.orcamentoLinhaId;
 
   var response = await supabaseClient
     .from('titulos_financeiros')
@@ -1109,6 +1606,7 @@ async function tfAddTitulo() {
     centroCusto: tfNomeCentroCustoById(response.data.centro_custo_id || null),
     eventoId: response.data.evento_id || null,
     evento: tfNomeEventoById(response.data.evento_id || null),
+    orcamentoLinhaId: response.data.orcamento_linha_id || null,
     vencimento: response.data.vencimento || null,
     valorTotal: Number(response.data.valor_total || 0),
     observacao: response.data.observacao || '',
@@ -1138,6 +1636,7 @@ function tfUpdateLocalTitulo(row) {
     centroCusto: tfNomeCentroCustoById(row.centro_custo_id || null),
     eventoId: row.evento_id || null,
     evento: tfNomeEventoById(row.evento_id || null),
+    orcamentoLinhaId: row.orcamento_linha_id || null,
     vencimento: row.vencimento || null,
     valorTotal: Number(row.valor_total || 0),
     observacao: row.observacao || '',
@@ -1184,6 +1683,7 @@ function tfTituloCardHtml(item) {
   var pct = total > 0 ? Math.min(100, Math.round((baixado / total) * 100)) : 0;
   var centro = item.centroCusto || tfNomeCentroCustoById(item.centroCustoId || null);
   var evento = item.evento || tfNomeEventoById(item.eventoId || null);
+  var linhaOrcamento = tfOrcamentoLinhaById(item.orcamentoLinhaId || '');
   var bulk = tfEventosEnabled()
     ? '<label class="tf-title-select" title="Selecionar para alterar evento em lote"><input type="checkbox" value="' + esc(item.id) + '"' + (_tfBulkSelected.has(item.id) ? ' checked' : '') + ' onchange="tfToggleBulkTitulo(\'' + item.id + '\', this.checked)"/><span></span></label>'
     : '';
@@ -1198,6 +1698,7 @@ function tfTituloCardHtml(item) {
       + '<div class="tf-title-meta">'
         + '<span>Vence ' + esc(formatDate(item.vencimento)) + '</span>'
         + (tfEventosEnabled() ? (evento ? '<span>' + esc(evento) + '</span>' : '<span>Sem ' + esc(tfEventosLabel().toLowerCase()) + '</span>') : '')
+        + (linhaOrcamento ? '<span>Orcamento: ' + esc(linhaOrcamento.categoria || '-') + '</span>' : '')
         + (item.natureza === 'pagar' ? (centro ? '<span>' + esc(centro) + '</span>' : '<span>Sem centro</span>') : '')
         + (item.observacao ? '<span>' + esc(item.observacao) + '</span>' : '')
       + '</div>'
@@ -1423,7 +1924,8 @@ function tfOpenTituloModal(id, foco) {
     + '</div>'
     + ((item.natureza === 'pagar' || tfEventosEnabled()) ? '<div class="form-row">'
       + (item.natureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="tf-edit-centro-custo">' + tfCentrosCustoOptionsHtml(item.centroCustoId || '') + '</select></div>' : '')
-      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="tf-edit-evento">' + tfEventosOptionsHtml(item.eventoId || '') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="tf-edit-evento" onchange="tfSyncOrcamentoOptions(\'tf-edit\',\'' + item.natureza + '\')">' + tfEventosOptionsHtml(item.eventoId || '') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>Linha do orcamento</label><select id="tf-edit-orcamento-linha">' + tfOrcamentoOptionsHtml(item.natureza, item.eventoId || '', item.orcamentoLinhaId || '') + '</select></div>' : '')
     + '</div>' : '')
     + '<div class="form-row">'
       + '<div class="form-group"><label>Observacao</label><textarea id="tf-edit-observacao" rows="3" placeholder="Informacoes importantes deste titulo">' + esc(item.observacao || '') + '</textarea></div>'
@@ -1461,17 +1963,25 @@ function tfOpenTituloModal(id, foco) {
 async function tfSaveTitulo(id) {
   var item = tfFindTituloById(id);
   if (!item) return;
+  var orcamentoLinhaId = ((document.getElementById('tf-edit-orcamento-linha') || {}).value || '').trim() || null;
+  var orcamentoLinha = tfOrcamentoLinhaById(orcamentoLinhaId);
   var payload = {
     pessoa_nome: formatDescriptionTitleCase((document.getElementById('tf-edit-pessoa') || {}).value || ''),
     descricao: tfDescricaoTitulo((document.getElementById('tf-edit-descricao') || {}).value || '', item.natureza, (document.getElementById('tf-edit-pessoa') || {}).value || item.pessoaNome || ''),
     categoria: null,
     centro_custo_id: item.natureza === 'pagar' ? (((document.getElementById('tf-edit-centro-custo') || {}).value || '').trim() || null) : null,
-    evento_id: ((document.getElementById('tf-edit-evento') || {}).value || '').trim() || null,
+    evento_id: orcamentoLinha ? (orcamentoLinha.eventoId || null) : (((document.getElementById('tf-edit-evento') || {}).value || '').trim() || null),
+    orcamento_linha_id: orcamentoLinhaId,
     vencimento: tfNormalizeDateFieldValue('tf-edit-vencimento', 'vencimento'),
     valor_total: tfParseAmountFromInput('tf-edit-valor'),
     observacao: ((document.getElementById('tf-edit-observacao') || {}).value || '').trim() || null
   };
   if (!tfEventosEnabled() && !payload.evento_id && !item.eventoId) delete payload.evento_id;
+  if (!payload.orcamento_linha_id && !item.orcamentoLinhaId) delete payload.orcamento_linha_id;
+  if (orcamentoLinha && !tfOrcamentoLinhaCompativelComTitulo(orcamentoLinha, Object.assign({}, item, { eventoId: payload.evento_id }))) {
+    alert('A linha do orcamento precisa ser do mesmo tipo e evento deste titulo.');
+    return;
+  }
 
   if (payload.vencimento === null) return;
 
@@ -1689,7 +2199,8 @@ function renderFinanceiroNovo(root) {
     + '</div>'
     + ((_tfNatureza === 'pagar' || tfEventosEnabled()) ? '<div class="form-row">'
       + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="' + tfFormPrefix() + '-centro-custo">' + tfCentrosCustoOptionsHtml('') + '</select></div>' : '')
-      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="' + tfFormPrefix() + '-evento">' + tfEventosOptionsHtml(_tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="' + tfFormPrefix() + '-evento" onchange="tfSyncOrcamentoOptions(\'' + tfFormPrefix() + '\',\'' + _tfNatureza + '\')">' + tfEventosOptionsHtml(_tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>Linha do orcamento</label><select id="' + tfFormPrefix() + '-orcamento-linha">' + tfOrcamentoOptionsHtml(_tfNatureza, _tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '', '') + '</select></div>' : '')
     + '</div>' : '')
     + '<div class="form-row">'
       + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informacoes complementares deste titulo"></textarea></div>'
