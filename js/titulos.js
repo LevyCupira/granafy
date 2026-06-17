@@ -1476,7 +1476,7 @@ function tfEventosResumoHtml() {
         + '<div><span>Margem</span><strong>' + margem.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</strong></div>'
       + '</div>'
       + '<div class="tf-event-meta"><span>Aberto a receber: ' + fmt(ind.emAbertoReceber) + '</span><span>Aberto a pagar: ' + fmt(ind.emAbertoPagar) + '</span><span>Maior custo: ' + esc(maiorCusto ? maiorCusto.nome : '-') + (maiorCusto ? ' (' + fmt(maiorCusto.valor) + ')' : '') + '</span></div>'
-      + '<div class="tf-event-actions"><button class="btn-sm" onclick="tfStartEventoEdit(\'' + evento.id + '\')">Editar</button><button class="btn-sm" onclick="_tfEvento=\'' + evento.id + '\';renderFinanceiro()">Ver titulos</button><button class="btn-icon danger" onclick="tfDeleteEvento(\'' + evento.id + '\')" title="Excluir evento">&#128465;</button></div>'
+      + '<div class="tf-event-actions"><button class="btn-sm" onclick="tfStartEventoEdit(\'' + evento.id + '\')">Editar</button><button class="btn-sm" onclick="_tfEvento=\'' + evento.id + '\';_tfFinanceiroView=\'titulos\';renderFinanceiro()">Ver titulos</button><button class="btn-icon danger" onclick="tfDeleteEvento(\'' + evento.id + '\')" title="Excluir evento">&#128465;</button></div>'
       + '</div>';
   }).join('');
 
