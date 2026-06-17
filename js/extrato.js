@@ -411,6 +411,30 @@ function extratoResolvidoConciliacao(cliente, lanc) {
   return !!lanc && !extratoPendenteConciliacao(cliente, lanc);
 }
 
+function extratoCategoriasBuscaLancamento(lanc) {
+  if (extratoTemRateio(lanc)) {
+    return extratoRateiosValidos(lanc).map(function(item) { return item.categoria || ''; }).filter(Boolean);
+  }
+  return lanc && lanc.cat ? [lanc.cat] : [];
+}
+
+function extratoTextoBuscaLancamento(cliente, lanc, centroCustoAtivo, relacionamentoAtivo) {
+  var categoriasBusca = extratoCategoriasBuscaLancamento(lanc).join(' ');
+  return [
+    lanc.desc || '',
+    categoriasBusca,
+    centroCustoAtivo ? nomeCentroCustoPorId(cliente, lanc.centroCustoId) : '',
+    relacionamentoAtivo ? nomeRelacionamentoPorId(cliente, lanc.relacionamentoId) : '',
+    lanc.observacao || '',
+    lanc.estornoObservacao || ''
+  ].join(' ').toLowerCase();
+}
+
+function extratoCategoriaBateFiltro(lanc, categoria) {
+  if (!categoria) return true;
+  return extratoCategoriasBuscaLancamento(lanc).includes(categoria);
+}
+
 function extratoLancamentosFiltrados(cliente) {
   if (!cliente) return [];
   var financeiroPJAtivo = clienteAtivoEhPJ();
@@ -418,13 +442,13 @@ function extratoLancamentosFiltrados(cliente) {
   var centroCustoAtivo = extratoCentroCustoAtivo();
   var lncs = cliente.extrato || [];
   return lncs.filter(function(l) {
-    var texto = ((l.desc || '') + ' ' + (l.cat || '') + ' ' + (centroCustoAtivo ? nomeCentroCustoPorId(cliente, l.centroCustoId) : '') + ' ' + (relacionamentoAtivo ? nomeRelacionamentoPorId(cliente, l.relacionamentoId) : '') + ' ' + (l.observacao || '') + ' ' + (l.estornoObservacao || '')).toLowerCase();
+    var texto = extratoTextoBuscaLancamento(cliente, l, centroCustoAtivo, relacionamentoAtivo);
     var pendenteConciliacao = extratoPendenteConciliacao(cliente, l);
     var resolvidoConciliacao = extratoResolvidoConciliacao(cliente, l);
     var statusEstorno = extratoStatusEstornoValor(l);
     var ehLancamentoDeEstorno = extratoLancamentoEhEstornoVinculado(cliente, l.id);
     if (_exFiltroTipo !== 'todos' && extratoTipoNormalizado(l.tipo) !== extratoTipoNormalizado(_exFiltroTipo)) return false;
-    if (_exFiltroCat && l.cat !== _exFiltroCat) return false;
+    if (_exFiltroCat && !extratoCategoriaBateFiltro(l, _exFiltroCat)) return false;
     if (!extratoPeriodoBate(l.data || '')) return false;
     if (_exFiltroConta && l.contaId !== _exFiltroConta) return false;
     if (relacionamentoAtivo && _exFiltroRelacionamento && l.relacionamentoId !== _exFiltroRelacionamento) return false;
@@ -2106,7 +2130,7 @@ function renderExtrato() {
   _exSelecionados = new Set(Array.from(_exSelecionados).filter(function(id) {
     return lncs.some(function(l) { return l.id === id; });
   }));
-  var catsLanc = [...new Set(lncs.map(l => l.cat || '').filter(Boolean))].sort(compararCategoriaNome);
+  var catsLanc = [...new Set(lncs.flatMap(function(l) { return extratoCategoriasBuscaLancamento(l); }).filter(Boolean))].sort(compararCategoriaNome);
   var filtradosBrutos = extratoLancamentosFiltrados(c);
   var gruposDuplicados = agruparDuplicadosExtrato(filtradosBrutos).filter(grupoDuplicadoPendenteExtrato);
   var qtdDuplicadosPendentes = gruposDuplicados.reduce((total, grupo) => total + Math.max(grupo.linhas.length - 1, 0), 0);
