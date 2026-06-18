@@ -2997,9 +2997,6 @@ async function conciliarExtratoLancamento(i) {
   });
 
   closeModal();
-  if (_exFiltroConciliacao === 'nao_conciliados') {
-    _exFiltroConciliacao = 'todos';
-  }
   await loadData();
   renderExtrato();
 }
@@ -3026,9 +3023,6 @@ async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extrato
     if (titulo) titulo.baixas = (titulo.baixas || []).filter(function(baixa) { return baixa.id !== baixaId; });
   }
 
-  if (_exFiltroConciliacao === 'conciliados') {
-    _exFiltroConciliacao = 'todos';
-  }
   await loadData();
   renderExtrato();
   var cAtual = data.clients[activeClient];
