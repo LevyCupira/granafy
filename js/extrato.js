@@ -401,14 +401,17 @@ function extratoSaldoInicialBase(cliente) {
 function extratoPendenteConciliacao(cliente, lanc) {
   if (!lanc) return false;
   if (extratoIgnoraConciliacao(lanc)) return false;
-  if (valorConciliadoDoLancamento(lanc) > 0) return false;
   if (extratoStatusEstornoValor(lanc) === 'estornado') return false;
   if (extratoLancamentoEhEstornoVinculado(cliente, lanc.id)) return false;
-  return true;
+  var valorLancamento = Math.abs(Number(lanc.valor || 0));
+  var valorConciliado = Math.abs(Number(valorConciliadoDoLancamento(lanc) || 0));
+  return valorConciliado + 0.005 < valorLancamento;
 }
 
 function extratoResolvidoConciliacao(cliente, lanc) {
-  return !!lanc && !extratoPendenteConciliacao(cliente, lanc);
+  if (!lanc) return false;
+  if (valorConciliadoDoLancamento(lanc) > 0) return true;
+  return !extratoPendenteConciliacao(cliente, lanc);
 }
 
 function extratoCategoriasBuscaLancamento(lanc) {
