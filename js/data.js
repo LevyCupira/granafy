@@ -5,6 +5,10 @@
 var data = { clients: {} };
 var activeClient = null;
 var activeTab = 'cartao';
+var workspaceDataSyncChannel = null;
+var workspaceDataSyncTimer = null;
+var workspaceDataSyncLoading = false;
+var workspaceDataSyncQueued = false;
 
 function readWorkspaceUrlState() {
   try {
@@ -39,6 +43,67 @@ function openCurrentWorkspaceInNewTab() {
   url.searchParams.set('client', activeClient);
   url.searchParams.set('tab', activeTab || 'cartao');
   window.open(url.toString(), '_blank', 'noopener');
+}
+
+function workspaceDataSyncPayload(clientId, area) {
+  return {
+    clientId: String(clientId || activeClient || ''),
+    area: String(area || 'dados'),
+    changedAt: Date.now()
+  };
+}
+
+function notifyWorkspaceDataChanged(clientId, area) {
+  var payload = workspaceDataSyncPayload(clientId, area);
+  if (!payload.clientId) return;
+
+  if (workspaceDataSyncChannel) workspaceDataSyncChannel.postMessage(payload);
+  try {
+    localStorage.setItem('granafy_workspace_data_sync', JSON.stringify(payload));
+  } catch (e) {}
+}
+
+function scheduleWorkspaceDataRefresh(payload) {
+  if (!payload || !payload.clientId || payload.clientId !== activeClient) return;
+
+  if (workspaceDataSyncLoading) {
+    workspaceDataSyncQueued = true;
+    return;
+  }
+
+  clearTimeout(workspaceDataSyncTimer);
+  workspaceDataSyncTimer = setTimeout(async function() {
+    workspaceDataSyncLoading = true;
+    try {
+      await loadData();
+      renderClientList();
+      renderTab(activeTab);
+    } catch (error) {
+      console.error('Nao foi possivel sincronizar os dados entre as abas:', error);
+    } finally {
+      workspaceDataSyncLoading = false;
+      if (workspaceDataSyncQueued) {
+        workspaceDataSyncQueued = false;
+        scheduleWorkspaceDataRefresh(payload);
+      }
+    }
+  }, 120);
+}
+
+function initWorkspaceDataSync() {
+  if (typeof BroadcastChannel === 'function') {
+    workspaceDataSyncChannel = new BroadcastChannel('granafy_workspace_data_sync');
+    workspaceDataSyncChannel.addEventListener('message', function(event) {
+      scheduleWorkspaceDataRefresh(event.data || null);
+    });
+  }
+
+  window.addEventListener('storage', function(event) {
+    if (event.key !== 'granafy_workspace_data_sync' || !event.newValue) return;
+    try {
+      scheduleWorkspaceDataRefresh(JSON.parse(event.newValue));
+    } catch (e) {}
+  });
 }
 
 var TAB_DEFS = [
@@ -832,4 +897,5 @@ function renderTab(tabKey) {
     });
   }
   if (typeof syncSidebarThemeToggle === 'function') syncSidebarThemeToggle();
+  initWorkspaceDataSync();
 })();

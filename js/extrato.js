@@ -3091,8 +3091,9 @@ async function conciliarExtratoLancamento(i) {
   });
 
   closeModal();
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'conciliacao_extrato');
   await loadData();
-  renderExtrato();
+  renderTab(activeTab);
 }
 
 async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extratoIdx) {
@@ -3117,8 +3118,9 @@ async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extrato
     if (titulo) titulo.baixas = (titulo.baixas || []).filter(function(baixa) { return baixa.id !== baixaId; });
   }
 
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'desconciliacao_extrato');
   await loadData();
-  renderExtrato();
+  renderTab(activeTab);
   var cAtual = data.clients[activeClient];
   var novoIdx = cAtual && cAtual.extrato ? cAtual.extrato.findIndex(function(item) { return item.id === lancamentoId; }) : -1;
   if (novoIdx >= 0) openExtratoConciliacaoModal(novoIdx);

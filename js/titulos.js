@@ -2084,8 +2084,7 @@ async function tfRegistrarBaixa(id) {
     return;
   }
 
-  if (lancamentoId) await loadData();
-  else {
+  if (!lancamentoId) {
     if (!Array.isArray(item.baixas)) item.baixas = [];
     item.baixas.push({
       id: response.data.id,
@@ -2097,6 +2096,8 @@ async function tfRegistrarBaixa(id) {
       userId: response.data.user_id || null
     });
   }
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'baixa_financeiro');
+  if (lancamentoId) await loadData();
   tfOpenTituloModal(id);
   renderFinanceiro();
 }
@@ -2126,6 +2127,7 @@ async function tfDeleteBaixa(tituloId, baixaId) {
 
   var item = tfFindTituloById(tituloId);
   if (item) item.baixas = (item.baixas || []).filter(function(baixa) { return baixa.id !== baixaId; });
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'exclusao_baixa_financeiro');
   if (baixaAtual && baixaAtual.lancamentoId) await loadData();
   tfOpenTituloModal(tituloId);
   renderFinanceiro();
