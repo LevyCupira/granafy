@@ -6,7 +6,7 @@
 <title>Granafy</title>
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="css/style.css?v=20260620-1"/>
+<link rel="stylesheet" href="css/style.css?v=20260620-4"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <meta name="theme-color" content="#181c27"/>
 <link rel="icon" href="data:,">
@@ -130,6 +130,13 @@
       </div>
     </div>
   </main>
+
+  <div class="app-loading-overlay" id="appLoadingOverlay" role="status" aria-live="polite" aria-hidden="true">
+    <div class="app-loading-panel">
+      <span class="app-loading-spinner" aria-hidden="true"></span>
+      <div><strong id="appLoadingMessage">Atualizando informacoes</strong><small>Aguarde um instante.</small></div>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
@@ -166,14 +173,14 @@
 <script src="js/categorias.js?v=20260520-1"></script>
 <script src="js/cartao.js?v=20260611-1"></script>
 <script src="js/dividas.js?v=20260611-1"></script>
-<script src="js/extrato.js?v=20260620-3"></script>
-<script src="js/titulos.js?v=20260620-2"></script>
+<script src="js/extrato.js?v=20260620-4"></script>
+<script src="js/titulos.js?v=20260620-3"></script>
 <script src="js/resumo.js?v=20260611-1"></script>
 <script src="js/dre.js?v=20260611-1"></script>
 <script src="js/graficos.js?v=20260613-2"></script>
 <script src="js/pdf.js?v=20260611-1"></script>
 <script src="js/settings.js?v=20260611-1"></script>
-<script src="js/data.js?v=20260620-3"></script>
+<script src="js/data.js?v=20260620-4"></script>
 <script src="js/migracao-cartao-segura.js?v=20260412-6"></script>
 <script src="js/auditoria.js?v=20260412-3"></script>
 </body>

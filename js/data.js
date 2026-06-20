@@ -9,6 +9,44 @@ var workspaceDataSyncChannel = null;
 var workspaceDataSyncTimer = null;
 var workspaceDataSyncLoading = false;
 var workspaceDataSyncQueued = false;
+var appLoadingDepth = 0;
+var appLoadingShowTimer = null;
+var appLoadingHideTimer = null;
+var appLoadingVisibleAt = 0;
+
+function beginAppLoading(message) {
+  appLoadingDepth += 1;
+  clearTimeout(appLoadingHideTimer);
+  var messageEl = document.getElementById('appLoadingMessage');
+  if (messageEl) messageEl.textContent = message || 'Atualizando informacoes';
+
+  var overlay = document.getElementById('appLoadingOverlay');
+  if (!overlay || overlay.classList.contains('open') || appLoadingShowTimer) return;
+  appLoadingShowTimer = setTimeout(function() {
+    appLoadingShowTimer = null;
+    if (!appLoadingDepth) return;
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    appLoadingVisibleAt = Date.now();
+  }, 180);
+}
+
+function endAppLoading() {
+  appLoadingDepth = Math.max(0, appLoadingDepth - 1);
+  if (appLoadingDepth) return;
+
+  clearTimeout(appLoadingShowTimer);
+  appLoadingShowTimer = null;
+  var overlay = document.getElementById('appLoadingOverlay');
+  if (!overlay || !overlay.classList.contains('open')) return;
+
+  var remaining = Math.max(0, 320 - (Date.now() - appLoadingVisibleAt));
+  appLoadingHideTimer = setTimeout(function() {
+    if (appLoadingDepth) return;
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }, remaining);
+}
 
 function readWorkspaceUrlState() {
   try {
@@ -151,6 +189,15 @@ function isActiveClientPJ() {
 }
 
 async function loadData() {
+  beginAppLoading('Atualizando informacoes');
+  try {
+    return await loadDataFromSupabase();
+  } finally {
+    endAppLoading();
+  }
+}
+
+async function loadDataFromSupabase() {
   data = { clients: {} };
   const uid = typeof currentUserId === 'function' ? currentUserId() : null;
 

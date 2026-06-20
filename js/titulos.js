@@ -1407,19 +1407,35 @@ function tfOrcamentoLinhasHtml(eventoId) {
         var diff = linha.natureza === 'receita' ? realizado - Number(linha.valorOrcado || 0) : Number(linha.valorOrcado || 0) - realizado;
         var titulos = tfTitulosPorOrcamentoLinha(linha.id);
         var editando = _tfOrcamentoLinhaEditId === linha.id;
-        var vinculoResumo = titulos.length ? titulos.length + ' conta(s) vinculada(s)' : 'Sem conta vinculada';
-        var descricaoCompleta = [linha.pessoaNome, linha.descricao].filter(Boolean).join(' - ') || 'Sem descricao complementar';
+        var totalContas = titulos.reduce(function(sum, titulo) { return sum + Number(titulo.valorTotal || 0); }, 0);
+        var baixadoContas = titulos.reduce(function(sum, titulo) { return sum + tfTotalBaixado(titulo); }, 0);
+        var saldoContas = titulos.reduce(function(sum, titulo) { return sum + tfSaldo(titulo); }, 0);
+        var baseRealizacao = Math.max(0, previsto || Number(linha.valorOrcado || 0));
+        var percentualRealizado = baseRealizacao > 0 ? Math.min(100, Math.round((realizado / baseRealizacao) * 100)) : 0;
+        var pendente = Math.max(0, baseRealizacao - realizado);
+        var descricaoCompleta = [linha.pessoaNome, linha.descricao].filter(Boolean).join(' - ');
+        var vinculoResumo = titulos.length
+          ? titulos.length + ' conta(s) - Total ' + fmt(totalContas) + ' - Baixado ' + fmt(baixadoContas) + ' - Saldo ' + fmt(saldoContas)
+          : 'Nenhuma conta vinculada';
         return (editando ? '<div class="tf-budget-edit-row">' + tfOrcamentoFormHtml(linha) + '</div>' : '')
           + '<article class="tf-budget-item">'
-            + '<div class="tf-budget-item-main">'
-              + '<div><span class="tf-budget-type ' + (linha.natureza === 'receita' ? 'green' : 'red') + '">' + esc(tfNaturezaOrcamentoLabel(linha.natureza)) + '</span><span class="tf-budget-status">' + esc(tfOrcamentoStatusLabel(linha.status)) + '</span></div>'
-              + '<div><strong>' + esc(linha.categoria || '-') + '</strong><p>' + esc(descricaoCompleta) + '</p><small>' + esc(vinculoResumo) + '</small></div>'
+            + '<div class="tf-budget-item-head">'
+              + '<div class="tf-budget-item-main">'
+                + '<div class="tf-budget-badges"><span class="tf-budget-type ' + (linha.natureza === 'receita' ? 'green' : 'red') + '">' + esc(tfNaturezaOrcamentoLabel(linha.natureza)) + '</span><span class="tf-budget-status">' + esc(tfOrcamentoStatusLabel(linha.status)) + '</span></div>'
+                + '<strong>' + esc(linha.categoria || '-') + '</strong>'
+                + (descricaoCompleta ? '<p>' + esc(descricaoCompleta) + '</p>' : '')
+              + '</div>'
+              + '<div class="tf-budget-link-summary"><span>' + esc(vinculoResumo) + '</span></div>'
             + '</div>'
             + '<div class="tf-budget-values">'
               + '<div><span>Orcado</span><strong>' + fmt(linha.valorOrcado || 0) + '</strong></div>'
               + '<div><span>Previsto</span><strong>' + fmt(previsto) + '</strong></div>'
               + '<div><span>Realizado</span><strong class="' + (linha.natureza === 'receita' ? 'green' : 'red') + '">' + fmt(realizado) + '</strong></div>'
-              + '<div><span>Dif.</span><strong class="' + (diff >= 0 ? 'green' : 'red') + '">' + fmt(diff) + '</strong></div>'
+              + '<div><span>Diferenca</span><strong class="' + (diff >= 0 ? 'green' : 'red') + '">' + fmt(diff) + '</strong></div>'
+            + '</div>'
+            + '<div class="tf-budget-progress">'
+              + '<div><span>Realizado ' + percentualRealizado + '%</span><strong>' + (pendente > 0 ? (fmt(pendente) + (linha.natureza === 'receita' ? ' a receber' : ' a pagar')) : 'Concluido') + '</strong></div>'
+              + '<i><b style="width:' + percentualRealizado + '%"></b></i>'
             + '</div>'
             + '<div class="tf-budget-actions">'
               + (titulos.length ? '<button class="btn-sm" type="button" onclick="_tfFinanceiroView=\'titulos\';_tfEvento=\'' + esc(linha.eventoId || '') + '\';renderFinanceiro()">Ver contas</button>' : '<button class="btn-sm" type="button" onclick="tfGerarTituloDoOrcamento(\'' + linha.id + '\')">Gerar conta</button>')

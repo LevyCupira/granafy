@@ -2242,7 +2242,7 @@ function renderExtrato() {
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
     + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button><button class="btn-sm" onclick="exportExtratoPDF()">Exportar PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">Exportar XLSX</button></div>';
+    + '<div class="ex-filter-actions"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>';
   var idsFiltrados = filtrados.map(function(l) { return l.id; }).filter(Boolean);
   var selecionadosVisiveis = idsFiltrados.filter(function(id) { return _exSelecionados.has(id); }).length;
   var idsFiltradosJs = idsFiltrados.map(function(id) {
@@ -2300,7 +2300,7 @@ function renderExtrato() {
   var html = headerHtml + resumoHtml + tabsHtml + activePanelHtml;
 
   if (_exView === 'lancamentos') {
-    html += '<div class="form-card ex-filter-strip"><div class="ex-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">Filtre por periodo, conta, categoria, conciliacao, valor e busca textual.</p></div><div class="ex-export-actions"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button><button class="btn-sm" onclick="exportExtratoPDF()">PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">XLSX</button></div></div>' + filtrosPanelBody + '</div>';
+    html += '<div class="form-card ex-filter-strip"><div class="ex-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">Filtre por periodo, conta, categoria, conciliacao, valor e busca textual.</p></div><div class="ex-export-actions"><button class="btn-sm" onclick="exportExtratoPDF()">PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">XLSX</button></div></div>' + filtrosPanelBody + '</div>';
   } else {
     area.innerHTML = html;
     atualizarPlaceholdersFiltrosExtrato();
