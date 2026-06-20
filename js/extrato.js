@@ -2751,6 +2751,26 @@ function extratoConciliacaoOptionsHtml(natureza, selecionadoId) {
   }).join('');
 }
 
+function refreshOpenExtratoConciliationOptions() {
+  var select = document.getElementById('ex-conciliar-titulo');
+  if (!select) return;
+  var lancamentoId = String(select.dataset.lancamentoId || '');
+  var cliente = data && data.clients ? data.clients[activeClient] : null;
+  var lanc = cliente && Array.isArray(cliente.extrato)
+    ? cliente.extrato.find(function(item) { return String(item.id || '') === lancamentoId; })
+    : null;
+  if (!lanc) return;
+
+  var selecionadoId = select.value || '';
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
+  select.innerHTML = extratoConciliacaoOptionsHtml(natureza, selecionadoId);
+  if (selecionadoId && Array.from(select.options).some(function(option) { return option.value === selecionadoId; })) {
+    select.value = selecionadoId;
+  }
+  var restante = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
+  syncExtratoConciliacaoValor(restante);
+}
+
 function extratoTextoNormalizadoConciliacao(value) {
   return String(value || '')
     .normalize('NFD')
@@ -2948,7 +2968,7 @@ function openExtratoConciliacaoModal(i) {
       + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Você pode vincular este lançamento a mais de um título, desde que o total conciliado não ultrapasse o valor do banco.</p></div></div>'
       + baixasHtml
       + '<div class="form-row" style="margin-top:16px">'
-        + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+        + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" data-lancamento-id="' + esc(lanc.id) + '" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
@@ -3015,7 +3035,7 @@ function openExtratoConciliacaoModal(i) {
         + '<div class="conciliation-section-head"><div><h5>Baixas conciliadas</h5><p>Vincule este lancamento a uma conta financeira ja gerada ou vinculada ao orcamento.</p></div></div>'
         + baixasHtml
         + '<div class="form-row" style="margin-top:16px">'
-          + '<div class="form-group"><label>Conta para conciliar</label><select id="ex-conciliar-titulo" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+          + '<div class="form-group"><label>Conta para conciliar</label><select id="ex-conciliar-titulo" data-lancamento-id="' + esc(lanc.id) + '" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
         + '</div>'
         + '<div class="form-row">'
           + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'

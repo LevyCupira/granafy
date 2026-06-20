@@ -595,6 +595,7 @@ async function importTitulosXlsx(event) {
       return alert('Nao foi possivel importar os titulos. Verifique a planilha e a migracao do Financeiro PJ.');
     }
 
+    if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'importacao_titulos');
     await loadData();
     renderFinanceiro();
     alert(payloads.length + ' titulo(s) importado(s) com sucesso!' + (ignorados ? ' ' + ignorados + ' linha(s) ignorada(s).' : ''));
@@ -972,6 +973,7 @@ async function tfAddEvento() {
     return;
   }
 
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'evento_criado');
   await loadData();
   renderFinanceiro();
 }
@@ -1032,6 +1034,7 @@ async function tfDeleteEvento(id) {
     return;
   }
 
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'evento_excluido');
   await loadData();
   renderFinanceiro();
 }
@@ -1212,6 +1215,7 @@ async function tfGerarTituloDoOrcamento(id) {
     return;
   }
 
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulo_orcamento_criado');
   await loadData();
   _tfNatureza = naturezaTitulo;
   _tfEvento = linha.eventoId || '';
@@ -1303,6 +1307,7 @@ async function tfSalvarVinculosOrcamento(linhaId) {
     }
   }
 
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'vinculo_orcamento');
   await loadData();
   closeModal();
   renderFinanceiro();
@@ -1617,6 +1622,7 @@ async function tfAddTitulo() {
   });
 
   tfResetForm(tfFormPrefix());
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulo_criado');
   renderFinanceiro();
 }
 
@@ -1794,6 +1800,7 @@ async function tfApplyBulkEvento() {
     item.evento = eventoNome;
   });
   _tfBulkSelected.clear();
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulos_atualizados');
   renderFinanceiro();
 }
 
@@ -2004,6 +2011,7 @@ async function tfSaveTitulo(id) {
   }
 
   tfUpdateLocalTitulo(response.data);
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulo_editado');
   closeModal();
   renderFinanceiro();
 }
@@ -2029,6 +2037,7 @@ async function tfDeleteTitulo(id) {
 
   var cliente = tfClienteAtivo();
   cliente.titulos = (cliente.titulos || []).filter(function(entry) { return entry.id !== id; });
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulo_excluido');
   closeModal();
   renderFinanceiro();
 }

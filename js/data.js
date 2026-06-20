@@ -78,6 +78,9 @@ function scheduleWorkspaceDataRefresh(payload) {
       await loadData();
       renderClientList();
       renderTab(activeTab);
+      if (typeof refreshOpenExtratoConciliationOptions === 'function') {
+        refreshOpenExtratoConciliationOptions();
+      }
     } catch (error) {
       console.error('Nao foi possivel sincronizar os dados entre as abas:', error);
     } finally {
