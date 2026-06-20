@@ -6,6 +6,41 @@ var data = { clients: {} };
 var activeClient = null;
 var activeTab = 'cartao';
 
+function readWorkspaceUrlState() {
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    return {
+      clientId: String(params.get('client') || '').trim(),
+      tab: String(params.get('tab') || '').trim()
+    };
+  } catch (e) {
+    return { clientId: '', tab: '' };
+  }
+}
+
+function syncWorkspaceUrlState() {
+  try {
+    var url = new URL(window.location.href);
+    if (activeClient) url.searchParams.set('client', activeClient);
+    else url.searchParams.delete('client');
+    if (activeTab) url.searchParams.set('tab', activeTab);
+    else url.searchParams.delete('tab');
+    window.history.replaceState(null, '', url.toString());
+  } catch (e) {}
+}
+
+function openCurrentWorkspaceInNewTab() {
+  if (!activeClient || !data.clients[activeClient]) {
+    alert('Selecione um cliente primeiro.');
+    return;
+  }
+
+  var url = new URL(window.location.href);
+  url.searchParams.set('client', activeClient);
+  url.searchParams.set('tab', activeTab || 'cartao');
+  window.open(url.toString(), '_blank', 'noopener');
+}
+
 var TAB_DEFS = [
   { key: 'cartao', label: 'Cartão', contentId: 'cartao-content', render: () => renderCartao() },
   { key: 'dividas', label: 'Dívidas', contentId: 'dividas-content', render: () => renderDividas() },
@@ -730,6 +765,7 @@ function initTabDrag(container) {
 function switchTab(tabKey) {
   var visibleTabs = getVisibleTabs();
   activeTab = visibleTabs.find(function(tab) { return tab.key === tabKey; }) ? tabKey : (visibleTabs[0] ? visibleTabs[0].key : 'cartao');
+  syncWorkspaceUrlState();
   renderTabs();
   renderTab(activeTab);
 }
@@ -738,6 +774,7 @@ function renderTab(tabKey) {
   const visibleTabs = getVisibleTabs();
   const tab = visibleTabs.find(function(item) { return item.key === tabKey; }) || visibleTabs[0] || TAB_DEFS[0];
   activeTab = tab.key;
+  syncWorkspaceUrlState();
 
   renderTabs();
 
@@ -766,7 +803,11 @@ function renderTab(tabKey) {
   renderClientList();
   if (typeof renderAuthUser === 'function') renderAuthUser();
 
-  const saved = localStorage.getItem(activeClientStorageKey());
+  var workspaceState = readWorkspaceUrlState();
+  if (workspaceState.tab && TAB_DEFS.some(function(tab) { return tab.key === workspaceState.tab; })) {
+    activeTab = workspaceState.tab;
+  }
+  const saved = workspaceState.clientId || localStorage.getItem(activeClientStorageKey());
   if (saved && data.clients[saved]) {
     selectClient(saved);
   } else {

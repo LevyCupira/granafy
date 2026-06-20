@@ -541,7 +541,13 @@ async function refreshAppAfterAuth() {
   if (typeof renderTabs === 'function') renderTabs();
   if (typeof renderClientList === 'function') renderClientList();
 
-  var saved = localStorage.getItem(activeClientStorageKey());
+  var workspaceState = typeof readWorkspaceUrlState === 'function'
+    ? readWorkspaceUrlState()
+    : { clientId: '', tab: '' };
+  if (workspaceState.tab && typeof TAB_DEFS !== 'undefined' && TAB_DEFS.some(function(tab) { return tab.key === workspaceState.tab; })) {
+    activeTab = workspaceState.tab;
+  }
+  var saved = workspaceState.clientId || localStorage.getItem(activeClientStorageKey());
   if (saved && data.clients[saved] && typeof selectClient === 'function') {
     selectClient(saved);
   } else if (typeof clearActiveClientView === 'function') {

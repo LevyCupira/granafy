@@ -2506,6 +2506,79 @@ async function addExtrato() {
   renderExtrato();
 }
 
+function selecionarDuplicadosImportacaoExtrato(duplicados, novosCount) {
+  return new Promise(function(resolve) {
+    var overlay = appDialogEnsure();
+    var titleEl = document.getElementById('appDialogTitle');
+    var messageEl = document.getElementById('appDialogMessage');
+    var actionsEl = document.getElementById('appDialogActions');
+
+    overlay.classList.add('import-duplicates-dialog');
+    titleEl.textContent = 'Duplicados encontrados';
+    messageEl.innerHTML =
+      '<p class="import-duplicates-summary"><strong>' + Number(duplicados.length) + ' duplicado(s)</strong> precisam de revisao. ' + Number(novosCount || 0) + ' lancamento(s) novo(s) serao importados normalmente.</p>'
+      + '<label class="import-duplicates-toggle"><input type="checkbox" id="ex-import-duplicados-todos"/><span>Selecionar todos os duplicados</span></label>'
+      + '<div class="import-duplicates-list">'
+      + duplicados.map(function(item, index) {
+          return '<label class="import-duplicate-item">'
+            + '<input type="checkbox" class="ex-import-duplicado-check" value="' + index + '"/>'
+            + '<span><strong>' + esc(item.desc || '-') + '</strong><small>' + esc(formatDate(item.data) || '-') + ' - ' + esc(item.cat || 'Outros') + ' - ' + esc(item.tipo === 'credito' ? 'Credito' : 'Debito') + '</small></span>'
+            + '<b>' + fmt(item.valor || 0) + '</b>'
+          + '</label>';
+        }).join('')
+      + '</div>';
+    actionsEl.innerHTML =
+      '<button class="app-dialog-btn ghost" type="button" data-action="cancelar">Cancelar importacao</button>'
+      + '<button class="app-dialog-btn ghost" type="button" data-action="sem-duplicados">Importar sem duplicados</button>'
+      + '<button class="app-dialog-btn primary" type="button" data-action="selecionados">Importar selecionados (0)</button>';
+
+    var checks = Array.from(messageEl.querySelectorAll('.ex-import-duplicado-check'));
+    var toggleTodos = document.getElementById('ex-import-duplicados-todos');
+    var buttons = Array.from(actionsEl.querySelectorAll('button'));
+    var selectedButton = actionsEl.querySelector('[data-action="selecionados"]');
+
+    var selecionados = function() {
+      return checks.filter(function(check) { return check.checked; }).map(function(check) { return Number(check.value); });
+    };
+    var atualizar = function() {
+      var total = selecionados().length;
+      selectedButton.textContent = 'Importar selecionados (' + total + ')';
+      if (toggleTodos) {
+        toggleTodos.checked = total === checks.length && checks.length > 0;
+        toggleTodos.indeterminate = total > 0 && total < checks.length;
+      }
+    };
+    var done = function(value) {
+      overlay.classList.remove('open', 'import-duplicates-dialog');
+      checks.forEach(function(check) { check.removeEventListener('change', atualizar); });
+      if (toggleTodos) toggleTodos.removeEventListener('change', onToggleTodos);
+      buttons.forEach(function(button) { button.removeEventListener('click', onAction); });
+      document.removeEventListener('keydown', onKey);
+      resolve(value);
+    };
+    var onToggleTodos = function() {
+      checks.forEach(function(check) { check.checked = !!toggleTodos.checked; });
+      atualizar();
+    };
+    var onAction = function(event) {
+      var action = event.currentTarget.dataset.action;
+      if (action === 'cancelar') return done(null);
+      if (action === 'sem-duplicados') return done([]);
+      done(selecionados());
+    };
+    var onKey = function(event) {
+      if (event.key === 'Escape') done(null);
+    };
+
+    checks.forEach(function(check) { check.addEventListener('change', atualizar); });
+    if (toggleTodos) toggleTodos.addEventListener('change', onToggleTodos);
+    buttons.forEach(function(button) { button.addEventListener('click', onAction); });
+    document.addEventListener('keydown', onKey);
+    overlay.classList.add('open');
+    atualizar();
+  });
+}
+
 async function importExtratoXlsx(event) {
   var file = event.target.files[0];
   if (!file) return;
@@ -2535,8 +2608,11 @@ async function importExtratoXlsx(event) {
     }
 
     var c = data.clients[activeClient];
-    var count = 0;
-    var erros = 0;
+    var novos = [];
+    var duplicados = [];
+    var chavesExistentes = new Set((c.extrato || []).map(function(l) {
+      return [l.data || '', String(l.desc || ''), Number(l.valor || 0), l.tipo || '', l.contaId || ''].join('|');
+    }));
 
     for (const row of rows.slice(1)) {
       var dataFmt = normalizarDataImportada(row[iDate]);
@@ -2548,35 +2624,48 @@ async function importExtratoXlsx(event) {
 
       if (!desc || !valor) continue;
 
-      var duplicado = (c.extrato || []).find(l =>
-        (l.data || '') === (dataFmt || '')
-        && String(l.desc || '') === desc
-        && Number(l.valor || 0) === Number(valor || 0)
-        && (l.tipo || '') === tipo
-        && (l.contaId || '') === contaId
-      );
-
-      if (duplicado && !(await appConfirm('Ja existe um lancamento nessa conta com a mesma data, descricao, valor e tipo: "' + desc + '". Deseja importar novamente?', { title: 'Lancamento duplicado', confirmText: 'Importar novamente' }))) {
-        continue;
-      }
-
       var relacionamentoSugerido = !relacionamentoIdFixo && extratoRelacionamentoAtivo() ? sugerirRelacionamentoPorTexto(desc) : null;
-
-      const { error } = await insertLancamentoComFallback({
-        cliente_id: activeClient,
-        data_lancamento: dataFmt || null,
-        descricao: desc,
-        descricao_original: desc,
-        categoria: cat || 'Outros',
-        centro_custo_id: null,
+      var itemImportacao = {
+        data: dataFmt || '',
+        desc: desc,
+        cat: cat || 'Outros',
         tipo: tipo,
         valor: Number(valor || 0),
-        conta_id: contaId,
-        relacionamento_id: relacionamentoIdFixo || (relacionamentoSugerido ? relacionamentoSugerido.id : null)
-      });
+        payload: {
+          cliente_id: activeClient,
+          data_lancamento: dataFmt || null,
+          descricao: desc,
+          descricao_original: desc,
+          categoria: cat || 'Outros',
+          centro_custo_id: null,
+          tipo: tipo,
+          valor: Number(valor || 0),
+          conta_id: contaId,
+          relacionamento_id: relacionamentoIdFixo || (relacionamentoSugerido ? relacionamentoSugerido.id : null)
+        }
+      };
+      var chave = [dataFmt || '', desc, Number(valor || 0), tipo, contaId].join('|');
+      if (chavesExistentes.has(chave)) duplicados.push(itemImportacao);
+      else novos.push(itemImportacao);
+      chavesExistentes.add(chave);
+    }
+
+    var duplicadosSelecionados = [];
+    if (duplicados.length) {
+      var indicesSelecionados = await selecionarDuplicadosImportacaoExtrato(duplicados, novos.length);
+      if (indicesSelecionados === null) return;
+      var indiceSet = new Set(indicesSelecionados);
+      duplicadosSelecionados = duplicados.filter(function(_, index) { return indiceSet.has(index); });
+    }
+
+    var count = 0;
+    var erros = 0;
+    var paraImportar = novos.concat(duplicadosSelecionados);
+    for (const item of paraImportar) {
+      const { error } = await insertLancamentoComFallback(item.payload);
 
       if (error) {
-        console.error('Erro ao importar item do extrato:', row, error);
+        console.error('Erro ao importar item do extrato:', item, error);
         erros++;
       } else {
         count++;
@@ -2585,7 +2674,9 @@ async function importExtratoXlsx(event) {
 
     await loadData();
     renderExtrato();
-    alert(count + ' lancamento(s) do extrato importado(s) com sucesso!' + (erros ? ' ' + erros + ' falharam.' : ''));
+    alert(count + ' lancamento(s) do extrato importado(s) com sucesso!'
+      + (duplicados.length ? ' ' + (duplicados.length - duplicadosSelecionados.length) + ' duplicado(s) ignorado(s).' : '')
+      + (erros ? ' ' + erros + ' falharam.' : ''));
   };
 
   reader.readAsArrayBuffer(file);

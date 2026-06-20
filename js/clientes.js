@@ -60,6 +60,7 @@ async function refreshClientsFromSupabase() {
 
 function clearActiveClientView() {
   activeClient = null;
+  if (typeof syncWorkspaceUrlState === 'function') syncWorkspaceUrlState();
   document.getElementById('clientTitle').textContent = 'Selecione um cliente';
   document.getElementById('toggleAvatar').style.display = 'none';
   document.getElementById('toggleLabel').textContent = 'Selecionar cliente...';
@@ -378,6 +379,7 @@ function selectClient(id) {
   activeClient = id;
   localStorage.setItem(activeClientStorageKey(), id);
   localStorage.setItem('fb_activeClient', id);
+  if (typeof syncWorkspaceUrlState === 'function') syncWorkspaceUrlState();
 
   document.getElementById('clientDropdownMenu').classList.remove('open');
   document.getElementById('clientDropdownToggle').classList.remove('open');
