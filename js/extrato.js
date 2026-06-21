@@ -2791,6 +2791,7 @@ function extratoConciliacaoOptionsHtml(natureza, selecionadoId) {
 
 function refreshOpenExtratoConciliationOptions() {
   var select = document.getElementById('ex-conciliar-titulo');
+  var selects = Array.from(document.querySelectorAll('.ex-conciliar-titulo'));
   var orcamentoInput = document.getElementById('ex-conciliar-orcamento-busca');
   var orcamentoIdInput = document.getElementById('ex-conciliar-orcamento-linha');
   if (!select && !orcamentoInput) return;
@@ -2803,13 +2804,11 @@ function refreshOpenExtratoConciliationOptions() {
   if (!lanc) return;
 
   var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
-  if (select) {
-    var selecionadoId = select.value || '';
-    select.innerHTML = extratoConciliacaoOptionsHtml(natureza, selecionadoId);
-    if (selecionadoId && Array.from(select.options).some(function(option) { return option.value === selecionadoId; })) {
-      select.value = selecionadoId;
-    }
-  }
+  selects.forEach(function(itemSelect) {
+    var selecionadoId = itemSelect.value || '';
+    itemSelect.innerHTML = extratoConciliacaoOptionsHtml(natureza, selecionadoId);
+    if (selecionadoId && Array.from(itemSelect.options).some(function(option) { return option.value === selecionadoId; })) itemSelect.value = selecionadoId;
+  });
   if (orcamentoInput && orcamentoIdInput) {
     var linhaSelecionada = extratoOrcamentoLinhasConciliacao(natureza, '').find(function(linha) {
       return linha.id === orcamentoIdInput.value;
@@ -2821,7 +2820,7 @@ function refreshOpenExtratoConciliationOptions() {
     }
     filtrarExtratoOrcamentoLinhas();
   }
-  var restante = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
+  var restante = restanteConciliacaoEmCentavos(lanc) / 100;
   syncExtratoConciliacaoValor(restante);
   syncExtratoOrcamentoConciliacaoValor(restante);
 }
@@ -3011,7 +3010,7 @@ function syncExtratoOrcamentoConciliacaoValor(restante) {
 
 function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
   if (!sugestoes.length) return '';
-  return '<div class="conciliation-section">'
+  return '<div class="conciliation-section conciliation-suggestion-section">'
     + '<div class="conciliation-section-head"><div><h5>Sugestoes de conciliacao</h5><p>Titulos mais provaveis pelo valor, nome e descricao.</p></div></div>'
     + '<div class="conciliation-suggestions">'
     + sugestoes.map(function(item) {
@@ -3031,17 +3030,68 @@ function syncExtratoConciliacaoValor(lancamentoValor) {
   var select = document.getElementById('ex-conciliar-titulo');
   var valorInput = document.getElementById('ex-conciliar-valor');
   if (!select || !valorInput) return;
+  syncExtratoConciliacaoLinha(select, lancamentoValor);
+}
+
+function syncExtratoConciliacaoLinha(select, lancamentoValor) {
+  var linha = select && select.closest ? select.closest('.ex-conciliar-linha') : null;
+  var valorInput = linha ? linha.querySelector('.ex-conciliar-valor') : document.getElementById('ex-conciliar-valor');
+  if (!select || !valorInput) return;
   var option = select.options[select.selectedIndex];
   var saldo = option ? Number(option.dataset.saldo || 0) : 0;
-  var restante = Number(lancamentoValor || 0);
+  var distribuidoOutras = Array.from(document.querySelectorAll('.ex-conciliar-linha')).reduce(function(total, item) {
+    if (item === linha) return total;
+    return total + valorMonetarioEmCentavos(parseMoney(item.querySelector('.ex-conciliar-valor')));
+  }, 0);
+  var restante = Math.max(0, valorMonetarioEmCentavos(lancamentoValor) - distribuidoOutras) / 100;
   if (!saldo || !restante) {
     valorInput.value = '0,00';
     valorInput.dataset.cents = '0';
+    atualizarResumoDistribuicaoConciliacao(lancamentoValor);
     return;
   }
   var alvo = Math.min(saldo, restante);
   valorInput.value = Number(alvo).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   valorInput.dataset.cents = String(Math.round(alvo * 100));
+  atualizarResumoDistribuicaoConciliacao(lancamentoValor);
+}
+
+function extratoConciliacaoLinhaHtml(natureza, restante, tituloId, primeira) {
+  return '<div class="ex-conciliar-linha">'
+    + '<div class="form-group"><label>Conta para conciliar</label><select ' + (primeira ? 'id="ex-conciliar-titulo" ' : '') + 'class="ex-conciliar-titulo" onchange="syncExtratoConciliacaoLinha(this,' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloId || '') + '</select></div>'
+    + '<div class="form-group"><label>Valor da baixa</label><input type="text" ' + (primeira ? 'id="ex-conciliar-valor" ' : '') + 'class="money-input ex-conciliar-valor" value="0,00"/></div>'
+    + '<button class="btn-icon danger" type="button" title="Remover titulo" onclick="removerLinhaConciliacaoExtrato(this,' + Number(restante || 0) + ')"' + (primeira ? ' style="visibility:hidden"' : '') + '>&#128465;</button>'
+    + '</div>';
+}
+
+function adicionarLinhaConciliacaoExtrato(natureza, restante) {
+  var container = document.getElementById('ex-conciliar-linhas');
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', extratoConciliacaoLinhaHtml(natureza, restante, '', false));
+  var linha = container.lastElementChild;
+  initMoneyInputs(linha);
+  var valorInput = linha.querySelector('.ex-conciliar-valor');
+  if (valorInput) valorInput.addEventListener('input', function() { atualizarResumoDistribuicaoConciliacao(restante); });
+  var select = linha.querySelector('.ex-conciliar-titulo');
+  if (select) select.focus();
+  atualizarResumoDistribuicaoConciliacao(restante);
+}
+
+function removerLinhaConciliacaoExtrato(botao, restante) {
+  var linha = botao && botao.closest ? botao.closest('.ex-conciliar-linha') : null;
+  if (linha) linha.remove();
+  atualizarResumoDistribuicaoConciliacao(restante);
+}
+
+function atualizarResumoDistribuicaoConciliacao(restante) {
+  var totalCentavos = Array.from(document.querySelectorAll('.ex-conciliar-linha .ex-conciliar-valor')).reduce(function(total, input) {
+    return total + valorMonetarioEmCentavos(parseMoney(input));
+  }, 0);
+  var restanteCentavos = valorMonetarioEmCentavos(restante);
+  var resumo = document.getElementById('ex-conciliar-distribuicao-resumo');
+  if (!resumo) return;
+  resumo.textContent = 'Distribuido ' + fmt(totalCentavos / 100) + ' de ' + fmt(restanteCentavos / 100);
+  resumo.style.color = totalCentavos > restanteCentavos ? 'var(--danger)' : 'var(--text-muted)';
 }
 
 function openExtratoConciliacaoModal(i) {
@@ -3054,7 +3104,7 @@ function openExtratoConciliacaoModal(i) {
   var naturezaLabel = natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
   var acaoLabel = natureza === 'receber' ? 'Conciliar recebimento' : 'Conciliar pagamento';
   var conciliado = valorConciliadoDoLancamento(lanc);
-  var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var restante = restanteConciliacaoEmCentavos(lanc) / 100;
   var sugestoes = extratoSugestoesConciliacao(lanc, natureza, restante);
   var tituloSugeridoId = sugestoes.length ? sugestoes[0].id : '';
   var baixas = baixasFinanceirasDoLancamento(lanc);
@@ -3119,7 +3169,7 @@ function openExtratoConciliacaoModal(i) {
   var naturezaLabel = natureza === 'receber' ? 'Conta a receber' : 'Conta a pagar';
   var acaoLabel = natureza === 'receber' ? 'Conciliar recebimento' : 'Conciliar pagamento';
   var conciliado = valorConciliadoDoLancamento(lanc);
-  var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var restante = restanteConciliacaoEmCentavos(lanc) / 100;
   var sugestoes = extratoSugestoesConciliacao(lanc, natureza, restante);
   var tituloSugeridoId = sugestoes.length ? sugestoes[0].id : '';
   var baixas = baixasFinanceirasDoLancamento(lanc);
@@ -3168,7 +3218,7 @@ function openExtratoConciliacaoModal(i) {
       + '</div>'
       + extratoConciliacaoCategoriasHtml(lanc)
       + extratoSugestoesConciliacaoHtml(sugestoes, restante)
-      + '<div class="conciliation-section">'
+      + '<div class="conciliation-section conciliation-budget-section">'
         + '<div class="conciliation-section-head"><div><h5>Realizar pelo orcamento</h5><p>Atualize o realizado do evento agora e gere uma unica conta somente quando confirmar a linha.</p></div></div>'
         + realizacoesOrcamentoHtml
         + (restante > 0 ? '<div class="form-row" style="margin-top:16px">'
@@ -3182,27 +3232,32 @@ function openExtratoConciliacaoModal(i) {
           + '</div><div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-conciliar-orcamento-obs" placeholder="Ex.: segunda parcela do fornecedor"/></div></div>'
           + '<div class="conciliation-actions"><button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoComOrcamento(' + i + ')">Conciliar com orcamento</button></div>' : '')
       + '</div>'
-      + '<div class="conciliation-section">'
-        + '<div class="conciliation-section-head"><div><h5>Baixas conciliadas</h5><p>Vincule este lancamento a uma conta financeira ja gerada ou vinculada ao orcamento.</p></div></div>'
+      + '<div class="conciliation-section conciliation-accounts-section">'
+        + '<div class="conciliation-section-head"><div><h5>Distribuir entre contas</h5><p>Use uma ou mais contas financeiras e informe quanto deste lancamento pertence a cada uma.</p></div>'
+          + (restante > 0 ? '<button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar titulo</button>' : '')
+        + '</div>'
         + baixasHtml
-        + '<div class="form-row" style="margin-top:16px">'
-          + '<div class="form-group"><label>Conta para conciliar</label><select id="ex-conciliar-titulo" data-lancamento-id="' + esc(lanc.id) + '" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+        + (restante > 0 ? '<div id="ex-conciliar-linhas" data-lancamento-id="' + esc(lanc.id) + '" class="conciliation-allocation-list">'
+          + extratoConciliacaoLinhaHtml(natureza, restante, tituloSugeridoId, true)
         + '</div>'
-        + '<div class="form-row">'
-          + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
-          + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: recebimento parcial, pagamento fornecedor"/></div>'
-        + '</div>'
+        + '<div class="conciliation-allocation-footer"><span id="ex-conciliar-distribuicao-resumo"></span><button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar outro titulo</button></div>'
+        + '<div class="form-group" style="margin-top:12px"><label>Observacao geral</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: pagamento dividido entre fornecedores"/></div>' : '')
         + '<div class="conciliation-actions">'
           + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
-          + '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLancamento(' + i + ')">' + acaoLabel + '</button>'
+          + (restante > 0 ? '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLancamento(' + i + ')">' + acaoLabel + '</button>' : '')
         + '</div>'
       + '</div>'
     + '</div>';
 
   document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('modalOverlay').querySelector('.modal').classList.add('modal-wide');
   document.addEventListener('keydown', handleMainModalEscape);
   initMoneyInputs(document.getElementById('modalBody'));
+  document.querySelectorAll('.ex-conciliar-valor').forEach(function(input) {
+    input.addEventListener('input', function() { atualizarResumoDistribuicaoConciliacao(restante); });
+  });
   syncExtratoConciliacaoValor(restante);
+  atualizarResumoDistribuicaoConciliacao(restante);
   syncExtratoOrcamentoConciliacaoValor(restante);
 }
 
@@ -3299,41 +3354,51 @@ async function conciliarExtratoLancamento(i) {
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
 
-  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
-  var tituloId = ((document.getElementById('ex-conciliar-titulo') || {}).value) || '';
-  var valor = parseMoney(document.getElementById('ex-conciliar-valor'));
   var observacao = ((document.getElementById('ex-conciliar-obs') || {}).value || '').trim();
-
-  if (!tituloId) return alert('Selecione uma conta para conciliar. Se ela veio do orcamento, gere a conta pela linha do orcamento primeiro.');
-  if (!valor || valor <= 0) return alert('Informe um valor de baixa maior que zero.');
-
-  var valorCentavos = valorMonetarioEmCentavos(valor);
-  var restanteLancAntesCentavos = restanteConciliacaoEmCentavos(lanc);
-  if (valorCentavos > restanteLancAntesCentavos) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
-  valor = valorCentavos / 100;
-
   if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
-  var titulo = tfFindTituloById(tituloId);
-  if (!titulo) return alert('Título não encontrado.');
 
-  var saldoTituloCentavos = valorMonetarioEmCentavos(tfSaldo(titulo));
+  var distribuicoesPorTitulo = Array.from(document.querySelectorAll('.ex-conciliar-linha')).reduce(function(mapa, linha) {
+    var tituloId = ((linha.querySelector('.ex-conciliar-titulo') || {}).value || '').trim();
+    var valorCentavos = valorMonetarioEmCentavos(parseMoney(linha.querySelector('.ex-conciliar-valor')));
+    if (tituloId && valorCentavos > 0) mapa[tituloId] = (mapa[tituloId] || 0) + valorCentavos;
+    return mapa;
+  }, {});
+  var distribuicoes = Object.keys(distribuicoesPorTitulo).map(function(tituloId) {
+    return { tituloId: tituloId, valorCentavos: distribuicoesPorTitulo[tituloId] };
+  });
+  if (!distribuicoes.length) return alert('Adicione ao menos uma conta com valor maior que zero.');
+
+  var totalCentavos = distribuicoes.reduce(function(total, item) { return total + item.valorCentavos; }, 0);
   var restanteLancCentavos = restanteConciliacaoEmCentavos(lanc);
-  if (valorCentavos > saldoTituloCentavos) return alert('O valor informado ultrapassa o saldo do título.');
-  if (valorCentavos > restanteLancCentavos) return alert('O valor informado ultrapassa o restante disponível deste lançamento.');
+  if (totalCentavos > restanteLancCentavos) return alert('A soma distribuida ultrapassa o restante disponivel deste lancamento.');
 
-  var response = await supabaseClient
-    .from('titulos_financeiros_baixas')
-    .insert([Object.assign({
-      titulo_id: tituloId,
+  var titulos = {};
+  for (var d = 0; d < distribuicoes.length; d++) {
+    var distribuicao = distribuicoes[d];
+    var titulo = tfFindTituloById(distribuicao.tituloId);
+    if (!titulo) return alert('Um dos titulos selecionados nao foi encontrado. Atualize a pagina e tente novamente.');
+    if (distribuicao.valorCentavos > valorMonetarioEmCentavos(tfSaldo(titulo))) {
+      return alert('O valor de ' + (titulo.pessoaNome || titulo.descricao || 'um titulo') + ' ultrapassa o saldo disponivel.');
+    }
+    titulos[distribuicao.tituloId] = titulo;
+  }
+
+  var payload = distribuicoes.map(function(item) {
+    return Object.assign({
+      titulo_id: item.tituloId,
       cliente_id: activeClient,
       data_baixa: lanc.data || new Date().toISOString().slice(0, 10),
-      valor: Number(valor),
+      valor: item.valorCentavos / 100,
       observacao: observacao || ('Conciliado pelo extrato: ' + (lanc.descOriginal || lanc.desc || '')),
       origem: 'extrato',
       extrato_lancamento_id: lanc.id
-    }, getUserScopePayload())])
-    .select()
-    .single();
+    }, getUserScopePayload());
+  });
+
+  var response = await supabaseClient
+    .from('titulos_financeiros_baixas')
+    .insert(payload)
+    .select();
 
   if (response.error) {
     console.error(response.error);
@@ -3341,15 +3406,19 @@ async function conciliarExtratoLancamento(i) {
     return;
   }
 
-  if (!Array.isArray(titulo.baixas)) titulo.baixas = [];
-  titulo.baixas.push({
-    id: response.data.id,
-    data: response.data.data_baixa || null,
-    valor: Number(response.data.valor || 0),
-    observacao: response.data.observacao || '',
-    origem: response.data.origem || 'extrato',
-    lancamentoId: response.data.extrato_lancamento_id || null,
-    userId: response.data.user_id || null
+  (response.data || []).forEach(function(baixa) {
+    var titulo = titulos[baixa.titulo_id];
+    if (!titulo) return;
+    if (!Array.isArray(titulo.baixas)) titulo.baixas = [];
+    titulo.baixas.push({
+      id: baixa.id,
+      data: baixa.data_baixa || null,
+      valor: Number(baixa.valor || 0),
+      observacao: baixa.observacao || '',
+      origem: baixa.origem || 'extrato',
+      lancamentoId: baixa.extrato_lancamento_id || null,
+      userId: baixa.user_id || null
+    });
   });
 
   closeModal();
