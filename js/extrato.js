@@ -991,6 +991,17 @@ function valorConciliadoDoLancamento(lanc) {
   return tfValorConciliadoLancamento(lanc.id, naturezaFinanceiraDoExtrato(lanc.tipo || 'credito'));
 }
 
+function valorMonetarioEmCentavos(valor) {
+  return Math.round(Number(valor || 0) * 100);
+}
+
+function restanteConciliacaoEmCentavos(lanc) {
+  return Math.max(
+    0,
+    valorMonetarioEmCentavos(lanc && lanc.valor) - valorMonetarioEmCentavos(valorConciliadoDoLancamento(lanc))
+  );
+}
+
 function resumoConciliacaoLancamento(lanc) {
   var baixas = baixasFinanceirasDoLancamento(lanc);
   var realizacoes = typeof tfOrcamentoRealizacoesLancamento === 'function'
@@ -998,7 +1009,7 @@ function resumoConciliacaoLancamento(lanc) {
     : [];
   if (!baixas.length && !realizacoes.length) return '';
   var conciliado = valorConciliadoDoLancamento(lanc);
-  var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
+  var restante = restanteConciliacaoEmCentavos(lanc) / 100;
   var somenteOrcamento = realizacoes.length && !baixas.length;
   var prefixo = somenteOrcamento
     ? (restante > 0 ? 'Orcamento parcial' : 'Orcamento conciliado')
@@ -3211,8 +3222,10 @@ async function conciliarExtratoComOrcamento(i) {
   var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
   if (!linha || linha.natureza !== (natureza === 'receber' ? 'receita' : 'despesa')) return alert('A linha selecionada nao corresponde ao tipo deste lancamento.');
 
-  var restante = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
-  if (valor > restante) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+  var valorCentavos = valorMonetarioEmCentavos(valor);
+  var restanteCentavos = restanteConciliacaoEmCentavos(lanc);
+  if (valorCentavos > restanteCentavos) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+  valor = valorCentavos / 100;
 
   var titulosVinculados = typeof tfTitulosPorOrcamentoLinha === 'function'
     ? tfTitulosPorOrcamentoLinha(linha.id).filter(function(titulo) { return typeof tfSaldo !== 'function' || tfSaldo(titulo) > 0; })
@@ -3294,17 +3307,19 @@ async function conciliarExtratoLancamento(i) {
   if (!tituloId) return alert('Selecione uma conta para conciliar. Se ela veio do orcamento, gere a conta pela linha do orcamento primeiro.');
   if (!valor || valor <= 0) return alert('Informe um valor de baixa maior que zero.');
 
-  var restanteLancAntes = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
-  if (valor > restanteLancAntes) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+  var valorCentavos = valorMonetarioEmCentavos(valor);
+  var restanteLancAntesCentavos = restanteConciliacaoEmCentavos(lanc);
+  if (valorCentavos > restanteLancAntesCentavos) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+  valor = valorCentavos / 100;
 
   if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
   var titulo = tfFindTituloById(tituloId);
   if (!titulo) return alert('Título não encontrado.');
 
-  var saldoTitulo = tfSaldo(titulo);
-  var restanteLanc = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
-  if (valor > saldoTitulo) return alert('O valor informado ultrapassa o saldo do título.');
-  if (valor > restanteLanc) return alert('O valor informado ultrapassa o restante disponível deste lançamento.');
+  var saldoTituloCentavos = valorMonetarioEmCentavos(tfSaldo(titulo));
+  var restanteLancCentavos = restanteConciliacaoEmCentavos(lanc);
+  if (valorCentavos > saldoTituloCentavos) return alert('O valor informado ultrapassa o saldo do título.');
+  if (valorCentavos > restanteLancCentavos) return alert('O valor informado ultrapassa o restante disponível deste lançamento.');
 
   var response = await supabaseClient
     .from('titulos_financeiros_baixas')
