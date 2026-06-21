@@ -204,6 +204,8 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .conciliation-allocation-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
 .ex-conciliar-linha{display:grid;grid-template-columns:minmax(220px,1fr) 150px 38px;gap:10px;align-items:end;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
 .ex-conciliar-linha .form-group{margin:0;min-width:0}
+.ex-conciliar-orcamento-linha{display:grid;grid-template-columns:minmax(210px,1fr) 140px 38px;gap:10px;align-items:end;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.ex-conciliar-orcamento-linha .form-group{margin:0;min-width:0}
 .conciliation-allocation-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
 .conciliation-allocation-footer span{font-size:.78rem;color:var(--muted);font-weight:700}
 .settings-note-box{margin-top:14px;padding:12px;background:var(--surface);border-radius:10px;border:1px solid var(--border)}
@@ -969,6 +971,8 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .conciliation-actions .btn-sm,.conciliation-actions .btn-add{width:100%;min-height:42px}
   .ex-conciliar-linha{grid-template-columns:1fr 38px}
   .ex-conciliar-linha .form-group:first-child{grid-column:1/-1}
+  .ex-conciliar-orcamento-linha{grid-template-columns:1fr 38px}
+  .ex-conciliar-orcamento-linha .form-group:first-child{grid-column:1/-1}
   .conciliation-allocation-footer{align-items:stretch;flex-direction:column}
   .modal-tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
   .modal-tabs::-webkit-scrollbar{display:none}
