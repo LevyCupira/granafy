@@ -1785,6 +1785,89 @@ function tfStatusResumoLabel(item) {
   return tfStatusLabel(tfStatusOf(item));
 }
 
+async function tfIncorporarRealizacoesOrcamento(tituloId) {
+  if (!canEditActiveClient()) return alert('Este cliente esta disponivel apenas para visualizacao.');
+  var titulo = tfFindTituloById(tituloId);
+  if (!titulo || !titulo.orcamentoLinhaId) return alert('Esta conta nao esta vinculada a uma linha do orcamento.');
+  var linha = tfOrcamentoLinhaById(titulo.orcamentoLinhaId);
+  var realizacoes = tfOrcamentoRealizacoesLinha(titulo.orcamentoLinhaId);
+  if (!realizacoes.length) return alert('Nao ha realizacoes do orcamento pendentes para incorporar.');
+
+  var lancamentosJaBaixados = new Set((titulo.baixas || []).map(function(baixa) { return baixa.lancamentoId; }).filter(Boolean));
+  var novasRealizacoes = realizacoes.filter(function(item) { return !item.lancamentoId || !lancamentosJaBaixados.has(item.lancamentoId); });
+  var valorIncorporar = novasRealizacoes.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
+  var totalBaixadoAtual = tfTotalBaixado(titulo);
+  var totalOriginal = Number(titulo.valorTotal || 0);
+  var totalFinal = Math.max(totalOriginal, totalBaixadoAtual + valorIncorporar);
+
+  var ok = await appConfirm(
+    'Incorporar ' + fmt(valorIncorporar) + ' realizado pelo orcamento na conta ' + (titulo.descricao || titulo.pessoaNome || '') + '?'
+      + (totalFinal > totalOriginal ? ' O total da conta sera atualizado para ' + fmt(totalFinal) + '.' : ''),
+    { title: 'Incorporar realizacoes', confirmText: 'Incorporar' }
+  );
+  if (!ok) return;
+
+  if (totalFinal !== totalOriginal) {
+    var totalResponse = await applyUserScope(
+      supabaseClient.from('titulos_financeiros').update({ valor_total: totalFinal }).eq('id', titulo.id)
+    );
+    if (totalResponse.error) {
+      console.error('Erro ao ajustar total da conta:', totalResponse.error);
+      alert('Nao foi possivel ajustar o valor total da conta.');
+      return;
+    }
+  }
+
+  var baixasInseridas = [];
+  if (novasRealizacoes.length) {
+    var payload = novasRealizacoes.map(function(item) {
+      return Object.assign({
+        titulo_id: titulo.id,
+        cliente_id: activeClient,
+        data_baixa: item.data || new Date().toISOString().slice(0, 10),
+        valor: Number(item.valor || 0),
+        observacao: item.observacao || ('Incorporado do orcamento: ' + ((linha && linha.categoria) || '')),
+        origem: 'extrato',
+        extrato_lancamento_id: item.lancamentoId || null
+      }, getUserScopePayload());
+    });
+    var baixasResponse = await supabaseClient.from('titulos_financeiros_baixas').insert(payload).select();
+    if (baixasResponse.error) {
+      console.error('Erro ao incorporar realizacoes:', baixasResponse.error);
+      if (totalFinal !== totalOriginal) await applyUserScope(supabaseClient.from('titulos_financeiros').update({ valor_total: totalOriginal }).eq('id', titulo.id));
+      alert('Nao foi possivel incorporar os valores. As realizacoes continuam preservadas no orcamento.');
+      return;
+    }
+    baixasInseridas = baixasResponse.data || [];
+  }
+
+  var realizacoesIds = realizacoes.map(function(item) { return item.id; });
+  var remocaoResponse = await applyUserScope(
+    supabaseClient.from('orcamento_eventos_realizacoes').delete().in('id', realizacoesIds)
+  );
+  if (remocaoResponse.error) {
+    console.error('Erro ao concluir incorporacao:', remocaoResponse.error);
+    if (baixasInseridas.length) {
+      await applyUserScope(supabaseClient.from('titulos_financeiros_baixas').delete().in('id', baixasInseridas.map(function(item) { return item.id; })));
+    }
+    if (totalFinal !== totalOriginal) await applyUserScope(supabaseClient.from('titulos_financeiros').update({ valor_total: totalOriginal }).eq('id', titulo.id));
+    alert('A incorporacao nao foi concluida. Nenhum valor foi perdido.');
+    return;
+  }
+
+  if (linha) {
+    var totalDepois = totalBaixadoAtual + valorIncorporar;
+    await supabaseClient.from('orcamento_eventos_linhas').update({
+      valor_previsto: totalFinal,
+      status: totalDepois >= totalFinal ? 'realizado' : 'contratado'
+    }).eq('id', linha.id);
+  }
+
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'realizacoes_orcamento_incorporadas');
+  await loadData();
+  renderFinanceiro();
+}
+
 function tfTituloCardHtml(item) {
   var status = tfStatusOf(item);
   var saldo = tfSaldo(item);
@@ -1794,6 +1877,8 @@ function tfTituloCardHtml(item) {
   var centro = item.centroCusto || tfNomeCentroCustoById(item.centroCustoId || null);
   var evento = item.evento || tfNomeEventoById(item.eventoId || null);
   var linhaOrcamento = tfOrcamentoLinhaById(item.orcamentoLinhaId || '');
+  var realizacoesOrcamento = item.orcamentoLinhaId ? tfOrcamentoRealizacoesLinha(item.orcamentoLinhaId) : [];
+  var valorRealizacoesOrcamento = realizacoesOrcamento.reduce(function(sum, realizacao) { return sum + Number(realizacao.valor || 0); }, 0);
   var bulk = tfEventosEnabled()
     ? '<label class="tf-title-select" title="Selecionar para alterar evento em lote"><input type="checkbox" value="' + esc(item.id) + '"' + (_tfBulkSelected.has(item.id) ? ' checked' : '') + ' onchange="tfToggleBulkTitulo(\'' + item.id + '\', this.checked)"/><span></span></label>'
     : '';
@@ -1809,6 +1894,7 @@ function tfTituloCardHtml(item) {
         + '<span>Vence ' + esc(formatDate(item.vencimento)) + '</span>'
         + (tfEventosEnabled() ? (evento ? '<span>' + esc(evento) + '</span>' : '<span>Sem ' + esc(tfEventosLabel().toLowerCase()) + '</span>') : '')
         + (linhaOrcamento ? '<span>Orcamento: ' + esc(linhaOrcamento.categoria || '-') + '</span>' : '')
+        + (realizacoesOrcamento.length ? '<span>Orcamento pendente: ' + esc(fmt(valorRealizacoesOrcamento)) + '</span>' : '')
         + (item.natureza === 'pagar' ? (centro ? '<span>' + esc(centro) + '</span>' : '<span>Sem centro</span>') : '')
         + (item.observacao ? '<span>' + esc(item.observacao) + '</span>' : '')
       + '</div>'
@@ -1820,6 +1906,7 @@ function tfTituloCardHtml(item) {
       + '<div class="tf-title-progress"><span style="width:' + pct + '%"></span></div>'
     + '</div>'
     + '<div class="tf-title-actions">'
+      + (realizacoesOrcamento.length ? '<button class="btn-sm" type="button" onclick="tfIncorporarRealizacoesOrcamento(\'' + item.id + '\')" title="Transformar o realizado do orcamento em baixa desta conta">Incorporar ' + esc(fmt(valorRealizacoesOrcamento)) + '</button>' : '')
       + '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\')" title="Ver e editar os dados do titulo">Ver/editar</button>'
       + (saldo > 0 ? '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\', \'baixa\')" title="Registrar uma baixa neste titulo">' + (item.natureza === 'receber' ? 'Registrar recebimento' : 'Registrar pagamento') + '</button>' : '')
       + '<button class="btn-icon danger" type="button" onclick="tfDeleteTitulo(\'' + item.id + '\')" title="Excluir titulo">&#128465;</button>'
