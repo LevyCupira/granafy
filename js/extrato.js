@@ -2780,22 +2780,34 @@ function extratoConciliacaoOptionsHtml(natureza, selecionadoId) {
 
 function refreshOpenExtratoConciliationOptions() {
   var select = document.getElementById('ex-conciliar-titulo');
-  if (!select) return;
-  var lancamentoId = String(select.dataset.lancamentoId || '');
+  var orcamentoSelect = document.getElementById('ex-conciliar-orcamento-linha');
+  if (!select && !orcamentoSelect) return;
+  var referencia = select || orcamentoSelect;
+  var lancamentoId = String(referencia.dataset.lancamentoId || '');
   var cliente = data && data.clients ? data.clients[activeClient] : null;
   var lanc = cliente && Array.isArray(cliente.extrato)
     ? cliente.extrato.find(function(item) { return String(item.id || '') === lancamentoId; })
     : null;
   if (!lanc) return;
 
-  var selecionadoId = select.value || '';
   var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
-  select.innerHTML = extratoConciliacaoOptionsHtml(natureza, selecionadoId);
-  if (selecionadoId && Array.from(select.options).some(function(option) { return option.value === selecionadoId; })) {
-    select.value = selecionadoId;
+  if (select) {
+    var selecionadoId = select.value || '';
+    select.innerHTML = extratoConciliacaoOptionsHtml(natureza, selecionadoId);
+    if (selecionadoId && Array.from(select.options).some(function(option) { return option.value === selecionadoId; })) {
+      select.value = selecionadoId;
+    }
+  }
+  if (orcamentoSelect) {
+    var orcamentoSelecionadoId = orcamentoSelect.value || '';
+    orcamentoSelect.innerHTML = extratoOrcamentoConciliacaoOptionsHtml(natureza);
+    if (orcamentoSelecionadoId && Array.from(orcamentoSelect.options).some(function(option) { return option.value === orcamentoSelecionadoId; })) {
+      orcamentoSelect.value = orcamentoSelecionadoId;
+    }
   }
   var restante = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
   syncExtratoConciliacaoValor(restante);
+  syncExtratoOrcamentoConciliacaoValor(restante);
 }
 
 function extratoTextoNormalizadoConciliacao(value) {
@@ -2920,10 +2932,11 @@ function extratoOrcamentoConciliacaoOptionsHtml(natureza) {
     if (!linha || linha.natureza !== naturezaOrcamento || linha.status === 'cancelado') return false;
     return typeof tfTitulosPorOrcamentoLinha !== 'function' || !tfTitulosPorOrcamentoLinha(linha.id).length;
   }).sort(function(a, b) {
+    var porCategoria = String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
+    if (porCategoria) return porCategoria;
     var eventoA = typeof tfNomeEventoById === 'function' ? tfNomeEventoById(a.eventoId) : '';
     var eventoB = typeof tfNomeEventoById === 'function' ? tfNomeEventoById(b.eventoId) : '';
-    var porEvento = String(eventoA || '').localeCompare(String(eventoB || ''), 'pt-BR', { sensitivity: 'base' });
-    return porEvento || String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
+    return String(eventoA || '').localeCompare(String(eventoB || ''), 'pt-BR', { sensitivity: 'base' });
   });
   if (!linhas.length) return '<option value="">Sem linhas de orcamento disponiveis</option>';
   return '<option value="">Selecione uma linha do orcamento</option>' + linhas.map(function(linha) {
@@ -3104,7 +3117,7 @@ function openExtratoConciliacaoModal(i) {
         + '<div class="conciliation-section-head"><div><h5>Realizar pelo orcamento</h5><p>Atualize o realizado do evento agora e gere uma unica conta somente quando confirmar a linha.</p></div></div>'
         + realizacoesOrcamentoHtml
         + (restante > 0 ? '<div class="form-row" style="margin-top:16px">'
-          + '<div class="form-group"><label>Linha do orcamento</label><select id="ex-conciliar-orcamento-linha">' + extratoOrcamentoConciliacaoOptionsHtml(natureza) + '</select></div>'
+          + '<div class="form-group"><label>Linha do orcamento</label><select id="ex-conciliar-orcamento-linha" data-lancamento-id="' + esc(lanc.id) + '">' + extratoOrcamentoConciliacaoOptionsHtml(natureza) + '</select></div>'
           + '<div class="form-group" style="max-width:170px"><label>Valor realizado</label><input type="text" id="ex-conciliar-orcamento-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
           + '</div><div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-conciliar-orcamento-obs" placeholder="Ex.: segunda parcela do fornecedor"/></div></div>'
           + '<div class="conciliation-actions"><button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoComOrcamento(' + i + ')">Conciliar com orcamento</button></div>' : '')

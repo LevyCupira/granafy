@@ -829,9 +829,9 @@ function tfOrcamentoOptionsHtml(naturezaTitulo, eventoId, selectedId, includeEmp
     if (eventoId && linha.eventoId !== eventoId) return false;
     return true;
   }).sort(function(a, b) {
-    var evComp = String(tfNomeEventoById(a.eventoId) || '').localeCompare(String(tfNomeEventoById(b.eventoId) || ''), 'pt-BR', { sensitivity: 'base' });
-    if (evComp) return evComp;
-    return String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
+    var categoriaComp = String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
+    if (categoriaComp) return categoriaComp;
+    return String(tfNomeEventoById(a.eventoId) || '').localeCompare(String(tfNomeEventoById(b.eventoId) || ''), 'pt-BR', { sensitivity: 'base' });
   });
   return '<option value="">' + esc(includeEmptyLabel || 'Sem vinculo com orcamento') + '</option>' + linhas.map(function(linha) {
     return '<option value="' + esc(linha.id) + '"' + (linha.id === atual ? ' selected' : '') + '>' + esc(tfOrcamentoLabelLinha(linha)) + '</option>';
@@ -1150,6 +1150,7 @@ async function tfAddOrcamentoLinha() {
 
   tfUpdateLocalOrcamentoLinha(response.data);
   _tfOrcamentoEventoId = response.data.evento_id || _tfOrcamentoEventoId;
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'orcamento_linha_criada');
   renderFinanceiro();
 }
 
@@ -1184,6 +1185,7 @@ async function tfSaveOrcamentoLinha(id) {
 
   _tfOrcamentoLinhaEditId = null;
   tfUpdateLocalOrcamentoLinha(response.data);
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'orcamento_linha_editada');
   renderFinanceiro();
 }
 
@@ -1209,6 +1211,7 @@ async function tfDeleteOrcamentoLinha(id) {
 
   var cliente = tfClienteAtivo();
   if (cliente) cliente.orcamentoEventos = (cliente.orcamentoEventos || []).filter(function(item) { return item.id !== id; });
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'orcamento_linha_excluida');
   renderFinanceiro();
 }
 

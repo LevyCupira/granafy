@@ -2,10 +2,20 @@
 
 Backlog vivo do produto, organizado por prioridade e contexto operacional.
 
+## Padroes do produto
+
+### Listas dinamicas
+- Manter opcoes e cadastros em ordem alfabetica, priorizando o nome usado na tarefa principal
+- Refletir inclusoes, edicoes e exclusoes simultaneamente nas outras abas abertas
+- Preservar a selecao atual quando o item continuar disponivel
+- Remover imediatamente da selecao itens excluidos ou que deixaram de ser elegiveis
+- Expandir este comportamento gradualmente para todas as listas do sistema
+
 ## Revisao atual - 21/06/2026
 
 ### Pendencias prioritarias
 - [ ] Revisar redundancias entre Extrato, Financeiro, Eventos e Orcamento
+- [ ] Criar cadastro estruturado de clientes e fornecedores
 - [ ] Criar titulos recorrentes no Financeiro
 - [ ] Completar a auditoria financeira de conciliacoes, estornos, titulos, rateios e categorias
 - [ ] Criar fechamento de periodo com conferencia e bloqueio ou alerta de alteracoes
@@ -19,6 +29,24 @@ Backlog vivo do produto, organizado por prioridade e contexto operacional.
 - [ ] Refinar rateios com copia e sugestoes baseadas no historico
 - [ ] Sincronizacao em tempo real entre dispositivos pelo Supabase Realtime
 - [ ] Concluir os fluxos de governanca e direitos previstos no plano de LGPD
+
+### Cadastro de clientes e fornecedores
+- Criar uma base unica de pessoas e empresas vinculadas a cada cliente PJ
+- Permitir classificar o cadastro como:
+  - cliente
+  - fornecedor
+  - cliente e fornecedor
+- Armazenar nome, nome fantasia, documento, contatos, dados bancarios e observacoes
+- Reaproveitar o cadastro em:
+  - Contas a Receber
+  - Contas a Pagar
+  - Orcamento de eventos
+  - conciliacao do Extrato
+  - importacoes e relatorios
+- Evitar duplicidades por documento e sugerir possiveis cadastros repetidos por nome
+- Manter historico mesmo quando o cadastro for inativado
+- Preparar importacao em lote por planilha
+- Avaliar migracao dos nomes livres existentes sem alterar o historico financeiro
 
 ### Funcionalidades ja operacionais ou parcialmente entregues
 - Painel de pendencias
@@ -173,9 +201,9 @@ Backlog vivo do produto, organizado por prioridade e contexto operacional.
 
 - Prioridade atual recomendada:
   1. Revisao de redundancias
-  2. Titulos recorrentes
-  3. Auditoria financeira completa
-  4. Fechamento de periodo
-  5. Cobertura automatizada dos fluxos criticos
+  2. Cadastro de clientes e fornecedores
+  3. Titulos recorrentes
+  4. Auditoria financeira completa
+  5. Fechamento de periodo
 
 - Este backlog deve ser revisado sempre que uma frente nova entrar em producao ou mudar de prioridade.
