@@ -2936,7 +2936,6 @@ function extratoOrcamentoLinhasConciliacao(natureza, termoBusca) {
   var termo = extratoTextoNormalizadoConciliacao(termoBusca || '');
   return tfOrcamentoLinhasCliente().filter(function(linha) {
     if (!linha || linha.natureza !== naturezaOrcamento || linha.status === 'cancelado') return false;
-    if (typeof tfTitulosPorOrcamentoLinha === 'function' && tfTitulosPorOrcamentoLinha(linha.id).length) return false;
     if (termo.length < 3) return true;
     var evento = typeof tfNomeEventoById === 'function' ? tfNomeEventoById(linha.eventoId) : '';
     var texto = extratoTextoNormalizadoConciliacao([evento, linha.categoria, linha.descricao, linha.pessoaNome].join(' '));
@@ -2953,9 +2952,10 @@ function extratoOrcamentoLinhasConciliacao(natureza, termoBusca) {
 function extratoOrcamentoLinhaConciliacaoLabel(linha) {
   var evento = typeof tfNomeEventoById === 'function' ? tfNomeEventoById(linha && linha.eventoId) : 'Sem evento';
   var realizado = typeof tfOrcamentoRealizadoLinha === 'function' ? tfOrcamentoRealizadoLinha(linha) : 0;
+  var temConta = typeof tfTitulosPorOrcamentoLinha === 'function' && tfTitulosPorOrcamentoLinha(linha && linha.id).length > 0;
   var detalhe = [linha && linha.descricao, linha && linha.pessoaNome].filter(Boolean).join(' - ');
   return (evento || 'Sem evento') + ' - ' + ((linha && linha.categoria) || '-')
-    + (detalhe ? ' - ' + detalhe : '') + ' (realizado ' + fmt(realizado) + ')';
+    + (detalhe ? ' - ' + detalhe : '') + ' (realizado ' + fmt(realizado) + (temConta ? ' - conta gerada' : '') + ')';
 }
 
 function extratoOrcamentoConciliacaoDatalistHtml(linhas) {
@@ -3210,12 +3210,32 @@ async function conciliarExtratoComOrcamento(i) {
   var linha = typeof tfOrcamentoLinhaById === 'function' ? tfOrcamentoLinhaById(linhaId) : null;
   var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
   if (!linha || linha.natureza !== (natureza === 'receber' ? 'receita' : 'despesa')) return alert('A linha selecionada nao corresponde ao tipo deste lancamento.');
-  if (typeof tfTitulosPorOrcamentoLinha === 'function' && tfTitulosPorOrcamentoLinha(linha.id).length) {
-    return alert('Esta linha ja foi confirmada no Financeiro. Concilie com a conta gerada.');
-  }
 
   var restante = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
   if (valor > restante) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+
+  var titulosVinculados = typeof tfTitulosPorOrcamentoLinha === 'function'
+    ? tfTitulosPorOrcamentoLinha(linha.id).filter(function(titulo) { return typeof tfSaldo !== 'function' || tfSaldo(titulo) > 0; })
+    : [];
+  if (titulosVinculados.length) {
+    if (titulosVinculados.length > 1) return alert('Esta linha possui mais de uma conta aberta. Selecione a conta especifica na secao Baixas conciliadas.');
+    var tituloSelect = document.getElementById('ex-conciliar-titulo');
+    var valorBaixaInput = document.getElementById('ex-conciliar-valor');
+    var observacaoBaixaInput = document.getElementById('ex-conciliar-obs');
+    if (!tituloSelect || !Array.from(tituloSelect.options).some(function(option) { return option.value === titulosVinculados[0].id; })) {
+      return alert('A conta vinculada a esta linha nao possui saldo disponivel para conciliacao.');
+    }
+    tituloSelect.value = titulosVinculados[0].id;
+    if (valorBaixaInput) {
+      valorBaixaInput.value = Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      valorBaixaInput.dataset.cents = String(Math.round(Number(valor) * 100));
+    }
+    if (observacaoBaixaInput && observacao) observacaoBaixaInput.value = observacao;
+    return conciliarExtratoLancamento(i);
+  }
+
+  var contasDaLinha = typeof tfTitulosPorOrcamentoLinha === 'function' ? tfTitulosPorOrcamentoLinha(linha.id) : [];
+  if (contasDaLinha.length) return alert('A conta vinculada a esta linha ja esta totalmente conciliada.');
 
   var response = await supabaseClient
     .from('orcamento_eventos_realizacoes')
