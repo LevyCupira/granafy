@@ -169,6 +169,17 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .conciliation-progress-grid div{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:11px 12px}
 .conciliation-progress-grid strong{display:block;margin-top:4px;font-size:.95rem;color:var(--text)}
 .conciliation-progress-grid .green{color:var(--success)}.conciliation-progress-grid .yellow{color:var(--warning)}
+.conciliation-classification{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
+.conciliation-classification-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}
+.conciliation-classification-head div{display:flex;flex-direction:column;gap:3px}
+.conciliation-classification-head span{font-size:.66rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.7px}
+.conciliation-classification-head strong{font-size:.94rem;color:var(--text)}
+.conciliation-classification-head small{font-size:.78rem;color:var(--muted);font-weight:700}
+.conciliation-category-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.conciliation-category-list div{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:9px 11px;min-width:0}
+.conciliation-category-list span{color:var(--text);font-size:.82rem;font-weight:600;overflow-wrap:anywhere}
+.conciliation-category-list strong{color:var(--accent3);font-size:.82rem;white-space:nowrap}
+.conciliation-classification p{margin-top:9px;color:var(--muted);font-size:.76rem;line-height:1.4}
 .conciliation-section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
 .conciliation-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
 .conciliation-section-head h5{font-size:.94rem;color:var(--text);margin-bottom:4px}
@@ -941,7 +952,7 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .modal-body{padding:16px;max-height:calc(92dvh - 56px)}
   .conciliation-hero{grid-template-columns:1fr}
   .conciliation-amount-box{align-items:flex-start;min-width:0}
-  .conciliation-progress-grid,.conciliation-suggestions{grid-template-columns:1fr}
+  .conciliation-progress-grid,.conciliation-suggestions,.conciliation-category-list{grid-template-columns:1fr}
   .conciliation-actions{display:grid;grid-template-columns:1fr;gap:8px}
   .conciliation-actions .btn-sm,.conciliation-actions .btn-add{width:100%;min-height:42px}
   .modal-tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}

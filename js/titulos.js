@@ -79,9 +79,16 @@ function tfBaixasPorLancamentoId(lancamentoId, natureza) {
 }
 
 function tfValorConciliadoLancamento(lancamentoId, natureza) {
-  return tfBaixasPorLancamentoId(lancamentoId, natureza).reduce(function(sum, item) {
+  var realizacoes = typeof tfOrcamentoRealizacoesLancamento === 'function'
+    ? tfOrcamentoRealizacoesLancamento(lancamentoId, natureza)
+    : [];
+  var linhasDiretas = new Set(realizacoes.map(function(item) { return item.orcamentoLinhaId; }).filter(Boolean));
+  var financeiro = tfBaixasPorLancamentoId(lancamentoId, natureza).reduce(function(sum, item) {
+    var titulo = tfFindTituloById(item.tituloId);
+    if (titulo && titulo.orcamentoLinhaId && linhasDiretas.has(titulo.orcamentoLinhaId)) return sum;
     return sum + Number(item.baixa.valor || 0);
   }, 0);
+  return financeiro + realizacoes.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
 }
 
 function tfNormalizeText(value) {
@@ -778,6 +785,31 @@ function tfTitulosPorOrcamentoLinha(linhaId) {
   return tfTitulosCliente().filter(function(item) { return item.orcamentoLinhaId === linhaId; });
 }
 
+function tfOrcamentoRealizacoesCliente() {
+  var cliente = tfClienteAtivo();
+  return cliente && Array.isArray(cliente.orcamentoRealizacoes) ? cliente.orcamentoRealizacoes : [];
+}
+
+function tfOrcamentoRealizacoesLinha(linhaId) {
+  if (!linhaId) return [];
+  return tfOrcamentoRealizacoesCliente().filter(function(item) { return item.orcamentoLinhaId === linhaId; });
+}
+
+function tfOrcamentoRealizacoesLancamento(lancamentoId, natureza) {
+  if (!lancamentoId) return [];
+  return tfOrcamentoRealizacoesCliente().filter(function(item) {
+    if (item.lancamentoId !== lancamentoId) return false;
+    var linha = tfOrcamentoLinhaById(item.orcamentoLinhaId);
+    return linha && (!natureza || tfNaturezaTituloParaOrcamento(natureza) === linha.natureza);
+  });
+}
+
+function tfValorOrcamentoConciliadoLancamento(lancamentoId, natureza) {
+  return tfOrcamentoRealizacoesLancamento(lancamentoId, natureza).reduce(function(sum, item) {
+    return sum + Number(item.valor || 0);
+  }, 0);
+}
+
 function tfNaturezaTituloParaOrcamento(naturezaTitulo) {
   return naturezaTitulo === 'receber' ? 'receita' : 'despesa';
 }
@@ -821,9 +853,16 @@ function tfOrcamentoLinhaCompativelComTitulo(linha, titulo) {
 }
 
 function tfOrcamentoRealizadoLinha(linha) {
-  return tfTitulosPorOrcamentoLinha(linha && linha.id).reduce(function(sum, titulo) {
-    return sum + tfTotalBaixado(titulo);
+  if (!linha) return 0;
+  var realizacoes = tfOrcamentoRealizacoesLinha(linha.id);
+  var lancamentosDiretos = new Set(realizacoes.map(function(item) { return item.lancamentoId; }).filter(Boolean));
+  var direto = realizacoes.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
+  var financeiro = tfTitulosPorOrcamentoLinha(linha.id).reduce(function(sum, titulo) {
+    return sum + (titulo.baixas || []).reduce(function(total, baixa) {
+      return total + (baixa.lancamentoId && lancamentosDiretos.has(baixa.lancamentoId) ? 0 : Number(baixa.valor || 0));
+    }, 0);
   }, 0);
+  return direto + financeiro;
 }
 
 function tfOrcamentoPrevistoLinha(linha) {
@@ -1151,6 +1190,7 @@ async function tfSaveOrcamentoLinha(id) {
 async function tfDeleteOrcamentoLinha(id) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
   if (tfTitulosPorOrcamentoLinha(id).length) return alert('Esta linha ja tem titulos financeiros vinculados. Remova o vinculo antes de excluir.');
+  if (tfOrcamentoRealizacoesLinha(id).length) return alert('Esta linha tem realizacoes conciliadas no Extrato. Desconcilie os valores antes de excluir.');
   var ok = await appConfirm('Excluir esta linha de orcamento?', { title: 'Excluir orcamento', confirmText: 'Excluir' });
   if (!ok) return;
 
@@ -1178,14 +1218,18 @@ async function tfGerarTituloDoOrcamento(id) {
   if (!linha) return;
   if (tfTitulosPorOrcamentoLinha(linha.id).length) return alert('Esta linha do orcamento ja tem conta vinculada. Use a conta existente para registrar novas baixas.');
   var naturezaTitulo = linha.natureza === 'receita' ? 'receber' : 'pagar';
-  var valor = tfOrcamentoPrevistoLinha(linha);
+  var realizacoesDiretas = tfOrcamentoRealizacoesLinha(linha.id);
+  var totalRealizadoDireto = realizacoesDiretas.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
+  var valor = totalRealizadoDireto > 0 ? totalRealizadoDireto : tfOrcamentoPrevistoLinha(linha);
   if (valor <= 0) return alert('Informe um valor previsto antes de gerar o titulo.');
   var pessoa = linha.pessoaNome || (naturezaTitulo === 'receber' ? 'Cliente do evento' : 'Fornecedor do evento');
   var descricao = linha.descricao || linha.categoria || tfNomeEventoById(linha.eventoId);
 
   var ok = await appConfirm(
-    'Gerar conta a ' + (naturezaTitulo === 'receber' ? 'receber' : 'pagar') + ' de ' + fmt(valor) + ' para esta linha?',
-    { title: 'Gerar titulo financeiro', confirmText: 'Gerar' }
+    (realizacoesDiretas.length ? 'Confirmar o valor realizado e gerar' : 'Gerar') + ' conta a '
+      + (naturezaTitulo === 'receber' ? 'receber' : 'pagar') + ' de ' + fmt(valor) + ' para esta linha?'
+      + (realizacoesDiretas.length ? ' As ' + realizacoesDiretas.length + ' conciliacao(oes) do Extrato serao levadas para a conta.' : ''),
+    { title: realizacoesDiretas.length ? 'Confirmar realizacao' : 'Gerar titulo financeiro', confirmText: realizacoesDiretas.length ? 'Confirmar e gerar' : 'Gerar' }
   );
   if (!ok) return;
 
@@ -1213,6 +1257,44 @@ async function tfGerarTituloDoOrcamento(id) {
     console.error('Erro ao gerar titulo pelo orcamento:', response.error);
     alert('Nao foi possivel gerar o titulo. Rode a migracao 20260615_orcamento_eventos.sql no Supabase.');
     return;
+  }
+
+  if (realizacoesDiretas.length) {
+    var baixasPayload = realizacoesDiretas.map(function(item) {
+      return Object.assign({
+        titulo_id: response.data.id,
+        cliente_id: activeClient,
+        data_baixa: item.data || new Date().toISOString().slice(0, 10),
+        valor: Number(item.valor || 0),
+        observacao: item.observacao || ('Realizado diretamente pelo orcamento: ' + (linha.categoria || '')),
+        origem: 'extrato',
+        extrato_lancamento_id: item.lancamentoId
+      }, getUserScopePayload());
+    });
+    var baixasResponse = await supabaseClient.from('titulos_financeiros_baixas').insert(baixasPayload);
+    if (baixasResponse.error) {
+      console.error('Erro ao transferir realizacoes para o titulo:', baixasResponse.error);
+      await applyUserScope(supabaseClient.from('titulos_financeiros').delete().eq('id', response.data.id));
+      alert('A conta nao foi gerada porque nao foi possivel transferir as conciliacoes do orcamento. Nenhuma realizacao foi perdida.');
+      return;
+    }
+
+    var realizacoesIds = realizacoesDiretas.map(function(item) { return item.id; });
+    var remocaoResponse = await applyUserScope(
+      supabaseClient.from('orcamento_eventos_realizacoes').delete().in('id', realizacoesIds)
+    );
+    if (remocaoResponse.error) {
+      console.error('Erro ao concluir transferencia das realizacoes:', remocaoResponse.error);
+      await applyUserScope(supabaseClient.from('titulos_financeiros').delete().eq('id', response.data.id));
+      alert('A conta nao foi gerada porque a transferencia nao pode ser concluida. As conciliacoes continuam no orcamento.');
+      return;
+    }
+
+    var linhaResponse = await supabaseClient
+      .from('orcamento_eventos_linhas')
+      .update({ valor_previsto: valor, status: 'realizado' })
+      .eq('id', linha.id);
+    if (linhaResponse.error) console.warn('Nao foi possivel atualizar o status final da linha:', linhaResponse.error);
   }
 
   if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulo_orcamento_criado');
@@ -1406,6 +1488,7 @@ function tfOrcamentoLinhasHtml(eventoId) {
         var realizado = tfOrcamentoRealizadoLinha(linha);
         var diff = linha.natureza === 'receita' ? realizado - Number(linha.valorOrcado || 0) : Number(linha.valorOrcado || 0) - realizado;
         var titulos = tfTitulosPorOrcamentoLinha(linha.id);
+        var realizacoesDiretas = tfOrcamentoRealizacoesLinha(linha.id);
         var editando = _tfOrcamentoLinhaEditId === linha.id;
         var totalContas = titulos.reduce(function(sum, titulo) { return sum + Number(titulo.valorTotal || 0); }, 0);
         var baixadoContas = titulos.reduce(function(sum, titulo) { return sum + tfTotalBaixado(titulo); }, 0);
@@ -1416,7 +1499,9 @@ function tfOrcamentoLinhasHtml(eventoId) {
         var descricaoCompleta = [linha.pessoaNome, linha.descricao].filter(Boolean).join(' - ');
         var vinculoResumo = titulos.length
           ? titulos.length + ' conta(s) - Total ' + fmt(totalContas) + ' - Baixado ' + fmt(baixadoContas) + ' - Saldo ' + fmt(saldoContas)
-          : 'Nenhuma conta vinculada';
+          : (realizacoesDiretas.length
+            ? realizacoesDiretas.length + ' lancamento(s) do Extrato aguardando confirmacao'
+            : 'Nenhuma conta vinculada');
         return (editando ? '<div class="tf-budget-edit-row">' + tfOrcamentoFormHtml(linha) + '</div>' : '')
           + '<article class="tf-budget-item">'
             + '<div class="tf-budget-item-head">'
@@ -1438,7 +1523,7 @@ function tfOrcamentoLinhasHtml(eventoId) {
               + '<i><b style="width:' + percentualRealizado + '%"></b></i>'
             + '</div>'
             + '<div class="tf-budget-actions">'
-              + (titulos.length ? '<button class="btn-sm" type="button" onclick="_tfFinanceiroView=\'titulos\';_tfEvento=\'' + esc(linha.eventoId || '') + '\';renderFinanceiro()">Ver contas</button>' : '<button class="btn-sm" type="button" onclick="tfGerarTituloDoOrcamento(\'' + linha.id + '\')">Gerar conta</button>')
+              + (titulos.length ? '<button class="btn-sm" type="button" onclick="_tfFinanceiroView=\'titulos\';_tfEvento=\'' + esc(linha.eventoId || '') + '\';renderFinanceiro()">Ver contas</button>' : '<button class="btn-sm" type="button" onclick="tfGerarTituloDoOrcamento(\'' + linha.id + '\')">' + (realizacoesDiretas.length ? 'Confirmar e gerar conta' : 'Gerar conta') + '</button>')
               + '<button class="btn-sm" type="button" onclick="tfOpenVincularTituloOrcamentoModal(\'' + linha.id + '\')">Vincular conta</button>'
               + '<button class="btn-sm" type="button" onclick="tfStartOrcamentoLinhaEdit(\'' + linha.id + '\')">Editar</button>'
               + '<button class="btn-icon danger" type="button" onclick="tfDeleteOrcamentoLinha(\'' + linha.id + '\')" title="Excluir">&#128465;</button>'

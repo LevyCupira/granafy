@@ -299,6 +299,22 @@ async function loadDataFromSupabase() {
     return res;
   }
 
+  async function carregarOrcamentoRealizacoesComEscopo() {
+    var query = supabaseClient.from('orcamento_eventos_realizacoes').select('*');
+    var res = await query.order('data_realizacao', { ascending: true, nullsFirst: false });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('orcamento_eventos_realizacoes')) {
+      console.warn('Tabela orcamento_eventos_realizacoes ainda nao existe. Rode a migracao 20260621_orcamento_conciliacao_direta.sql.');
+      return { data: [], error: null };
+    }
+
+    return res;
+  }
+
   async function carregarRelacionamentosComEscopo() {
     var query = supabaseClient.from('relacionamentos_cliente').select('*');
     var res = await query.order('nome', { ascending: true });
@@ -402,6 +418,11 @@ async function loadDataFromSupabase() {
     console.warn('Nao foi possivel carregar orcamento de eventos:', orcamentoEventosRes.error);
   }
   const orcamentoEventosRows = orcamentoEventosRes.data || [];
+  const orcamentoRealizacoesRes = await carregarOrcamentoRealizacoesComEscopo();
+  if (orcamentoRealizacoesRes.error) {
+    console.warn('Nao foi possivel carregar realizacoes do orcamento:', orcamentoRealizacoesRes.error);
+  }
+  const orcamentoRealizacoesRows = orcamentoRealizacoesRes.data || [];
   const relacionamentosRes = await carregarRelacionamentosComEscopo();
   if (relacionamentosRes.error) {
     console.warn('Nao foi possivel carregar relacionamentos personalizados:', relacionamentosRes.error);
@@ -444,6 +465,7 @@ async function loadDataFromSupabase() {
   const centrosCustoMetaPorCliente = {};
   const eventosPorCliente = {};
   const orcamentoEventosPorCliente = {};
+  const orcamentoRealizacoesPorCliente = {};
   (categoriasRows || []).forEach(cat => {
     if (!cat || !cat.cliente_id || !cat.nome) return;
     if (cat.escopo === 'cc') {
@@ -573,6 +595,21 @@ async function loadDataFromSupabase() {
     });
   });
 
+  (orcamentoRealizacoesRows || []).forEach(item => {
+    if (!item || !item.cliente_id || !item.orcamento_linha_id || !item.extrato_lancamento_id) return;
+    if (!orcamentoRealizacoesPorCliente[item.cliente_id]) orcamentoRealizacoesPorCliente[item.cliente_id] = [];
+    orcamentoRealizacoesPorCliente[item.cliente_id].push({
+      id: item.id,
+      orcamentoLinhaId: item.orcamento_linha_id,
+      lancamentoId: item.extrato_lancamento_id,
+      data: item.data_realizacao || null,
+      valor: Number(item.valor || 0),
+      observacao: item.observacao || '',
+      createdAt: item.created_at || null,
+      userId: item.user_id || null
+    });
+  });
+
   const cartoesPorCliente = {};
   (cartoesRows || []).forEach(cc => {
     if (!cartoesPorCliente[cc.cliente_id]) cartoesPorCliente[cc.cliente_id] = [];
@@ -673,6 +710,7 @@ async function loadDataFromSupabase() {
       titulos: titulosPorCliente[c.id] || [],
       eventos: eventosPorCliente[c.id] || [],
       orcamentoEventos: orcamentoEventosPorCliente[c.id] || [],
+      orcamentoRealizacoes: orcamentoRealizacoesPorCliente[c.id] || [],
       acessos: acessosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],

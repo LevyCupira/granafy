@@ -2,6 +2,32 @@
 
 Backlog vivo do produto, organizado por prioridade e contexto operacional.
 
+## Revisao atual - 21/06/2026
+
+### Pendencias prioritarias
+- [ ] Revisar redundancias entre Extrato, Financeiro, Eventos e Orcamento
+- [ ] Criar titulos recorrentes no Financeiro
+- [ ] Completar a auditoria financeira de conciliacoes, estornos, titulos, rateios e categorias
+- [ ] Criar fechamento de periodo com conferencia e bloqueio ou alerta de alteracoes
+- [ ] Ampliar testes automatizados dos fluxos criticos de conciliacao, Financeiro e Orcamento
+
+### Evolucoes pendentes
+- [ ] Operacao offline com sincronizacao posterior
+- [ ] Importacao inteligente com sugestoes de categoria, rateio e conciliacao
+- [ ] Dashboards executivos com inadimplencia, devolucoes e estornos
+- [ ] Relatorios e exportacoes operacionais por evento, responsavel e filtros
+- [ ] Refinar rateios com copia e sugestoes baseadas no historico
+- [ ] Sincronizacao em tempo real entre dispositivos pelo Supabase Realtime
+- [ ] Concluir os fluxos de governanca e direitos previstos no plano de LGPD
+
+### Funcionalidades ja operacionais ou parcialmente entregues
+- Painel de pendencias
+- Sugestoes de conciliacao
+- Saldo inicial por conta
+- Conta Caixa / Carteira
+- Eventos e Orcamento vinculados ao Financeiro
+- Atualizacao entre abas do mesmo navegador
+
 ## Agora
 
 ### Painel de pendencias
@@ -97,6 +123,27 @@ Backlog vivo do produto, organizado por prioridade e contexto operacional.
 
 ## Guardado
 
+### Operacao offline com sincronizacao posterior
+- Manter o sistema utilizavel quando a internet cair, inclusive apos recarregar a pagina
+- Evoluir o Service Worker atual para armazenar todo o shell necessario da aplicacao
+- Armazenar os dados de trabalho localmente com IndexedDB
+- Criar uma fila local de alteracoes pendentes para inclusoes e edicoes feitas offline
+- Exibir estados claros:
+  - Offline
+  - Alteracoes pendentes
+  - Sincronizando
+- Sincronizar automaticamente ao recuperar a conexao ou abrir o sistema novamente
+- Definir idempotencia e regras de conflito antes de liberar operacoes sensiveis
+- Implantar em etapas:
+  1. consulta offline
+  2. cadastros e edicoes simples de lancamentos, titulos e orcamento
+  3. conciliacoes, rateios, estornos e exclusoes
+
+### Revisao de redundancias
+- Mapear informacoes e acoes repetidas entre Extrato, Financeiro, Eventos e Orcamento
+- Definir uma unica origem para cada valor realizado, previsto e conciliado
+- Simplificar telas sem remover rastreabilidade ou atalhos importantes
+
 ### LGPD - pendentes do fim de semana
 - Definir canal formal de privacidade
 - Definir retencao e descarte
@@ -125,10 +172,10 @@ Backlog vivo do produto, organizado por prioridade e contexto operacional.
 ## Observacoes
 
 - Prioridade atual recomendada:
-  1. Painel de pendencias
-  2. Conciliacao inteligente
-  3. Saldo inicial por conta
-  4. Caixa / dinheiro em especie
-  5. Titulos recorrentes
+  1. Revisao de redundancias
+  2. Titulos recorrentes
+  3. Auditoria financeira completa
+  4. Fechamento de periodo
+  5. Cobertura automatizada dos fluxos criticos
 
 - Este backlog deve ser revisado sempre que uma frente nova entrar em producao ou mudar de prioridade.

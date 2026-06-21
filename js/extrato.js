@@ -408,6 +408,27 @@ function extratoPendenteConciliacao(cliente, lanc) {
   return valorConciliado + 0.005 < valorLancamento;
 }
 
+function extratoConciliacaoCategoriasHtml(lanc) {
+  var rateios = extratoRateiosValidos(lanc);
+  var itens = rateios.length
+    ? rateios
+    : [{ categoria: (lanc && lanc.cat) || 'Sem categoria', valor: Number((lanc && lanc.valor) || 0) }];
+  var total = itens.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
+
+  return '<div class="conciliation-classification">'
+    + '<div class="conciliation-classification-head">'
+      + '<div><span>Classificacao do Extrato</span><strong>' + (rateios.length ? 'Lancamento rateado' : 'Categoria unica') + '</strong></div>'
+      + '<small>' + (rateios.length ? itens.length + ' categorias - ' : '') + fmt(total) + '</small>'
+    + '</div>'
+    + '<div class="conciliation-category-list">'
+      + itens.map(function(item) {
+        return '<div><span>' + esc(item.categoria || 'Sem categoria') + '</span><strong>' + fmt(item.valor || 0) + '</strong></div>';
+      }).join('')
+    + '</div>'
+    + (rateios.length ? '<p>Use estes valores para distribuir o lancamento entre as linhas correspondentes do orcamento.</p>' : '')
+  + '</div>';
+}
+
 function extratoResolvidoConciliacao(cliente, lanc) {
   if (!lanc) return false;
   if (valorConciliadoDoLancamento(lanc) > 0) return true;
@@ -972,10 +993,16 @@ function valorConciliadoDoLancamento(lanc) {
 
 function resumoConciliacaoLancamento(lanc) {
   var baixas = baixasFinanceirasDoLancamento(lanc);
-  if (!baixas.length) return '';
+  var realizacoes = typeof tfOrcamentoRealizacoesLancamento === 'function'
+    ? tfOrcamentoRealizacoesLancamento(lanc && lanc.id, naturezaFinanceiraDoExtrato(lanc && lanc.tipo || 'credito'))
+    : [];
+  if (!baixas.length && !realizacoes.length) return '';
   var conciliado = valorConciliadoDoLancamento(lanc);
   var restante = Math.max(0, Number(lanc.valor || 0) - conciliado);
-  var prefixo = restante > 0 ? 'Financeiro parcial' : 'Financeiro conciliado';
+  var somenteOrcamento = realizacoes.length && !baixas.length;
+  var prefixo = somenteOrcamento
+    ? (restante > 0 ? 'Orcamento parcial' : 'Orcamento conciliado')
+    : (restante > 0 ? 'Financeiro parcial' : 'Financeiro conciliado');
   return prefixo + ': ' + fmt(conciliado) + (restante > 0 ? ' · saldo pendente ' + fmt(restante) : '');
 }
 
@@ -2886,6 +2913,34 @@ function extratoSelecionarSugestaoConciliacao(tituloId, restante) {
   syncExtratoConciliacaoValor(restante);
 }
 
+function extratoOrcamentoConciliacaoOptionsHtml(natureza) {
+  if (typeof tfOrcamentoLinhasCliente !== 'function') return '<option value="">Orcamento indisponivel</option>';
+  var naturezaOrcamento = natureza === 'receber' ? 'receita' : 'despesa';
+  var linhas = tfOrcamentoLinhasCliente().filter(function(linha) {
+    if (!linha || linha.natureza !== naturezaOrcamento || linha.status === 'cancelado') return false;
+    return typeof tfTitulosPorOrcamentoLinha !== 'function' || !tfTitulosPorOrcamentoLinha(linha.id).length;
+  }).sort(function(a, b) {
+    var eventoA = typeof tfNomeEventoById === 'function' ? tfNomeEventoById(a.eventoId) : '';
+    var eventoB = typeof tfNomeEventoById === 'function' ? tfNomeEventoById(b.eventoId) : '';
+    var porEvento = String(eventoA || '').localeCompare(String(eventoB || ''), 'pt-BR', { sensitivity: 'base' });
+    return porEvento || String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
+  });
+  if (!linhas.length) return '<option value="">Sem linhas de orcamento disponiveis</option>';
+  return '<option value="">Selecione uma linha do orcamento</option>' + linhas.map(function(linha) {
+    var evento = typeof tfNomeEventoById === 'function' ? tfNomeEventoById(linha.eventoId) : 'Sem evento';
+    var realizado = typeof tfOrcamentoRealizadoLinha === 'function' ? tfOrcamentoRealizadoLinha(linha) : 0;
+    return '<option value="' + esc(linha.id) + '">' + esc(evento || 'Sem evento') + ' - ' + esc(linha.categoria || '-') + ' (realizado ' + esc(fmt(realizado)) + ')</option>';
+  }).join('');
+}
+
+function syncExtratoOrcamentoConciliacaoValor(restante) {
+  var input = document.getElementById('ex-conciliar-orcamento-valor');
+  if (!input) return;
+  var valor = Math.max(0, Number(restante || 0));
+  input.value = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  input.dataset.cents = String(Math.round(valor * 100));
+}
+
 function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
   if (!sugestoes.length) return '';
   return '<div class="conciliation-section">'
@@ -3000,6 +3055,19 @@ function openExtratoConciliacaoModal(i) {
   var sugestoes = extratoSugestoesConciliacao(lanc, natureza, restante);
   var tituloSugeridoId = sugestoes.length ? sugestoes[0].id : '';
   var baixas = baixasFinanceirasDoLancamento(lanc);
+  var realizacoesOrcamento = typeof tfOrcamentoRealizacoesLancamento === 'function'
+    ? tfOrcamentoRealizacoesLancamento(lanc.id, natureza)
+    : [];
+  var realizacoesOrcamentoHtml = realizacoesOrcamento.length
+    ? '<div class="conciliation-baixas">' + realizacoesOrcamento.map(function(item) {
+        var linha = typeof tfOrcamentoLinhaById === 'function' ? tfOrcamentoLinhaById(item.orcamentoLinhaId) : null;
+        var evento = linha && typeof tfNomeEventoById === 'function' ? tfNomeEventoById(linha.eventoId) : '';
+        return '<div class="tf-baixa-item">'
+          + '<div><strong>' + esc((linha && linha.categoria) || 'Linha do orcamento') + '</strong><small>' + esc(evento || 'Sem evento') + ' - ' + esc(formatDate(item.data)) + '</small></div>'
+          + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoOrcamento(\'' + esc(item.id) + '\',' + i + ')" title="Desconciliar do orcamento">&#128465;</button></div>'
+          + '</div>';
+      }).join('') + '</div>'
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma realizacao vinculada diretamente ao orcamento.</div>';
   var baixasHtml = baixas.length
     ? '<div class="conciliation-baixas">' + baixas.map(function(item) {
         return '<div class="tf-baixa-item">'
@@ -3030,7 +3098,17 @@ function openExtratoConciliacaoModal(i) {
         + '<div><span>Conciliado</span><strong class="green">' + fmt(conciliado) + '</strong></div>'
         + '<div><span>Restante</span><strong class="' + (restante > 0 ? 'yellow' : 'green') + '">' + fmt(restante) + '</strong></div>'
       + '</div>'
+      + extratoConciliacaoCategoriasHtml(lanc)
       + extratoSugestoesConciliacaoHtml(sugestoes, restante)
+      + '<div class="conciliation-section">'
+        + '<div class="conciliation-section-head"><div><h5>Realizar pelo orcamento</h5><p>Atualize o realizado do evento agora e gere uma unica conta somente quando confirmar a linha.</p></div></div>'
+        + realizacoesOrcamentoHtml
+        + (restante > 0 ? '<div class="form-row" style="margin-top:16px">'
+          + '<div class="form-group"><label>Linha do orcamento</label><select id="ex-conciliar-orcamento-linha">' + extratoOrcamentoConciliacaoOptionsHtml(natureza) + '</select></div>'
+          + '<div class="form-group" style="max-width:170px"><label>Valor realizado</label><input type="text" id="ex-conciliar-orcamento-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+          + '</div><div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-conciliar-orcamento-obs" placeholder="Ex.: segunda parcela do fornecedor"/></div></div>'
+          + '<div class="conciliation-actions"><button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoComOrcamento(' + i + ')">Conciliar com orcamento</button></div>' : '')
+      + '</div>'
       + '<div class="conciliation-section">'
         + '<div class="conciliation-section-head"><div><h5>Baixas conciliadas</h5><p>Vincule este lancamento a uma conta financeira ja gerada ou vinculada ao orcamento.</p></div></div>'
         + baixasHtml
@@ -3052,6 +3130,73 @@ function openExtratoConciliacaoModal(i) {
   document.addEventListener('keydown', handleMainModalEscape);
   initMoneyInputs(document.getElementById('modalBody'));
   syncExtratoConciliacaoValor(restante);
+  syncExtratoOrcamentoConciliacaoValor(restante);
+}
+
+async function conciliarExtratoComOrcamento(i) {
+  if (!canEditActiveClient()) return alert('Este cliente esta disponivel apenas para visualizacao.');
+  var cliente = data.clients[activeClient];
+  var lanc = cliente && cliente.extrato ? cliente.extrato[i] : null;
+  if (!lanc || !lanc.id) return;
+
+  var linhaId = ((document.getElementById('ex-conciliar-orcamento-linha') || {}).value || '').trim();
+  var valor = parseMoney(document.getElementById('ex-conciliar-orcamento-valor'));
+  var observacao = ((document.getElementById('ex-conciliar-orcamento-obs') || {}).value || '').trim();
+  if (!linhaId) return alert('Selecione uma linha do orcamento.');
+  if (!valor || valor <= 0) return alert('Informe um valor realizado maior que zero.');
+
+  var linha = typeof tfOrcamentoLinhaById === 'function' ? tfOrcamentoLinhaById(linhaId) : null;
+  var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
+  if (!linha || linha.natureza !== (natureza === 'receber' ? 'receita' : 'despesa')) return alert('A linha selecionada nao corresponde ao tipo deste lancamento.');
+  if (typeof tfTitulosPorOrcamentoLinha === 'function' && tfTitulosPorOrcamentoLinha(linha.id).length) {
+    return alert('Esta linha ja foi confirmada no Financeiro. Concilie com a conta gerada.');
+  }
+
+  var restante = Math.max(0, Number(lanc.valor || 0) - valorConciliadoDoLancamento(lanc));
+  if (valor > restante) return alert('O valor informado ultrapassa o restante disponivel deste lancamento.');
+
+  var response = await supabaseClient
+    .from('orcamento_eventos_realizacoes')
+    .insert([Object.assign({
+      cliente_id: activeClient,
+      orcamento_linha_id: linha.id,
+      extrato_lancamento_id: lanc.id,
+      data_realizacao: lanc.data || new Date().toISOString().slice(0, 10),
+      valor: Number(valor),
+      observacao: observacao || ('Conciliado pelo extrato: ' + (lanc.descOriginal || lanc.desc || ''))
+    }, getUserScopePayload())])
+    .select()
+    .single();
+
+  if (response.error) {
+    console.error('Erro ao conciliar extrato com orcamento:', response.error);
+    var msg = String(response.error.message || '').toLowerCase();
+    if (msg.includes('unique') || response.error.code === '23505') return alert('Este lancamento ja esta conciliado com essa linha do orcamento.');
+    alert('Nao foi possivel conciliar com o orcamento. Rode a migracao 20260621_orcamento_conciliacao_direta.sql no Supabase.');
+    return;
+  }
+
+  closeModal();
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'conciliacao_orcamento_extrato');
+  await loadData();
+  renderTab(activeTab);
+}
+
+async function desconciliarExtratoOrcamento(realizacaoId, extratoIdx) {
+  var ok = await appConfirm('Desconciliar este valor do orcamento?', { title: 'Desconciliar orcamento', confirmText: 'Desconciliar' });
+  if (!ok) return;
+  var response = await applyUserScope(
+    supabaseClient.from('orcamento_eventos_realizacoes').delete().eq('id', realizacaoId)
+  );
+  if (response.error) {
+    console.error('Erro ao desfazer conciliacao do orcamento:', response.error);
+    alert('Nao foi possivel desfazer a conciliacao do orcamento.');
+    return;
+  }
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'desconciliacao_orcamento_extrato');
+  await loadData();
+  renderTab(activeTab);
+  openExtratoConciliacaoModal(extratoIdx);
 }
 
 async function conciliarExtratoLancamento(i) {
