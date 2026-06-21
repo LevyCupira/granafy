@@ -180,6 +180,7 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .conciliation-category-list span{color:var(--text);font-size:.82rem;font-weight:600;overflow-wrap:anywhere}
 .conciliation-category-list strong{color:var(--accent3);font-size:.82rem;white-space:nowrap}
 .conciliation-classification p{margin-top:9px;color:var(--muted);font-size:.76rem;line-height:1.4}
+.field-hint{display:block;margin-top:5px;color:var(--muted);font-size:.7rem;line-height:1.35}
 .conciliation-section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
 .conciliation-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
 .conciliation-section-head h5{font-size:.94rem;color:var(--text);margin-bottom:4px}
