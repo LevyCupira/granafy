@@ -1315,6 +1315,70 @@ async function tfGerarTituloDoOrcamento(id) {
   renderFinanceiro();
 }
 
+async function tfConfirmarRealizacoesOrcamento(id) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  var linha = tfOrcamentoLinhaById(id);
+  if (!linha) return;
+  var realizacoesDiretas = tfOrcamentoRealizacoesLinha(linha.id);
+  if (!realizacoesDiretas.length) return tfGerarTituloDoOrcamento(id);
+
+  var titulos = tfTitulosPorOrcamentoLinha(linha.id);
+  if (!titulos.length) return tfGerarTituloDoOrcamento(id);
+  if (titulos.length > 1) return alert('Esta linha possui mais de uma conta vinculada. Use Ver contas para escolher onde registrar a baixa.');
+
+  var titulo = titulos[0];
+  var totalRealizadoDireto = realizacoesDiretas.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
+  if (totalRealizadoDireto <= 0) return alert('Nao ha valor realizado para confirmar nesta linha.');
+  if (totalRealizadoDireto > tfSaldo(titulo) + 0.01) {
+    return alert('O valor realizado ultrapassa o saldo da conta vinculada. Ajuste a conta antes de confirmar.');
+  }
+
+  var ok = await appConfirm(
+    'Confirmar ' + fmt(totalRealizadoDireto) + ' realizado no orcamento dentro da conta "' + (titulo.descricao || titulo.pessoaNome || linha.categoria || '') + '"?',
+    { title: 'Confirmar realizacao', confirmText: 'Confirmar na conta' }
+  );
+  if (!ok) return;
+
+  var baixasPayload = realizacoesDiretas.map(function(item) {
+    return Object.assign({
+      titulo_id: titulo.id,
+      cliente_id: activeClient,
+      data_baixa: item.data || new Date().toISOString().slice(0, 10),
+      valor: Number(item.valor || 0),
+      observacao: item.observacao || ('Realizado diretamente pelo orcamento: ' + (linha.categoria || '')),
+      origem: 'extrato',
+      extrato_lancamento_id: item.lancamentoId
+    }, getUserScopePayload());
+  });
+
+  var baixasResponse = await supabaseClient.from('titulos_financeiros_baixas').insert(baixasPayload);
+  if (baixasResponse.error) {
+    console.error('Erro ao transferir realizacoes para a conta vinculada:', baixasResponse.error);
+    alert('Nao foi possivel confirmar as realizacoes na conta vinculada.');
+    return;
+  }
+
+  var realizacoesIds = realizacoesDiretas.map(function(item) { return item.id; });
+  var remocaoResponse = await applyUserScope(
+    supabaseClient.from('orcamento_eventos_realizacoes').delete().in('id', realizacoesIds)
+  );
+  if (remocaoResponse.error) {
+    console.error('Erro ao concluir transferencia das realizacoes:', remocaoResponse.error);
+    alert('As baixas foram registradas, mas nao foi possivel limpar as realizacoes diretas do orcamento. Atualize e confira a linha.');
+    return;
+  }
+
+  var linhaResponse = await supabaseClient
+    .from('orcamento_eventos_linhas')
+    .update({ status: 'realizado' })
+    .eq('id', linha.id);
+  if (linhaResponse.error) console.warn('Nao foi possivel atualizar o status final da linha:', linhaResponse.error);
+
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'realizacao_orcamento_confirmada');
+  await loadData();
+  renderFinanceiro();
+}
+
 function tfTitulosVinculaveisOrcamento(linha) {
   if (!linha) return [];
   var naturezaTitulo = linha.natureza === 'receita' ? 'receber' : 'pagar';
@@ -1512,6 +1576,13 @@ function tfOrcamentoLinhasHtml(eventoId) {
           : (realizacoesDiretas.length
             ? realizacoesDiretas.length + ' lancamento(s) do Extrato aguardando confirmacao'
             : 'Nenhuma conta vinculada');
+        var botoesOrcamento = '';
+        if (realizacoesDiretas.length) {
+          botoesOrcamento += '<button class="btn-sm" type="button" onclick="tfConfirmarRealizacoesOrcamento(\'' + linha.id + '\')">' + (titulos.length ? 'Confirmar na conta' : 'Confirmar e gerar conta') + '</button>';
+        }
+        botoesOrcamento += titulos.length
+          ? '<button class="btn-sm" type="button" onclick="_tfFinanceiroView=\'titulos\';_tfEvento=\'' + esc(linha.eventoId || '') + '\';renderFinanceiro()">Ver contas</button>'
+          : (!realizacoesDiretas.length ? '<button class="btn-sm" type="button" onclick="tfGerarTituloDoOrcamento(\'' + linha.id + '\')">Gerar conta</button>' : '');
         return (editando ? '<div class="tf-budget-edit-row">' + tfOrcamentoFormHtml(linha) + '</div>' : '')
           + '<article class="tf-budget-item">'
             + '<div class="tf-budget-item-head">'
@@ -1533,7 +1604,7 @@ function tfOrcamentoLinhasHtml(eventoId) {
               + '<i><b style="width:' + percentualRealizado + '%"></b></i>'
             + '</div>'
             + '<div class="tf-budget-actions">'
-              + (titulos.length ? '<button class="btn-sm" type="button" onclick="_tfFinanceiroView=\'titulos\';_tfEvento=\'' + esc(linha.eventoId || '') + '\';renderFinanceiro()">Ver contas</button>' : '<button class="btn-sm" type="button" onclick="tfGerarTituloDoOrcamento(\'' + linha.id + '\')">' + (realizacoesDiretas.length ? 'Confirmar e gerar conta' : 'Gerar conta') + '</button>')
+              + botoesOrcamento
               + '<button class="btn-sm" type="button" onclick="tfOpenVincularTituloOrcamentoModal(\'' + linha.id + '\')">Vincular conta</button>'
               + '<button class="btn-sm" type="button" onclick="tfStartOrcamentoLinhaEdit(\'' + linha.id + '\')">Editar</button>'
               + '<button class="btn-icon danger" type="button" onclick="tfDeleteOrcamentoLinha(\'' + linha.id + '\')" title="Excluir">&#128465;</button>'
