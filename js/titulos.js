@@ -1309,9 +1309,8 @@ async function tfGerarTituloDoOrcamento(id) {
 
   if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulo_orcamento_criado');
   await loadData();
-  _tfNatureza = naturezaTitulo;
-  _tfEvento = linha.eventoId || '';
-  _tfFinanceiroView = 'titulos';
+  _tfOrcamentoEventoId = linha.eventoId || _tfOrcamentoEventoId;
+  _tfFinanceiroView = 'eventos';
   renderFinanceiro();
 }
 
