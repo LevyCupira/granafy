@@ -1580,16 +1580,16 @@ function tfEventosResumoHtml() {
   var editando = eventos.find(function(item) { return item.id === _tfEventoEditId; });
   var linhas = eventos.map(function(evento) {
     var ind = tfEventoIndicadores(evento.id);
-    var margem = ind.receitaPrevista > 0 ? (ind.resultadoPrevisto / ind.receitaPrevista) * 100 : 0;
+    var margemRealizada = ind.recebido > 0 ? (ind.resultadoRealizado / ind.recebido) * 100 : 0;
     var maiorCusto = tfEventoCustoCategorias(evento.id)[0];
     return '<div class="tf-event-card">'
       + '<div class="tf-event-head"><div><strong>' + esc(evento.nome) + '</strong><span>' + esc(formatDate(evento.dataInicio) || '-') + (evento.dataFim ? ' ate ' + esc(formatDate(evento.dataFim)) : '') + '</span></div><span class="tf-event-status ' + tfEventoStatusClass(evento.status) + '">' + esc(tfStatusEventoLabel(evento.status)) + '</span></div>'
       + '<div class="tf-event-metrics">'
         + '<div><span>Receita</span><strong class="green">' + fmt(ind.receitaPrevista) + '</strong></div>'
         + '<div><span>Custo</span><strong class="red">' + fmt(ind.custoPrevisto) + '</strong></div>'
-        + '<div><span>Resultado</span><strong class="' + (ind.resultadoPrevisto >= 0 ? 'green' : 'red') + '">' + fmt(ind.resultadoPrevisto) + '</strong></div>'
+        + '<div><span>Resultado previsto</span><strong class="' + (ind.resultadoPrevisto >= 0 ? 'green' : 'red') + '">' + fmt(ind.resultadoPrevisto) + '</strong></div>'
         + '<div><span>Realizado</span><strong class="' + (ind.resultadoRealizado >= 0 ? 'green' : 'red') + '">' + fmt(ind.resultadoRealizado) + '</strong></div>'
-        + '<div><span>Margem</span><strong>' + margem.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</strong></div>'
+        + '<div><span>Margem realizada</span><strong>' + margemRealizada.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</strong></div>'
       + '</div>'
       + '<div class="tf-event-meta"><span>Aberto a receber: ' + fmt(ind.emAbertoReceber) + '</span><span>Aberto a pagar: ' + fmt(ind.emAbertoPagar) + '</span><span>Maior custo: ' + esc(maiorCusto ? maiorCusto.nome : '-') + (maiorCusto ? ' (' + fmt(maiorCusto.valor) + ')' : '') + '</span></div>'
       + '<div class="tf-event-actions"><button class="btn-sm" onclick="tfStartEventoEdit(\'' + evento.id + '\')">Editar</button><button class="btn-sm" onclick="_tfEvento=\'' + evento.id + '\';_tfFinanceiroView=\'titulos\';renderFinanceiro()">Ver titulos</button><button class="btn-icon danger" onclick="tfDeleteEvento(\'' + evento.id + '\')" title="Excluir evento">&#128465;</button></div>'
@@ -1599,10 +1599,10 @@ function tfEventosResumoHtml() {
   var ranking = eventos.map(function(evento) {
     var ind = tfEventoIndicadores(evento.id);
     return Object.assign({ evento: evento }, ind);
-  }).sort(function(a, b) { return b.resultadoPrevisto - a.resultadoPrevisto; });
+  }).sort(function(a, b) { return b.resultadoRealizado - a.resultadoRealizado; });
   var rankingHtml = ranking.length
     ? '<div class="tf-event-ranking">' + ranking.map(function(item) {
-        return '<div><span>' + esc(item.evento.nome) + '</span><strong class="' + (item.resultadoPrevisto >= 0 ? 'green' : 'red') + '">' + fmt(item.resultadoPrevisto) + '</strong></div>';
+        return '<div><span>' + esc(item.evento.nome) + '</span><strong class="' + (item.resultadoRealizado >= 0 ? 'green' : 'red') + '">' + fmt(item.resultadoRealizado) + '</strong></div>';
       }).join('') + '</div>'
     : '<div class="empty-state" style="padding:18px">Nenhum evento cadastrado ainda.</div>';
 
@@ -1612,7 +1612,7 @@ function tfEventosResumoHtml() {
       + (editando ? tfEventoFormHtml(editando) : tfEventoFormHtml(null))
     + '</div>'
     + '<div>'
-      + '<h4 class="tf-event-subtitle">Mais rentaveis</h4>'
+      + '<h4 class="tf-event-subtitle">Mais rentaveis realizados</h4>'
       + rankingHtml
     + '</div>'
     + '</div>'
