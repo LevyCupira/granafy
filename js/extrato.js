@@ -1002,6 +1002,28 @@ function restanteConciliacaoEmCentavos(lanc) {
   );
 }
 
+function restanteConciliacaoModalEmCentavos(containerId, lanc) {
+  var container = document.getElementById(containerId);
+  var centavos = container && container.dataset ? Number(container.dataset.restanteCentavos || 0) : 0;
+  return centavos > 0 ? Math.round(centavos) : restanteConciliacaoEmCentavos(lanc);
+}
+
+function ajustarDistribuicoesAoRestante(distribuicoes, restanteCentavos) {
+  var totalCentavos = (distribuicoes || []).reduce(function(total, item) {
+    return total + Number(item.valorCentavos || 0);
+  }, 0);
+  var diferenca = totalCentavos - Number(restanteCentavos || 0);
+  if (diferenca > 0 && diferenca <= 1) {
+    for (var i = distribuicoes.length - 1; i >= 0; i--) {
+      if (distribuicoes[i].valorCentavos > diferenca) {
+        distribuicoes[i].valorCentavos -= diferenca;
+        return Number(restanteCentavos || 0);
+      }
+    }
+  }
+  return totalCentavos;
+}
+
 function resumoConciliacaoLancamento(lanc) {
   var baixas = baixasFinanceirasDoLancamento(lanc);
   var realizacoes = typeof tfOrcamentoRealizacoesLancamento === 'function'
@@ -3300,7 +3322,7 @@ function openExtratoConciliacaoModal(i) {
           + (restante > 0 ? '<button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoOrcamento(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar linha</button>' : '')
         + '</div>'
         + realizacoesOrcamentoHtml
-        + (restante > 0 ? '<div id="ex-conciliar-orcamento-linhas" data-lancamento-id="' + esc(lanc.id) + '" class="conciliation-allocation-list">'
+        + (restante > 0 ? '<div id="ex-conciliar-orcamento-linhas" data-lancamento-id="' + esc(lanc.id) + '" data-restante-centavos="' + restanteConciliacaoEmCentavos(lanc) + '" class="conciliation-allocation-list">'
           + extratoOrcamentoLinhaFormularioHtml(natureza, restante, true)
           + '</div>'
           + '<div class="conciliation-allocation-footer"><span id="ex-conciliar-orcamento-resumo"></span><button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoOrcamento(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar outra linha</button></div>'
@@ -3312,7 +3334,7 @@ function openExtratoConciliacaoModal(i) {
           + (restante > 0 ? '<button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar titulo</button>' : '')
         + '</div>'
         + baixasHtml
-        + (restante > 0 ? '<div id="ex-conciliar-linhas" data-lancamento-id="' + esc(lanc.id) + '" class="conciliation-allocation-list">'
+        + (restante > 0 ? '<div id="ex-conciliar-linhas" data-lancamento-id="' + esc(lanc.id) + '" data-restante-centavos="' + restanteConciliacaoEmCentavos(lanc) + '" class="conciliation-allocation-list">'
           + extratoConciliacaoLinhaHtml(natureza, restante, tituloSugeridoId, true)
         + '</div>'
         + '<div class="conciliation-allocation-footer"><span id="ex-conciliar-distribuicao-resumo"></span><button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar outro titulo</button></div>'
@@ -3349,7 +3371,8 @@ async function conciliarExtratoComOrcamento(i) {
   var observacao = ((document.getElementById('ex-conciliar-orcamento-obs') || {}).value || '').trim();
   var natureza = naturezaFinanceiraDoExtrato(lanc.tipo || 'credito');
   var naturezaOrcamento = natureza === 'receber' ? 'receita' : 'despesa';
-  var distribuicoesPorLinha = Array.from(document.querySelectorAll('.ex-conciliar-orcamento-linha')).reduce(function(mapa, item) {
+  var containerOrcamento = document.getElementById('ex-conciliar-orcamento-linhas');
+  var distribuicoesPorLinha = Array.from(containerOrcamento ? containerOrcamento.querySelectorAll('.ex-conciliar-orcamento-linha') : []).reduce(function(mapa, item) {
     var linhaId = ((item.querySelector('.ex-conciliar-orcamento-linha-id') || {}).value || '').trim();
     var valorCentavos = valorMonetarioEmCentavos(parseMoney(item.querySelector('.ex-conciliar-orcamento-valor')));
     if (linhaId && valorCentavos > 0) mapa[linhaId] = (mapa[linhaId] || 0) + valorCentavos;
@@ -3360,8 +3383,8 @@ async function conciliarExtratoComOrcamento(i) {
   });
   if (!distribuicoes.length) return alert('Adicione ao menos uma linha do orcamento com valor maior que zero.');
 
-  var totalCentavos = distribuicoes.reduce(function(total, item) { return total + item.valorCentavos; }, 0);
-  var restanteCentavos = restanteConciliacaoEmCentavos(lanc);
+  var restanteCentavos = restanteConciliacaoModalEmCentavos('ex-conciliar-orcamento-linhas', lanc);
+  var totalCentavos = ajustarDistribuicoesAoRestante(distribuicoes, restanteCentavos);
   if (totalCentavos > restanteCentavos) return alert('A soma distribuida ultrapassa o restante disponivel deste lancamento.');
 
   var realizacoesExistentes = typeof tfOrcamentoRealizacoesLancamento === 'function'
@@ -3458,7 +3481,8 @@ async function conciliarExtratoLancamento(i) {
   var observacao = ((document.getElementById('ex-conciliar-obs') || {}).value || '').trim();
   if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
 
-  var distribuicoesPorTitulo = Array.from(document.querySelectorAll('.ex-conciliar-linha')).reduce(function(mapa, linha) {
+  var containerContas = document.getElementById('ex-conciliar-linhas');
+  var distribuicoesPorTitulo = Array.from(containerContas ? containerContas.querySelectorAll('.ex-conciliar-linha') : []).reduce(function(mapa, linha) {
     var tituloId = ((linha.querySelector('.ex-conciliar-titulo') || {}).value || '').trim();
     var valorCentavos = valorMonetarioEmCentavos(parseMoney(linha.querySelector('.ex-conciliar-valor')));
     if (tituloId && valorCentavos > 0) mapa[tituloId] = (mapa[tituloId] || 0) + valorCentavos;
@@ -3469,8 +3493,8 @@ async function conciliarExtratoLancamento(i) {
   });
   if (!distribuicoes.length) return alert('Adicione ao menos uma conta com valor maior que zero.');
 
-  var totalCentavos = distribuicoes.reduce(function(total, item) { return total + item.valorCentavos; }, 0);
-  var restanteLancCentavos = restanteConciliacaoEmCentavos(lanc);
+  var restanteLancCentavos = restanteConciliacaoModalEmCentavos('ex-conciliar-linhas', lanc);
+  var totalCentavos = ajustarDistribuicoesAoRestante(distribuicoes, restanteLancCentavos);
   if (totalCentavos > restanteLancCentavos) return alert('A soma distribuida ultrapassa o restante disponivel deste lancamento.');
 
   var titulos = {};
