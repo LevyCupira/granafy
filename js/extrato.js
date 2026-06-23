@@ -1794,12 +1794,7 @@ function assinaturaLinhaDuplicadaExtrato(l) {
   return [
     l && l.id ? 'id:' + l.id : '',
     l && (l.data || l.data_lancamento || '') || '',
-    String(l && (l.desc || l.descricao || '') || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' '),
+    textoDuplicidadeExtrato(l),
     String(l && l.cat || '').trim().toLowerCase(),
     String(l && l.tipo || '').trim().toLowerCase(),
     String(l && l.contaId || '').trim().toLowerCase(),
@@ -1913,21 +1908,27 @@ async function aplicarCategoriaEmLoteExtrato() {
   renderExtrato();
 }
 
-function chaveDuplicidadeExtrato(l) {
-  var data = l.data || l.data_lancamento || '';
-  var desc = String(l.desc || l.descricao || '')
+function textoDuplicidadeExtrato(l) {
+  return String(l && (l.descOriginal || l.descricao_original || l.desc || l.descricao || '') || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ');
+}
+
+function chaveDuplicidadeExtrato(l) {
+  var data = l.data || l.data_lancamento || '';
+  var desc = textoDuplicidadeExtrato(l);
   var tipo = String(l.tipo || '').trim().toLowerCase();
+  var contaId = String(l.contaId || l.conta_id || '').trim().toLowerCase();
   var centavos = Math.round(Number(l.valor || 0) * 100);
 
   return [
     data,
     desc,
     tipo,
+    contaId,
     centavos
   ].join('|');
 }
@@ -2092,7 +2093,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
   var query = applyUserScope(
     supabaseClient
       .from('lancamentos')
-      .select('id,cliente_id,data_lancamento,descricao,categoria,tipo,valor')
+      .select('id,cliente_id,data_lancamento,descricao,descricao_original,categoria,tipo,valor,conta_id')
       .eq('cliente_id', activeClient)
   );
 
@@ -2107,9 +2108,11 @@ async function removerDuplicadosExtratoClienteAtivo() {
     id: row.id,
     data: row.data_lancamento || '',
     desc: row.descricao || '',
+    descOriginal: row.descricao_original || row.descricao || '',
     cat: row.categoria || '',
     tipo: row.tipo || '',
-    valor: Number(row.valor || 0)
+    valor: Number(row.valor || 0),
+    contaId: row.conta_id || null
   }));
 
   var vistos = new Map();
@@ -2649,7 +2652,7 @@ async function importExtratoXlsx(event) {
     var novos = [];
     var duplicados = [];
     var chavesExistentes = new Set((c.extrato || []).map(function(l) {
-      return [l.data || '', String(l.desc || ''), Number(l.valor || 0), l.tipo || '', l.contaId || ''].join('|');
+      return chaveDuplicidadeExtrato(l);
     }));
 
     for (const row of rows.slice(1)) {
@@ -2682,7 +2685,14 @@ async function importExtratoXlsx(event) {
           relacionamento_id: relacionamentoIdFixo || (relacionamentoSugerido ? relacionamentoSugerido.id : null)
         }
       };
-      var chave = [dataFmt || '', desc, Number(valor || 0), tipo, contaId].join('|');
+      var chave = chaveDuplicidadeExtrato({
+        data: dataFmt || '',
+        descOriginal: desc,
+        desc: desc,
+        tipo: tipo,
+        valor: Number(valor || 0),
+        contaId: contaId
+      });
       if (chavesExistentes.has(chave)) duplicados.push(itemImportacao);
       else novos.push(itemImportacao);
       chavesExistentes.add(chave);

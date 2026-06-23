@@ -204,6 +204,8 @@ function tfFilteredItems() {
 
 function tfSummaryValues(items) {
   items = Array.isArray(items) ? items : tfTitulosCliente();
+  var totalReceber = 0;
+  var totalPagar = 0;
   var receber = 0;
   var pagar = 0;
   var recebido = 0;
@@ -211,8 +213,11 @@ function tfSummaryValues(items) {
   var vencidos = 0;
 
   items.forEach(function(item) {
+    var valorTotal = Number(item.valor || 0);
     var saldo = tfSaldo(item);
     var baixado = tfTotalBaixado(item);
+    if (item.natureza === 'receber') totalReceber += valorTotal;
+    if (item.natureza === 'pagar') totalPagar += valorTotal;
     if (item.natureza === 'receber') receber += saldo;
     if (item.natureza === 'pagar') pagar += saldo;
     if (item.natureza === 'receber') recebido += baixado;
@@ -221,6 +226,8 @@ function tfSummaryValues(items) {
   });
 
   return {
+    totalReceber: totalReceber,
+    totalPagar: totalPagar,
     receber: receber,
     pagar: pagar,
     recebido: recebido,
@@ -2355,9 +2362,11 @@ function renderFinanceiroNovo(root) {
   var resumoHtml =
     '<div class="summary-grid">'
       + (_tfNatureza === 'receber'
-        ? '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
+        ? '<div class="summary-card"><div class="s-label">Total a receber</div><div class="s-val blue">' + fmt(resumo.totalReceber) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
           + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
-        : '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
+        : '<div class="summary-card"><div class="s-label">Total a pagar</div><div class="s-val blue">' + fmt(resumo.totalPagar) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
           + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
