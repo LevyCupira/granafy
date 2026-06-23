@@ -3387,9 +3387,6 @@ async function conciliarExtratoComOrcamento(i) {
   var totalCentavos = ajustarDistribuicoesAoRestante(distribuicoes, restanteCentavos);
   if (totalCentavos > restanteCentavos) return alert('A soma distribuida ultrapassa o restante disponivel deste lancamento.');
 
-  var realizacoesExistentes = typeof tfOrcamentoRealizacoesLancamento === 'function'
-    ? tfOrcamentoRealizacoesLancamento(lanc.id, natureza)
-    : [];
   var realizacoesPayload = [];
   var baixasPayload = [];
   for (var d = 0; d < distribuicoes.length; d++) {
@@ -3414,8 +3411,6 @@ async function conciliarExtratoComOrcamento(i) {
         extrato_lancamento_id: lanc.id
       }, getUserScopePayload()));
     } else {
-      var jaRealizada = realizacoesExistentes.some(function(item) { return item.orcamentoLinhaId === linha.id; });
-      if (jaRealizada) return alert('Este lancamento ja possui uma realizacao direta em ' + (linha.categoria || 'uma das linhas') + '.');
       realizacoesPayload.push(Object.assign({
         cliente_id: activeClient,
         orcamento_linha_id: linha.id,
@@ -3445,7 +3440,7 @@ async function conciliarExtratoComOrcamento(i) {
         await applyUserScope(supabaseClient.from('titulos_financeiros_baixas').delete().in('id', baixasInseridas.map(function(item) { return item.id; })));
       }
       var msg = String(realizacoesResponse.error.message || '').toLowerCase();
-      if (msg.includes('unique') || realizacoesResponse.error.code === '23505') return alert('Este lancamento ja esta conciliado com uma das linhas selecionadas.');
+      if (msg.includes('unique') || realizacoesResponse.error.code === '23505') return alert('A base ainda possui uma restricao antiga no orcamento. Rode a migracao 20260622_orcamento_realizacoes_sem_limite.sql no Supabase.');
       return alert('Nao foi possivel conciliar com o orcamento. Rode a migracao 20260621_orcamento_conciliacao_direta.sql no Supabase.');
     }
   }

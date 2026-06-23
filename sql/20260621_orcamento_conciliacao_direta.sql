@@ -11,9 +11,7 @@ create table if not exists public.orcamento_eventos_realizacoes (
   valor numeric(14,2) not null,
   observacao text,
   created_at timestamptz not null default now(),
-  constraint orcamento_eventos_realizacoes_valor_check check (valor > 0),
-  constraint orcamento_eventos_realizacoes_linha_lancamento_unique
-    unique (orcamento_linha_id, extrato_lancamento_id)
+  constraint orcamento_eventos_realizacoes_valor_check check (valor > 0)
 );
 
 create index if not exists idx_orcamento_eventos_realizacoes_cliente_id
