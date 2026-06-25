@@ -155,15 +155,15 @@ function openClientFormModal(id) {
       + '<div class="form-group"><label>Responsavel</label><input type="text" id="client-form-responsavel" value="' + esc(cliente ? (cliente.responsavel || '') : '') + '" placeholder="Responsavel pelo contato"/></div>'
     + '</div>'
     + '<div class="form-row client-form-type client-form-type-pj">'
-      + '<div class="form-group" style="max-width:220px"><label>Modulo de eventos/projetos</label><select id="client-form-eventos-enabled"><option value="false"' + (!(cliente && cliente.eventosEnabled) ? ' selected' : '') + '>Desabilitado</option><option value="true"' + (cliente && cliente.eventosEnabled ? ' selected' : '') + '>Habilitado</option></select></div>'
-      + '<div class="form-group"><label>Nome do modulo</label><input type="text" id="client-form-eventos-label" value="' + esc(cliente ? (cliente.eventosLabel || 'Eventos') : 'Eventos') + '" placeholder="Eventos, Projetos, Obras..."/></div>'
+      + '<div class="form-group" style="max-width:220px"><label>Módulo de eventos/projetos</label><select id="client-form-eventos-enabled"><option value="false"' + (!(cliente && cliente.eventosEnabled) ? ' selected' : '') + '>Desabilitado</option><option value="true"' + (cliente && cliente.eventosEnabled ? ' selected' : '') + '>Habilitado</option></select></div>'
+      + '<div class="form-group"><label>Nome do módulo</label><input type="text" id="client-form-eventos-label" value="' + esc(cliente ? (cliente.eventosLabel || 'Eventos') : 'Eventos') + '" placeholder="Eventos, Projetos, Obras..."/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>Telefone</label><input type="text" id="client-form-telefone" value="' + esc(cliente ? (cliente.telefone || '') : '') + '" placeholder="(00) 00000-0000"/></div>'
       + '<div class="form-group"><label>E-mail financeiro</label><input type="email" id="client-form-email" value="' + esc(cliente ? (cliente.emailFinanceiro || '') : '') + '" placeholder="financeiro@empresa.com"/></div>'
     + '</div>'
     + '<div class="form-row">'
-      + '<div class="form-group"><label>Observacoes</label><textarea id="client-form-obs" rows="4" placeholder="Informacoes importantes deste cadastro">' + esc(cliente ? (cliente.observacoes || '') : '') + '</textarea></div>'
+      + '<div class="form-group"><label>Observacoes</label><textarea id="client-form-obs" rows="4" placeholder="Informações importantes deste cadastro">' + esc(cliente ? (cliente.observacoes || '') : '') + '</textarea></div>'
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
       + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
@@ -213,7 +213,7 @@ async function saveClientForm(id) {
   }
 
   if (!id && !canCreateOwnedClient()) {
-    alert('Seu acesso nao pode cadastrar novos clientes nesta base.');
+    alert('Seu acesso não pode cadastrar novos clientes nesta base.');
     return;
   }
 
@@ -226,9 +226,9 @@ async function saveClientForm(id) {
   if (resposta.error) {
     console.error('Erro ao salvar cliente:', resposta.error);
     if (isMissingClientProfileColumnError(resposta.error)) {
-      alert('O cadastro completo de PF/PJ precisa das migracoes mais recentes no Supabase, incluindo eventos/projetos quando habilitado.');
+      alert('O cadastro completo de PF/PJ precisa das migrações mais recentes no Supabase, incluindo eventos/projetos quando habilitado.');
     } else {
-      alert('Nao foi possivel salvar o cliente.');
+      alert('Não foi possível salvar o cliente.');
     }
     return;
   }
@@ -317,10 +317,10 @@ function renderClientList() {
         areaNovo.appendChild(note);
       }
       var limiteTexto = (totalProprios === 0 && possuiAcessoCompartilhado && !isAdminUser() && !isConsultorUser())
-        ? 'Este login possui acesso compartilhado e nao pode cadastrar clientes proprios.'
+        ? 'Este login possui acesso compartilhado e não pode cadastrar clientes proprios.'
         : (limiteClientes === Infinity
           ? 'Seu perfil permite cadastrar clientes sem limite.'
-          : ('Seu perfil permite cadastrar ate ' + limiteClientes + ' cliente' + (limiteClientes === 1 ? '' : 's') + '.'));
+          : ('Seu perfil permite cadastrar até ' + limiteClientes + ' cliente' + (limiteClientes === 1 ? '' : 's') + '.'));
       note.textContent = limiteTexto;
     } else if (note) {
       note.remove();
@@ -336,7 +336,7 @@ async function deleteClient(id) {
   var c = data.clients[id];
   if (!c) return;
 
-  if (!(await appConfirm('Excluir o cliente "' + c.name + '" e todos os seus dados?\n\nEsta acao nao pode ser desfeita.', { title: 'Excluir cliente', confirmText: 'Excluir' }))) {
+  if (!(await appConfirm('Excluir o cliente "' + c.name + '" e todos os seus dados?\n\nEsta ação não pode ser desfeita.', { title: 'Excluir cliente', confirmText: 'Excluir' }))) {
     return;
   }
 
@@ -350,7 +350,7 @@ async function deleteClient(id) {
 
   if (res.error) {
     console.error('Erro ao excluir cliente:', res.error);
-    alert('Nao foi possivel excluir o cliente.');
+    alert('Não foi possível excluir o cliente.');
     return;
   }
 
@@ -434,7 +434,7 @@ async function grantClientAccess(clientId) {
     return;
   }
   if (email === currentUserEmail()) {
-    alert('Seu proprio login ja possui acesso total a este cliente.');
+    alert('Seu proprio login já possui acesso total a este cliente.');
     return;
   }
 
@@ -488,22 +488,22 @@ async function grantClientAccess(clientId) {
 
   if (response.error) {
     console.error('Erro ao conceder acesso ao cliente:', response.error);
-    alert('Nao foi possivel conceder o acesso agora: ' + (response.error.message || 'erro desconhecido'));
+    alert('Não foi possível conceder o acesso agora: ' + (response.error.message || 'erro desconhecido'));
     return;
   }
 
   if (emailEl) emailEl.value = '';
   if (existingAccess && existingAccess.id) {
-    await appAlert('Acesso atualizado para ' + email + '. Esse login ja pode entrar com a conta que usa hoje.', 'Acesso compartilhado');
+    await appAlert('Acesso atualizado para ' + email + '. Esse login já pode entrar com a conta que usa hoje.', 'Acesso compartilhado');
   } else if (usuarioId) {
-    await appAlert('Acesso liberado para ' + email + '. Como esse login ja existe, a pessoa pode entrar normalmente no Granafy.', 'Acesso compartilhado');
+    await appAlert('Acesso liberado para ' + email + '. Como esse login já existe, a pessoa pode entrar normalmente no Granafy.', 'Acesso compartilhado');
   } else {
     var inviteLink = buildClientInviteLink(email, clientId, papel);
     var copied = await copyTextSafe(inviteLink);
     await appAlert(
-      'Acesso liberado para ' + email + '.\n\nEsse e-mail ainda nao tem conta no Granafy. A pessoa deve usar o primeiro acesso pelo link abaixo:\n'
+      'Acesso liberado para ' + email + '.\n\nEsse e-mail ainda não tem conta no Granafy. A pessoa deve usar o primeiro acesso pelo link abaixo:\n'
       + inviteLink
-      + (copied ? '\n\nO link ja foi copiado para a area de transferencia.' : '\n\nCopie esse link e envie para a pessoa.'),
+      + (copied ? '\n\nO link já foi copiado para a area de transferência.' : '\n\nCopie esse link e envie para a pessoa.'),
       'Primeiro acesso'
     );
   }
@@ -537,7 +537,7 @@ async function revokeClientAccess(clientId, accessId) {
 
   if (response.error) {
     console.error('Erro ao revogar acesso ao cliente:', response.error);
-    alert('Nao foi possivel revogar o acesso agora.');
+    alert('Não foi possível revogar o acesso agora.');
     return;
   }
 

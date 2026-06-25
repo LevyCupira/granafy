@@ -160,12 +160,12 @@ function dreTabelaHtml(resumo) {
   }).join('');
   var resClass = resumo.resultado >= 0 ? 'val-pos' : 'val-neg';
   return '<div class="dre-table-card">'
-    + '<table class="dre-table"><thead><tr><th>Descricao</th><th>Valor</th></tr></thead><tbody>'
-    + dreSectionHtml('Receitas', 'green', recRows, 'Nenhuma receita no periodo.')
+    + '<table class="dre-table"><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>'
+    + dreSectionHtml('Receitas', 'green', recRows, 'Nenhuma receita no período.')
     + dreTotal('(=) Total de Receitas', resumo.totalReceitas, 'val-pos', false)
-    + dreSectionHtml('Despesas Fixas', 'red', fixRows, 'Nenhuma despesa fixa no periodo.')
+    + dreSectionHtml('Despesas Fixas', 'red', fixRows, 'Nenhuma despesa fixa no período.')
     + dreTotal('(-) Total de Despesas Fixas', resumo.totalFixas, 'val-neg', false)
-    + dreSectionHtml('Despesas Variaveis', 'yellow', varRows, 'Nenhuma despesa variavel no periodo.')
+    + dreSectionHtml('Despesas Variaveis', 'yellow', varRows, 'Nenhuma despesa variavel no período.')
     + dreTotal('(-) Total de Despesas Variaveis', resumo.totalVariaveis, 'val-neg', false)
     + dreTotal('(=) Resultado Liquido', resumo.resultado, resClass, true)
     + '<tr><td>Margem liquida</td><td class="' + resClass + '">' + resumo.margem.toFixed(1) + '%</td></tr>'
@@ -194,7 +194,7 @@ function dreEventosResumo(cliente, transacoes) {
 
 function dreEventosRankingHtml(eventosResumo) {
   if (!eventosResumo.length) {
-    return '<div class="empty-state" style="padding:24px 12px">Nenhum evento com baixa realizada no periodo.</div>';
+    return '<div class="empty-state" style="padding:24px 12px">Nenhum evento com baixa realizada no período.</div>';
   }
   var maior = eventosResumo.reduce(function(max, item) { return Math.max(max, Math.abs(item.resultado), item.receita, item.despesa); }, 1);
   return '<div class="dre-event-list">'
@@ -239,7 +239,7 @@ function renderDRE() {
       + '<div class="dre-workbench-head">'
         + '<div><h3>DRE</h3><p class="cartao-helper-text">Resultado por categorias, com visao geral e leitura por eventos.</p></div>'
         + '<div class="dre-controls">'
-          + '<label><span>Periodo</span><select id="dre-mes-sel" onchange="renderDRE()">' + dreMesOptionsHtml(meses, mesAtual) + '</select></label>'
+          + '<label><span>Período</span><select id="dre-mes-sel" onchange="renderDRE()">' + dreMesOptionsHtml(meses, mesAtual) + '</select></label>'
           + (_dreView === 'eventos' && eventosDisponiveis ? '<label><span>' + esc(cliente.eventosLabel || 'Eventos') + '</span><select id="dre-evento-sel" onchange="renderDRE()">' + dreEventoOptionsHtml(cliente, _dreEventoId) + '</select></label>' : '')
         + '</div>'
       + '</div>'
@@ -258,7 +258,7 @@ function renderDRE() {
       + '</div>';
   } else {
     bodyHtml = dreTabelaHtml(resumo)
-      + '<div class="dre-note"><strong>Observacao:</strong> a categoria Mov. Contas e tratada como transferencia interna. Ela nao entra como receita nem como despesa no DRE. Total do periodo: <strong>' + fmt(movTotal) + '</strong>.</div>';
+      + '<div class="dre-note"><strong>Observação:</strong> a categoria Mov. Contas e tratada como transferência interna. Ela não entra como receita nem como despesa no DRE. Total do período: <strong>' + fmt(movTotal) + '</strong>.</div>';
   }
 
   document.getElementById('dre-content').innerHTML =

@@ -47,7 +47,7 @@ function setupDividasCollapsiblePanels(area) {
     if (anchor) area.insertBefore(grid, anchor);
   }
 
-  setupDividasPanelDom(calcCard, 'reneg', 'Renegociacao / nova divida');
+  setupDividasPanelDom(calcCard, 'reneg', 'Renegociação / nova dívida');
   setupDividasPanelDom(filtrosCard, 'filtros', 'Filtros');
 }
 
@@ -245,7 +245,7 @@ function simularRenegociacaoDivida() {
   var taxa = parseFloat(document.getElementById('dv-taxa').value) || 0;
 
   if (!pv || !parcelas) {
-    alert('Informe valor da divida e quantidade de parcelas.');
+    alert('Informe valor da dívida e quantidade de parcelas.');
     return null;
   }
 
@@ -308,15 +308,15 @@ function toggleDividaHistorico(i) {
 
 function descricaoPagamentoDivida(d, parcelaRef, banco) {
   return [
-    'Pagamento divida',
+    'Pagamento dívida',
     d.org || 'Sem credor',
     'Parcela ' + (parcelaRef || '-'),
-    'Banco ' + (banco || 'Nao informado')
+    'Banco ' + (banco || 'Não informado')
   ].join(' | ');
 }
 
 function historicoPagamentosDivida(c, d, excluirLancamentoId) {
-  var prefixo = 'Pagamento divida | ' + (d.org || 'Sem credor') + ' |';
+  var prefixo = 'Pagamento dívida | ' + (d.org || 'Sem credor') + ' |';
   return (c.extrato || [])
     .filter(l => String(l.desc || '').startsWith(prefixo) && (!excluirLancamentoId || l.id !== excluirLancamentoId))
     .map(l => {
@@ -326,14 +326,14 @@ function historicoPagamentosDivida(c, d, excluirLancamentoId) {
         data: l.data || '',
         valor: Number(l.valor || 0),
         parcela: (partes[2] || '').replace(/^Parcela\s*/i, '') || '-',
-        banco: (partes[3] || '').replace(/^Banco\s*/i, '') || 'Nao informado'
+        banco: (partes[3] || '').replace(/^Banco\s*/i, '') || 'Não informado'
       };
     })
     .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
 }
 
 function dividaReferenteAoPagamento(c, lancamento) {
-  if (!c || !lancamento || !String(lancamento.desc || '').startsWith('Pagamento divida |')) return null;
+  if (!c || !lancamento || !String(lancamento.desc || '').startsWith('Pagamento dívida |')) return null;
   var partes = String(lancamento.desc || '').split('|').map(p => p.trim());
   var credor = partes[1] || '';
   return (c.dividas || []).find(d => String(d.org || 'Sem credor') === credor) || null;
@@ -366,8 +366,8 @@ async function recalcularDividaPorHistorico(c, d, excluirLancamentoId) {
   );
 
   if (error) {
-    console.error('Erro ao sincronizar pagamento da divida:', error);
-    alert('O lancamento foi removido, mas nao foi possivel atualizar o saldo da divida: ' + (error.message || 'erro desconhecido'));
+    console.error('Erro ao sincronizar pagamento da dívida:', error);
+    alert('O lançamento foi removido, mas não foi possível atualizar o saldo da dívida: ' + (error.message || 'erro desconhecido'));
   }
 }
 
@@ -442,7 +442,7 @@ function renderDividas() {
           '<div class="dv-hist-item">'
           + '<span class="dh-data">' + (h.data ? h.data.split('-').reverse().join('/') : '-') + '</span>'
           + '<span>Parcela ' + esc(h.parcela || '-') + '</span>'
-          + '<span>' + esc(h.banco || 'Nao informado') + '</span>'
+          + '<span>' + esc(h.banco || 'Não informado') + '</span>'
           + '<span class="dh-val">' + fmt(h.valor || 0) + '</span>'
           + '</div>'
         ).join('')
@@ -488,22 +488,22 @@ function renderDividas() {
     + '<div class="summary-card"><div class="s-label">Atrasadas</div><div class="s-val yellow">' + atrasadas + '</div></div>'
     + '</div>'
     + '<div class="calc-bc">'
-    + '<h3>Renegociacao / nova divida</h3>'
-    + '<div class="calc-sub">Simule a taxa ou a parcela e cadastre a divida na mesma tela.</div>'
+    + '<h3>Renegociação / nova dívida</h3>'
+    + '<div class="calc-sub">Simule a taxa ou a parcela e cadastre a dívida na mesma tela.</div>'
     + '<div class="form-row">'
     + '<div class="form-group"><label>Orgao / credor</label><input type="text" id="dv-org" placeholder="Banco, financeira..."/></div>'
     + '<div class="form-group"><label>Tipo</label><select id="dv-tipo">' + tipoOpts + '</select></div>'
-    + '<div class="form-group"><label>Inicio</label><input type="date" id="dv-inicio"/></div>'
+    + '<div class="form-group"><label>Início</label><input type="date" id="dv-inicio"/></div>'
     + '</div>'
     + '<div class="form-row" style="margin-top:10px">'
-    + '<div class="form-group"><label>Valor da divida</label><input type="text" id="dv-total" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
+    + '<div class="form-group"><label>Valor da dívida</label><input type="text" id="dv-total" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group"><label>IOF (R$)</label><input type="text" id="dv-iof" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group"><label>Parcelas</label><input type="number" id="dv-parcelas" min="1" step="1" placeholder="Ex: 24"/></div>'
     + '<div class="form-group"><label>Valor da parcela</label><input type="text" id="dv-vparcela" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group"><label>Taxa mensal (%)</label><input type="number" id="dv-taxa" min="0" step="0.01" placeholder="Ex: 1.5"/></div>'
-    + '<div class="form-group"><label>Ja pago</label><input type="text" id="dv-pago" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
+    + '<div class="form-group"><label>Já pago</label><input type="text" id="dv-pago" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="simularRenegociacaoDivida()">Simular</button><button class="btn-add" style="width:auto;margin-top:0" onclick="addDivida()">Cadastrar divida</button></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="simularRenegociacaoDivida()">Simular</button><button class="btn-add" style="width:auto;margin-top:0" onclick="addDivida()">Cadastrar dívida</button></div>'
     + calcHtml
     + '</div>'
     + '<div class="form-card"><h3>Filtros</h3>'
@@ -537,7 +537,7 @@ async function insertDividaComFallback(payload) {
   var erroColuna = completo.error.code === '42703' || completo.error.code === 'PGRST204' || msg.includes('column') || msg.includes('schema cache');
   if (!erroColuna) return completo;
 
-  console.warn('Tentando salvar divida com campos basicos apos erro no payload completo:', completo.error);
+  console.warn('Tentando salvar dívida com campos básicos após erro no payload completo:', completo.error);
 
   var basico = {
     cliente_id: payload.cliente_id,
@@ -603,7 +603,7 @@ async function addDivida() {
 
   if (error) {
     console.error(error);
-    alert('Erro ao salvar divida: ' + (error.message || 'erro desconhecido'));
+    alert('Erro ao salvar dívida: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -615,7 +615,7 @@ async function addDivida() {
 
 async function deleteDivida(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
-  if (!(await appConfirm('Excluir divida?', { title: 'Excluir divida', confirmText: 'Excluir' }))) return;
+  if (!(await appConfirm('Excluir dívida?', { title: 'Excluir dívida', confirmText: 'Excluir' }))) return;
 
   var c = data.clients[activeClient];
   var d = c.dividas[i];
@@ -650,7 +650,7 @@ async function registrarPagamentoDivida(i) {
   if (!contaId) banco = '';
 
   if (!valor) return alert('Informe valor');
-  if (!contaId) return alert('Selecione uma conta cadastrada para registrar onde a divida foi paga.');
+  if (!contaId) return alert('Selecione uma conta cadastrada para registrar onde a dívida foi paga.');
 
   var c = data.clients[activeClient];
   var d = c.dividas[i];
@@ -697,8 +697,8 @@ async function registrarPagamentoDivida(i) {
   const extratoError = lancRes.error;
 
   if (extratoError) {
-    console.error('Erro ao lancar pagamento da divida no extrato:', extratoError);
-    alert('Pagamento registrado na divida, mas nao foi possivel incluir no extrato: ' + (extratoError.message || 'erro desconhecido'));
+    console.error('Erro ao lançar pagamento da dívida no extrato:', extratoError);
+    alert('Pagamento registrado na dívida, mas não foi possível incluir no extrato: ' + (extratoError.message || 'erro desconhecido'));
   }
 
   await loadData();

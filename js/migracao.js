@@ -1,7 +1,7 @@
 window.migrarDadosCompletos = async function () {
   const uid = currentUserId();
   if (!uid) {
-    alert('Entre com um usuario antes de migrar os dados.');
+    alert('Entre com um usuário antes de migrar os dados.');
     return;
   }
 

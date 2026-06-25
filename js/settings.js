@@ -4,7 +4,7 @@
 
 function openModal(section, tab) {
   if (section === 'backup' && typeof canSeeBackup === 'function' && !canSeeBackup()) {
-    alert('Backup disponivel apenas para perfis Master e Consultor.');
+    alert('Backup disponível apenas para perfis Master e Consultor.');
     return;
   }
 
@@ -135,9 +135,9 @@ function legalLgpdHtml() {
   return '<div class="settings-section-card legal-doc">'
     + '<div class="settings-card-head"><div><h5>Programa LGPD do Granafy</h5><p>Base inicial de governança e conformidade do produto.</p></div></div>'
     + '<div class="legal-doc-body">'
-    + '<h6>1. O que já existe</h6><p>O produto ja conta com aceite de termos, política de privacidade, perfis de acesso, compartilhamento por cliente, segregacao entre clientes, trilhas operacionais e documentacao inicial de LGPD no repositorio.</p>'
+    + '<h6>1. O que já existe</h6><p>O produto já conta com aceite de termos, política de privacidade, perfis de acesso, compartilhamento por cliente, segregacao entre clientes, trilhas operacionais e documentacao inicial de LGPD no repositorio.</p>'
     + '<h6>2. O que ainda precisa ser fechado</h6><p>As próximas etapas são formalizar canal de atendimento ao titular, política de retenção, procedimento de exportação/correção/exclusão, inventário de operadores e rito de incidente.</p>'
-    + '<h6>3. Referências oficiais usadas</h6><p>Esta fase foi estruturada com base na LGPD, nos guias da ANPD sobre agentes de tratamento, direitos do titular, segurança da informação para pequeno porte e regulamentos aplicáveis.</p>'
+    + '<h6>3. Referências oficiais usadas</h6><p>Está fase foi estruturada com base na LGPD, nos guias da ANPD sobre agentes de tratamento, direitos do titular, segurança da informação para pequeno porte e regulamentos aplicáveis.</p>'
     + '<h6>4. Documentos do projeto</h6><ul><li><code>docs/lgpd-plano-granafy.md</code></li><li><code>docs/lgpd-registro-tratamento.md</code></li><li><code>docs/lgpd-incidentes-e-direitos.md</code></li></ul>'
     + '<h6>5. Recomendação operacional</h6><p>Antes de operar em escala maior, a base deve definir responsável por privacidade, revisar acessos compartilhados, validar backups, mapear retenção e treinar quem concede acesso a clientes e terceiros.</p>'
     + '</div>'
@@ -269,7 +269,7 @@ async function importarCartoesCliente(clienteId, cartoes, resumo) {
     busca = queryCampoOpcional(busca, 'digits', digits);
 
     var existente = await busca.maybeSingle();
-    if (existente.error) throw new Error('Erro ao buscar cartao "' + nome + '": ' + existente.error.message);
+    if (existente.error) throw new Error('Erro ao buscar cartão "' + nome + '": ' + existente.error.message);
 
     if (existente.data) {
       mapa[cartao.id] = existente.data.id;
@@ -290,7 +290,7 @@ async function importarCartoesCliente(clienteId, cartoes, resumo) {
       .select('id')
       .single();
 
-    if (criado.error) throw new Error('Erro ao criar cartao "' + nome + '": ' + criado.error.message);
+    if (criado.error) throw new Error('Erro ao criar cartão "' + nome + '": ' + criado.error.message);
     mapa[cartao.id] = criado.data.id;
     resumo.cartoes++;
   }
@@ -326,7 +326,7 @@ async function importarDividasCliente(clienteId, dividas, resumo) {
     busca = queryCampoOpcional(busca, 'tipo_divida', payload.tipo_divida);
 
     var existente = await busca.maybeSingle();
-    if (existente.error) throw new Error('Erro ao buscar divida de "' + (payload.credor || '-') + '": ' + existente.error.message);
+    if (existente.error) throw new Error('Erro ao buscar dívida de "' + (payload.credor || '-') + '": ' + existente.error.message);
     if (existente.data) {
       resumo.ignorados++;
       continue;
@@ -336,7 +336,7 @@ async function importarDividasCliente(clienteId, dividas, resumo) {
       .from('dividas')
       .insert([Object.assign(payload, getUserScopePayload())]);
 
-    if (inserido.error) throw new Error('Erro ao importar divida de "' + (payload.credor || '-') + '": ' + inserido.error.message);
+    if (inserido.error) throw new Error('Erro ao importar dívida de "' + (payload.credor || '-') + '": ' + inserido.error.message);
     resumo.dividas++;
   }
 }
@@ -373,7 +373,7 @@ async function importarTitulosFinanceirosCliente(clienteId, titulos, resumo) {
     busca = queryCampoOpcional(busca, 'vencimento', payload.vencimento);
 
     var existente = await busca.maybeSingle();
-    if (existente.error) throw new Error('Erro ao buscar titulo financeiro "' + (payload.descricao || '-') + '": ' + existente.error.message);
+    if (existente.error) throw new Error('Erro ao buscar título financeiro "' + (payload.descricao || '-') + '": ' + existente.error.message);
 
     var tituloId = existente.data ? existente.data.id : null;
     if (!tituloId) {
@@ -383,7 +383,7 @@ async function importarTitulosFinanceirosCliente(clienteId, titulos, resumo) {
         .select('id')
         .single();
 
-      if (criado.error) throw new Error('Erro ao importar titulo financeiro "' + (payload.descricao || '-') + '": ' + criado.error.message);
+      if (criado.error) throw new Error('Erro ao importar título financeiro "' + (payload.descricao || '-') + '": ' + criado.error.message);
       tituloId = criado.data.id;
       resumo.titulos++;
     } else {
@@ -517,7 +517,7 @@ async function importarExtratoCliente(clienteId, lancamentos, mapaRelacionamento
     busca = queryCampoOpcional(busca, 'data_lancamento', payload.data_lancamento);
 
     var existente = await busca.maybeSingle();
-    if (existente.error) throw new Error('Erro ao buscar lancamento "' + (payload.descricao || '-') + '": ' + existente.error.message);
+    if (existente.error) throw new Error('Erro ao buscar lançamento "' + (payload.descricao || '-') + '": ' + existente.error.message);
     if (existente.data) {
       resumo.ignorados++;
       continue;
@@ -527,7 +527,7 @@ async function importarExtratoCliente(clienteId, lancamentos, mapaRelacionamento
       .from('lancamentos')
       .insert([Object.assign(payload, getUserScopePayload())]);
 
-    if (inserido.error) throw new Error('Erro ao importar lancamento "' + (payload.descricao || '-') + '": ' + inserido.error.message);
+    if (inserido.error) throw new Error('Erro ao importar lançamento "' + (payload.descricao || '-') + '": ' + inserido.error.message);
     resumo.lancamentos++;
   }
 }
@@ -564,7 +564,7 @@ async function importarLancamentosCartaoCliente(clienteId, lancamentos, mapaCart
     busca = queryCampoOpcional(busca, 'data', payload.data);
 
     var existente = await busca.maybeSingle();
-    if (existente.error) throw new Error('Erro ao buscar lancamento de cartao "' + (payload.descricao || '-') + '": ' + existente.error.message);
+    if (existente.error) throw new Error('Erro ao buscar lançamento de cartão "' + (payload.descricao || '-') + '": ' + existente.error.message);
     if (existente.data) {
       resumo.ignorados++;
       continue;
@@ -574,7 +574,7 @@ async function importarLancamentosCartaoCliente(clienteId, lancamentos, mapaCart
       .from('lancamentos_cartao')
       .insert([Object.assign(payload, getUserScopePayload())]);
 
-    if (inserido.error) throw new Error('Erro ao importar lancamento de cartao "' + (payload.descricao || '-') + '": ' + inserido.error.message);
+    if (inserido.error) throw new Error('Erro ao importar lançamento de cartão "' + (payload.descricao || '-') + '": ' + inserido.error.message);
     resumo.lancamentosCartao++;
   }
 }
@@ -600,7 +600,7 @@ function renderSettingsModal(activeTabKey) {
   var heroText = heroParts.join(', ') + ' sem misturar dados com os outros clientes da base.';
   var tabButtons = ''
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cc" onclick="switchSettingsTab(\'cats_cc\')"><span class="settings-tab-main">Conta Corrente</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + ccCount + '</span></button>'
-    + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartao</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
+    + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartão</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
   if (cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj') {
     tabButtons += '<button class="modal-tab settings-tab-rich" data-stab="cats_financeiro" onclick="switchSettingsTab(\'cats_financeiro\')"><span class="settings-tab-main">Financeiro</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + financeiroCount + '</span></button>';
   }
@@ -676,7 +676,7 @@ function renderLgpdPanel() {
     '<div class="settings-section-card">'
     + '<div class="settings-card-head"><div><h5>LGPD do ambiente</h5><p>Base inicial de governanca para o Granafy e para a operacao deste cliente.</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + esc(clienteNome) + '</span></div></div>'
     + '<div class="settings-card-grid backup-card-grid">'
-      + '<div class="settings-action-card"><span class="settings-action-title">Ja coberto</span><small>Termos e política de privacidade, aceite no cadastro, perfis de acesso, segregacao por cliente, compartilhamento controlado e trilhas operacionais.</small></div>'
+      + '<div class="settings-action-card"><span class="settings-action-title">Já coberto</span><small>Termos e política de privacidade, aceite no cadastro, perfis de acesso, segregacao por cliente, compartilhamento controlado e trilhas operacionais.</small></div>'
       + '<div class="settings-action-card"><span class="settings-action-title">Pendente priorizado</span><small>Canal do titular, retencao e descarte, exportacao/correcao/exclusao, registro formal de incidente e revisao periodica de acessos.</small></div>'
     + '</div>'
     + '<div class="settings-card-grid backup-card-grid" style="margin-top:16px">'
@@ -702,13 +702,13 @@ function renderClientTabsPanel() {
 
   panel.innerHTML =
     '<div class="settings-section-card">'
-    + '<div class="settings-card-head"><div><h5>Abas deste cliente</h5><p>Mostre so o que faz sentido para <strong style="color:var(--text)">' + esc(cliente.name || 'este cliente') + '</strong>. Se uma aba estiver oculta, ela sai apenas da navegacao principal.</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clientTypeLabel(cliente.tipoCliente || 'cliente')) + '</span><span class="settings-card-badge subtle">' + visibleCount + ' visiveis</span></div></div>'
+    + '<div class="settings-card-head"><div><h5>Abas deste cliente</h5><p>Mostre s? o que faz sentido para <strong style="color:var(--text)">' + esc(cliente.name || 'este cliente') + '</strong>. Se uma aba estiver oculta, ela sai apenas da navegacao principal.</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clientTypeLabel(cliente.tipoCliente || 'cliente')) + '</span><span class="settings-card-badge subtle">' + visibleCount + ' visiveis</span></div></div>'
     + '<div class="settings-visibility-list">'
     + tabs.map(function(tab) {
         var checked = !hiddenSet.has(tab.key);
         var disableHide = checked && visibleCount <= 1;
         return '<div class="settings-visibility-item">'
-          + '<div><strong>' + esc(tab.label) + '</strong><p>' + (disableHide ? 'Mantenha pelo menos uma aba visivel.' : 'Mostre ou oculte esta aba na navegacao principal.') + '</p></div>'
+          + '<div><strong>' + esc(tab.label) + '</strong><p>' + (disableHide ? 'Mantenha pelo menos uma aba visivel.' : 'Mostre ou oculte está aba na navegacao principal.') + '</p></div>'
           + '<label class="toggle-switch">'
           + '<input type="checkbox" ' + (checked ? 'checked ' : '') + (disableHide ? 'disabled ' : '') + 'onchange="toggleClientTabVisibility(\'' + esc(tab.key) + '\',this.checked)"/>'
           + '<span class="toggle-track"></span>'
@@ -740,7 +740,7 @@ function toggleClientTabVisibility(tabKey, shouldShow) {
 function renderAuditoriaPanel() {
   document.getElementById('modal-panel-auditoria').innerHTML =
     '<div class="settings-section-card">'
-    + '<div class="settings-card-head"><div><h5>Auditoria de cartoes</h5><p>Verifica lancamentos de cartao sem alterar nenhum dado do banco.</p></div><button class="btn-add" style="margin-top:0" onclick="renderAuditoriaCartoes()">Auditar cartoes agora</button></div>'
+    + '<div class="settings-card-head"><div><h5>Auditoria de cartões</h5><p>Verifica lançamentos de cartão sem alterar nenhum dado do banco.</p></div><button class="btn-add" style="margin-top:0" onclick="renderAuditoriaCartoes()">Auditar cartões agora</button></div>'
     + '<div id="auditoria-cartoes-output" style="margin-top:16px"></div>'
     + '</div>';
 }
@@ -758,29 +758,29 @@ async function renderUsuariosPanel() {
       + '<span class="settings-card-badge subtle">' + (limiteAtual === Infinity ? 'Clientes ilimitados' : ('Limite de ' + limiteAtual + ' cliente' + (limiteAtual === 1 ? '' : 's'))) + '</span>'
       + '</div>';
     var profileOptions = [];
-    if (tipoAtual !== 'usuario') profileOptions.push('<option value="usuario">Usuario</option>');
+    if (tipoAtual !== 'usuario') profileOptions.push('<option value="usuario">Usuário</option>');
     if (tipoAtual !== 'consultor') profileOptions.push('<option value="consultor">Consultor</option>');
     if (tipoAtual !== 'master') profileOptions.push('<option value="master">Master</option>');
     var solicitacaoAtual = authProfile && authProfile.solicitacao_tipo_acesso
-      ? '<p style="color:var(--muted);font-size:.8rem;margin-top:12px">Solicitacao atual: <strong style="color:var(--text)">' + esc(accessTypeLabel(authProfile.solicitacao_tipo_acesso)) + '</strong>'
+      ? '<p style="color:var(--muted);font-size:.8rem;margin-top:12px">Solicitação atual: <strong style="color:var(--text)">' + esc(accessTypeLabel(authProfile.solicitacao_tipo_acesso)) + '</strong>'
         + (authProfile.solicitacao_perfil_em ? ' em ' + esc(formatDate(authProfile.solicitacao_perfil_em)) : '')
         + '.</p>'
       : '';
     panel.innerHTML =
       '<div class="settings-section-card">'
-      + '<div class="settings-card-head"><div><h5>Minha conta</h5><p>Seu perfil atual: <strong style="color:var(--text)">' + esc(perfilAtual) + '</strong>. Se precisar ajustar seu acesso, envie uma solicitacao para um usuario Master.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Minha conta</h5><p>Seu perfil atual: <strong style="color:var(--text)">' + esc(perfilAtual) + '</strong>. Se precisar ajustar seu acesso, envie uma solicitação para um usuário Master.</p></div></div>'
       + resumoAcesso
       + '<div class="settings-user-request">'
       + '<div class="form-group"><label>Perfil solicitado</label><select id="perfil-solicitado">' + profileOptions.join('') + '</select></div>'
       + '<div class="form-group"><label>Motivo</label><textarea id="perfil-solicitacao-motivo" rows="4" placeholder="Explique por que voce precisa desse perfil."></textarea></div>'
-      + '<button class="btn-add" style="margin-top:6px" onclick="solicitarAlteracaoPerfil()">Enviar solicitacao</button>'
+      + '<button class="btn-add" style="margin-top:6px" onclick="solicitarAlteracaoPerfil()">Enviar solicitação</button>'
       + solicitacaoAtual
       + '</div>'
       + '</div>';
     return;
   }
 
-  panel.innerHTML = '<p style="color:var(--muted);font-size:.83rem">Carregando usuarios...</p>';
+  panel.innerHTML = '<p style="color:var(--muted);font-size:.83rem">Carregando usuários...</p>';
 
   const { data: perfis, error } = await supabaseClient
     .from('perfis')
@@ -796,7 +796,7 @@ async function renderUsuariosPanel() {
   panel.innerHTML =
     '<div class="settings-section-card">'
     + '<div class="settings-card-head"><div><h5>Perfis de acesso</h5><p>Gerencie perfil, limite de clientes, plano, status e solicitações pendentes.</p></div></div>'
-    + '<div class="user-table-wrap settings-table-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Limite</th><th>Plano</th><th>Status</th><th>Solicitacao</th><th></th></tr></thead><tbody>'
+    + '<div class="user-table-wrap settings-table-wrap"><table><thead><tr><th>Usuário</th><th>Tipo</th><th>Limite</th><th>Plano</th><th>Status</th><th>Solicitação</th><th></th></tr></thead><tbody>'
     + (perfis || []).map(function(p) {
       var id = esc(p.id);
       var tipoAtual = normalizeAccessType(p.tipo_acesso);
@@ -808,7 +808,7 @@ async function renderUsuariosPanel() {
         : '<span style="color:var(--muted);font-size:.72rem">Sem solicitação</span>';
       return '<tr>'
         + '<td><strong>' + esc(p.nome || p.email || '-') + '</strong><br><span style="color:var(--muted);font-size:.72rem">' + esc(p.email || '-') + (p.telefone ? ' · ' + esc(p.telefone) : '') + '</span></td>'
-        + '<td><select id="usr-tipo-' + id + '"><option value="usuario"' + (tipoAtual === 'usuario' ? ' selected' : '') + '>Usuario</option><option value="consultor"' + (tipoAtual === 'consultor' ? ' selected' : '') + '>Consultor</option><option value="master"' + (tipoAtual === 'master' ? ' selected' : '') + '>Master</option></select></td>'
+        + '<td><select id="usr-tipo-' + id + '"><option value="usuario"' + (tipoAtual === 'usuario' ? ' selected' : '') + '>Usuário</option><option value="consultor"' + (tipoAtual === 'consultor' ? ' selected' : '') + '>Consultor</option><option value="master"' + (tipoAtual === 'master' ? ' selected' : '') + '>Master</option></select></td>'
         + '<td><input id="usr-limite-' + id + '" type="number" min="0" value="' + limiteAtual + '"/></td>'
         + '<td><input id="usr-plano-' + id + '" value="' + esc(p.plano || 'gratuito') + '"/></td>'
         + '<td><select id="usr-status-' + id + '"><option value="ativo"' + (p.status === 'ativo' ? ' selected' : '') + '>Ativo</option><option value="teste"' + (p.status === 'teste' ? ' selected' : '') + '>Teste</option><option value="bloqueado"' + (p.status === 'bloqueado' ? ' selected' : '') + '>Bloqueado</option></select></td>'
@@ -844,7 +844,7 @@ async function salvarPerfilUsuario(id) {
 
   if (error) {
     console.error(error);
-    alert('Nao foi possivel salvar o usuario.');
+    alert('Não foi possível salvar o usuário.');
     return;
   }
 
@@ -899,7 +899,7 @@ function renderCatsPanel(tipo) {
 
   var cats = tipo === 'cc' ? loadCatsCC() : (tipo === 'cartao' ? loadCatsCartao() : (tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto()));
   var pid = 'modal-panel-cats_' + panelSuffix;
-  var TIPOS_DRE = { receita: 'Receita', fixa: 'Fixa', variavel: 'Variavel', transferencia: 'Transferencia' };
+  var TIPOS_DRE = { receita: 'Receita', fixa: 'Fixa', variavel: 'Variavel', transferência: 'Transferencia' };
   var clienteNome = (data.clients[activeClient] && data.clients[activeClient].name) || 'cliente atual';
 
   var tagHtml = '';
@@ -935,7 +935,7 @@ function renderCatsPanel(tipo) {
   var desc = tipo === 'cc'
     ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
     : (tipo === 'cartao'
-      ? 'Categorias dos lançamentos do <strong style="color:var(--text)">Cartao de Credito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variável no DRE.'
+      ? 'Categorias dos lançamentos do <strong style="color:var(--text)">Cartão de Crédito</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Entram como despesa variável no DRE.'
       : (tipo === 'financeiro'
         ? 'Categorias do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Use essas opções em contas a receber e contas a pagar.'
         : 'Centros de custo do <strong style="color:var(--text)">Financeiro PJ</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Organize extrato e títulos por área de responsabilidade.'));
@@ -944,7 +944,7 @@ function renderCatsPanel(tipo) {
 
   document.getElementById(pid).innerHTML =
     '<div class="settings-section-card">'
-    + '<div class="settings-card-head"><div><h5>' + (tipo === 'cc' ? 'Categorias da conta corrente' : (tipo === 'cartao' ? 'Categorias do cartao' : (tipo === 'financeiro' ? 'Categorias do financeiro' : 'Centros de custo'))) + '</h5><p>' + desc + '</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + totalCats + ' ' + esc(tipo === 'centro_custo' ? 'centros' : 'categorias') + '</span></div></div>'
+    + '<div class="settings-card-head"><div><h5>' + (tipo === 'cc' ? 'Categorias da conta corrente' : (tipo === 'cartao' ? 'Categorias do cartão' : (tipo === 'financeiro' ? 'Categorias do financeiro' : 'Centros de custo'))) + '</h5><p>' + desc + '</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + totalCats + ' ' + esc(tipo === 'centro_custo' ? 'centros' : 'categorias') + '</span></div></div>'
     + '<div class="settings-cat-grid" id="tagList-' + tipo + '">' + tagHtml + '</div>'
     + '<div class="tag-input-row settings-tag-input-row">'
     + '<input type="text" id="newCatInput-' + tipo + '" placeholder="' + esc(tipo === 'centro_custo' ? 'Novo centro de custo...' : 'Nova categoria...') + '" onkeydown="if(event.key===\'Enter\')addCategory(\'' + tipo + '\')"/>'
@@ -997,17 +997,17 @@ function addCategory(tipo) {
 
   if (tipo === 'cc') {
     var cats = loadCatsCC();
-    if (cats.find(function(c) { return normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
+    if (cats.find(function(c) { return normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(val); })) return alert('Categoria já existe.');
     cats.push({ nome: val, tipo: 'variavel' });
     saveCatsCC(cats);
   } else if (tipo === 'cartao') {
     var carts = loadCatsCartao();
-    if (carts.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert('Categoria ja existe.');
+    if (carts.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert('Categoria já existe.');
     carts.push(val);
     saveCatsCartao(carts);
   } else {
     var lista = tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto();
-    if (lista.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert((tipo === 'centro_custo' ? 'Centro de custo' : 'Categoria') + ' ja existe.');
+    if (lista.find(function(c) { return normalizarNomeCategoria(c) === normalizarNomeCategoria(val); })) return alert((tipo === 'centro_custo' ? 'Centro de custo' : 'Categoria') + ' já existe.');
     lista.push(val);
     if (tipo === 'financeiro') saveCatsFinanceiro(lista);
     else saveCentrosCusto(lista);
@@ -1067,7 +1067,7 @@ function openEditCategoryModal(tipo, i) {
     '<div class="form-row">'
     + '<div class="form-group"><label>Nome</label><input type="text" id="cat-edit-nome" value="' + esc(nome) + '" placeholder="Nome da categoria"/></div>'
     + (tipo === 'cc'
-      ? '<div class="form-group" style="max-width:180px"><label>Tipo</label><select id="cat-edit-tipo"><option value="receita"' + (tipoAtual === 'receita' ? ' selected' : '') + '>Receita</option><option value="fixa"' + (tipoAtual === 'fixa' ? ' selected' : '') + '>Fixa</option><option value="variavel"' + (tipoAtual === 'variavel' ? ' selected' : '') + '>Variavel</option><option value="transferencia"' + (tipoAtual === 'transferencia' ? ' selected' : '') + '>Transferencia</option></select></div>'
+      ? '<div class="form-group" style="max-width:180px"><label>Tipo</label><select id="cat-edit-tipo"><option value="receita"' + (tipoAtual === 'receita' ? ' selected' : '') + '>Receita</option><option value="fixa"' + (tipoAtual === 'fixa' ? ' selected' : '') + '>Fixa</option><option value="variavel"' + (tipoAtual === 'variavel' ? ' selected' : '') + '>Variavel</option><option value="transferência"' + (tipoAtual === 'transferência' ? ' selected' : '') + '>Transferencia</option></select></div>'
       : '')
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
@@ -1109,7 +1109,7 @@ async function saveCategoryEdit(tipo, i) {
     var cats = loadCatsCC();
     var atual = cats[i];
     if (!atual || atual.fixa) return;
-    if (cats.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
+    if (cats.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c.nome || c) === normalizarNomeCategoria(nome); })) return alert('Categoria já existe.');
 
     var nomeAntigo = atual.nome || '';
     atual.nome = nome;
@@ -1123,7 +1123,7 @@ async function saveCategoryEdit(tipo, i) {
       renderSettingsModal('cats_cc');
       refreshCategoryConsumers('cc');
     } catch (err) {
-      alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err.message);
+      alert('Não foi possível renomear a categoria nos lançamentos: ' + err.message);
     }
     return;
   }
@@ -1131,7 +1131,7 @@ async function saveCategoryEdit(tipo, i) {
   if (tipo === 'cartao') {
     var carts = loadCatsCartao();
     if (!carts[i]) return;
-    if (carts.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert('Categoria ja existe.');
+    if (carts.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert('Categoria já existe.');
 
     var nomeAntigoCartao = String(carts[i] || '');
     carts[i] = nome;
@@ -1143,14 +1143,14 @@ async function saveCategoryEdit(tipo, i) {
       renderSettingsModal('cats_cartao');
       refreshCategoryConsumers('cartao');
     } catch (err2) {
-      alert('Nao foi possivel renomear a categoria nos lancamentos: ' + err2.message);
+      alert('Não foi possível renomear a categoria nos lançamentos: ' + err2.message);
     }
     return;
   }
 
   var lista = tipo === 'financeiro' ? loadCatsFinanceiro() : loadCentrosCusto();
   if (!lista[i]) return;
-  if (lista.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert((tipo === 'centro_custo' ? 'Centro de custo' : 'Categoria') + ' ja existe.');
+  if (lista.some(function(c, idx) { return idx !== i && normalizarNomeCategoria(c) === normalizarNomeCategoria(nome); })) return alert((tipo === 'centro_custo' ? 'Centro de custo' : 'Categoria') + ' já existe.');
   lista[i] = nome;
   if (tipo === 'financeiro') {
     await Promise.resolve(saveCatsFinanceiro(lista));

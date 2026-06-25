@@ -28,7 +28,7 @@ async function buscarTodasLinhas(tabela, colunas) {
 
 async function auditarCartoes() {
   const [lancamentos, clientes, cartoes] = await Promise.all([
-    buscarTodasLinhas('lancamentos_cartao', 'id,cliente_id,cartao_id,data,descricao,categoria,tipo,valor'),
+    buscarTodasLinhas('lancamentos_cartao', 'id,cliente_id,cartao_id,data,descrição,categoria,tipo,valor'),
     buscarTodasLinhas('clientes', 'id,nome'),
     buscarTodasLinhas('cartoes', 'id,cliente_id,nome,digits')
   ]);
@@ -59,7 +59,7 @@ async function auditarCartoes() {
       id: row.id,
       cliente: cliente ? cliente.nome : '(cliente ausente)',
       cliente_id: row.cliente_id || null,
-      cartao: cartao ? cartao.nome : '(cartao ausente)',
+      cartao: cartao ? cartao.nome : '(cartão ausente)',
       cartao_id: row.cartao_id || null,
       data: row.data || '',
       descricao: row.descricao || '',
@@ -79,19 +79,19 @@ async function auditarCartoes() {
     const valor = Number(row.valor || 0);
 
     if (!row.cliente_id || !clientesMap[row.cliente_id]) {
-      addProblema(row, 'cliente_invalido', 'Lancamento sem cliente valido.');
+      addProblema(row, 'cliente_invalido', 'Lançamento sem cliente valido.');
     }
 
     if (!row.cartao_id) {
-      addProblema(row, 'cartao_vazio', 'Lancamento sem cartao vinculado.');
+      addProblema(row, 'cartao_vazio', 'Lançamento sem cartão vinculado.');
     } else if (!cartao) {
-      addProblema(row, 'cartao_inexistente', 'Lancamento aponta para cartao que nao existe.');
+      addProblema(row, 'cartao_inexistente', 'Lançamento aponta para cartão que não existe.');
     } else if (row.cliente_id && cartao.cliente_id !== row.cliente_id) {
-      addProblema(row, 'cartao_de_outro_cliente', 'Cartao pertence a outro cliente.');
+      addProblema(row, 'cartao_de_outro_cliente', 'Cartão pertence a outro cliente.');
     }
 
     if (!row.tipo) {
-      addProblema(row, 'tipo_vazio', 'Tipo vazio; deve ser lancamento ou estorno.');
+      addProblema(row, 'tipo_vazio', 'Tipo vazio; deve ser lançamento ou estorno.');
     } else if (!tiposValidos.includes(row.tipo)) {
       addProblema(row, 'tipo_invalido', 'Tipo fora do padrao esperado.');
     }
@@ -115,7 +115,7 @@ async function auditarCartoes() {
     problemas
   };
 
-  console.group('Auditoria de cartoes');
+  console.group('Auditoria de cartões');
   console.log('Resumo:', resultado);
   console.table(problemas);
   console.groupEnd();
@@ -140,16 +140,16 @@ async function renderAuditoriaCartoes() {
 
     output.innerHTML =
       '<div class="summary-grid" style="margin-top:14px">'
-      + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + resultado.totalLancamentos + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">' + resultado.totalLancamentos + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Problemas</div><div class="s-val red">' + resultado.totalProblemas + '</div></div>'
       + '</div>'
       + (resultado.totalProblemas
-        ? '<p style="color:var(--muted);font-size:.83rem;margin:12px 0">Detalhes completos tambem foram enviados para o console do navegador.</p>'
+        ? '<p style="color:var(--muted);font-size:.83rem;margin:12px 0">Detalhes completos também foram enviados para o console do navegador.</p>'
           + '<p class="section-title">Problemas por tipo</p>'
           + '<table><thead><tr><th>Tipo</th><th>Total</th></tr></thead><tbody>' + tipos + '</tbody></table>'
           + '<p class="section-title" style="margin-top:14px">Problemas por cliente</p>'
           + '<table><thead><tr><th>Cliente</th><th>Total</th></tr></thead><tbody>' + clientes + '</tbody></table>'
-        : '<p style="color:var(--success);font-size:.86rem;margin-top:12px">Nenhum problema encontrado nos lancamentos de cartao.</p>');
+        : '<p style="color:var(--success);font-size:.86rem;margin-top:12px">Nenhum problema encontrado nos lançamentos de cartão.</p>');
   } catch (err) {
     output.innerHTML = '<p style="color:var(--danger);font-size:.83rem">Erro ao auditar: ' + esc(err.message || String(err)) + '</p>';
   }

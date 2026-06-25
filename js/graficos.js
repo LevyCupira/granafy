@@ -241,7 +241,7 @@ function graficosFaturasPorPeriodo(cliente, periodos, colors) {
   var lancamentos = cliente.cartao || [];
 
   if (lancamentos.some(function(it) { return !it.cartaoId; })) {
-    cartoes.push({ id: '__sem_cartao', nome: 'Sem cartao' });
+    cartoes.push({ id: '__sem_cartao', nome: 'Sem cartão' });
   }
 
   return cartoes.map(function(cartao, i) {
@@ -273,13 +273,13 @@ function graficosResumoHtml(totalReceitas, totalDespesas, resultado, transacoes,
     + '<div class="summary-card"><div class="s-label">Resultado</div><div class="s-val ' + (resultado >= 0 ? 'green' : 'red') + '">' + fmt(resultado) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Margem</div><div class="s-val ' + (margem >= 0 ? 'green' : 'red') + '">' + margem.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</div></div>'
     + '<div class="summary-card"><div class="s-label">Transacoes</div><div class="s-val blue">' + transacoes + '</div></div>'
-    + '<div class="summary-card"><div class="s-label">Fatura cartao</div><div class="s-val yellow">' + fmt(faturaTotal) + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Fatura cartão</div><div class="s-val yellow">' + fmt(faturaTotal) + '</div></div>'
     + '</div>';
 }
 
 function graficosRankingHtml(categorias, total, tipo) {
   if (!categorias.length) {
-    return '<div class="empty-state" style="padding:24px 12px">Nenhuma categoria no periodo.</div>';
+    return '<div class="empty-state" style="padding:24px 12px">Nenhuma categoria no período.</div>';
   }
 
   return '<div class="charts-ranking">'
@@ -366,8 +366,8 @@ function graficosAbrirCategoriaDetalhes(key) {
     + '</div>'
     + graficosCategoriasDoDetalheHtml(detalhe)
     + (itens.length
-      ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>Data transacao</th><th>Origem</th><th>Categoria</th><th>Descricao</th><th>Evento</th><th>Valor</th></tr></thead><tbody>' + itens.map(graficosDetalheItemHtml).join('') + '</tbody></table></div>'
-      : '<div class="empty-state" style="padding:24px">Nenhum lancamento encontrado.</div>')
+      ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>Data transacao</th><th>Origem</th><th>Categoria</th><th>Descrição</th><th>Evento</th><th>Valor</th></tr></thead><tbody>' + itens.map(graficosDetalheItemHtml).join('') + '</tbody></table></div>'
+      : '<div class="empty-state" style="padding:24px">Nenhum lançamento encontrado.</div>')
     + '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button></div>';
   document.getElementById('modalOverlay').classList.add('open');
   document.addEventListener('keydown', handleMainModalEscape);
@@ -530,7 +530,7 @@ function graficosLancamentosExtratoEventos(cliente, periodos, eventoIds, incluir
 }
 
 function graficosEventosDetalheHtml(eventosResumo) {
-  if (!eventosResumo.length) return '<div class="empty-state" style="padding:24px 12px">Nenhum titulo vinculado aos eventos no periodo.</div>';
+  if (!eventosResumo.length) return '<div class="empty-state" style="padding:24px 12px">Nenhum título vinculado aos eventos no período.</div>';
   return '<div class="charts-ranking">'
     + eventosResumo.slice().sort(function(a, b) { return b.resultado - a.resultado; }).map(function(item) {
       var margem = item.receita > 0 ? Math.round((item.resultado / item.receita) * 100) : 0;
@@ -641,12 +641,12 @@ function renderGraficos() {
   var faturaTotal = faturaDatasets.reduce(function(total, ds) {
     return total + ds.data.reduce(function(s, valor) { return s + Number(valor || 0); }, 0);
   }, 0);
-  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
+  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um período';
 
   if (_graficosView === 'eventos' && !eventosDisponiveis.length) _graficosView = 'geral';
   var controlsHtml =
     '<div class="charts-workbench-controls">'
-      + '<label class="charts-control"><span>Periodo</span>' + buildPeriodoMultiSelect('graficos-periodos-sel', mesesSet, periodos, 'renderGraficos()') + '</label>'
+      + '<label class="charts-control"><span>Período</span>' + buildPeriodoMultiSelect('graficos-periodos-sel', mesesSet, periodos, 'renderGraficos()') + '</label>'
       + (eventosDisponiveis.length ? '<label class="charts-control"><span>' + esc((c.eventosLabel || 'Eventos')) + '</span>' + graficosBuildEventoMultiSelect('graficos-eventos-sel', eventosDisponiveis, eventosSelecionados) + '</label>' : '')
       + '<label class="charts-control"><span>Fluxo</span><select onchange="graficosSetFluxoModo(this.value)">'
         + '<option value="barras"' + (_graficosFluxoModo === 'barras' ? ' selected' : '') + '>Barras</option>'
@@ -662,7 +662,7 @@ function renderGraficos() {
   var headerHtml =
     '<div class="charts-workbench-hero">'
       + '<div class="charts-workbench-head">'
-        + '<div><h3>Graficos</h3><p class="cartao-helper-text">Analise fluxo, categorias, eventos e cartoes por periodo.</p></div>'
+        + '<div><h3>Graficos</h3><p class="cartao-helper-text">Analise fluxo, categorias, eventos e cartões por período.</p></div>'
         + controlsHtml
       + '</div>'
       + '<div class="charts-period-note">' + esc(periodoTexto) + '</div>'
@@ -672,7 +672,7 @@ function renderGraficos() {
       + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'geral' ? ' active' : '') + '" onclick="graficosSetView(\'geral\')"><span>Geral</span><strong>' + transacoesPeriodo.length + '</strong></button>'
       + (eventosDisponiveis.length ? '<button type="button" class="charts-workbench-tab' + (_graficosView === 'eventos' ? ' active' : '') + '" onclick="graficosSetView(\'eventos\')"><span>' + esc(c.eventosLabel || 'Eventos') + '</span><strong>' + eventosResumo.length + '</strong></button>' : '')
       + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'categorias' ? ' active' : '') + '" onclick="graficosSetView(\'categorias\')"><span>Categorias</span><strong>' + (eventosDisponiveis.length ? categoriasEventos.itens.length : categorias.itens.length) + '</strong></button>'
-      + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'cartao' ? ' active' : '') + '" onclick="graficosSetView(\'cartao\')"><span>Cartao</span><strong>' + faturaDatasets.length + '</strong></button>'
+      + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'cartao' ? ' active' : '') + '" onclick="graficosSetView(\'cartao\')"><span>Cartão</span><strong>' + faturaDatasets.length + '</strong></button>'
       + '<button type="button" class="charts-workbench-tab' + (_graficosView === 'comparacoes' ? ' active' : '') + '" onclick="graficosSetView(\'comparacoes\')"><span>Comparacoes</span><strong>' + periodosGrafico.length + '</strong></button>'
     + '</div>';
   var rankingHtml = graficosRankingHtml(eventosDisponiveis.length ? categoriasEventos.itens : categorias.itens, eventosDisponiveis.length ? categoriasEventos.total : categorias.total, eventosDisponiveis.length ? 'despesas' : _graficosCategoriaModo);
@@ -696,7 +696,7 @@ function renderGraficos() {
       + '<div class="chart-card"><h4>Detalhe do ranking</h4>' + rankingHtml + '</div>'
     + '</div>';
   } else if (_graficosView === 'cartao') {
-    activeHtml = '<div class="chart-card"><h4>Fatura do cartao por mes</h4><div class="chart-wrap-tall"><canvas id="chart-fatura"></canvas></div></div>';
+    activeHtml = '<div class="chart-card"><h4>Fatura do cartão por mes</h4><div class="chart-wrap-tall"><canvas id="chart-fatura"></canvas></div></div>';
   } else if (_graficosView === 'comparacoes') {
     activeHtml = '<div class="charts-grid-main">'
       + '<div class="chart-card chart-card-wide"><h4>Fluxo financeiro</h4><div class="chart-wrap"><canvas id="chart-recdesp"></canvas></div></div>'
@@ -717,7 +717,7 @@ function renderGraficos() {
   var eventosCanvas = document.getElementById('chart-eventos');
   if (eventosDisponiveis.length && eventosCanvas) {
     if (!eventosResumo.length) {
-      eventosCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhum titulo vinculado aos eventos no periodo.</div>';
+      eventosCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhum título vinculado aos eventos no período.</div>';
     } else {
       _chartInstances.eventos = new Chart(eventosCanvas, {
         type: 'bar',
@@ -766,7 +766,7 @@ function renderGraficos() {
     : graficosMontarDetalhesCategoriaGeral(transacoesPeriodo, categoriasGrafico, _graficosCategoriaModo);
   var categoriasCanvas = document.getElementById('chart-categorias');
   if (categoriasCanvas && !categoriasGrafico.itens.length) {
-    categoriasCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma categoria no periodo.</div>';
+    categoriasCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma categoria no período.</div>';
   } else if (categoriasCanvas) {
     _chartInstances.categorias = new Chart(categoriasCanvas, {
       type: 'bar',
@@ -795,7 +795,7 @@ function renderGraficos() {
   destroyChart('fatura');
   var faturaCanvas = document.getElementById('chart-fatura');
   if (faturaCanvas && !faturaDatasets.length) {
-    faturaCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma fatura no periodo.</div>';
+    faturaCanvas.parentElement.innerHTML = '<div class="empty-state" style="padding:40px 0">Nenhuma fatura no período.</div>';
   } else if (faturaCanvas) {
     _chartInstances.fatura = new Chart(faturaCanvas, {
       type: 'bar',

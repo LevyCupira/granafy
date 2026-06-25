@@ -1,7 +1,7 @@
 // Categorias da conta corrente e do cartao.
-// A categoria "Mov. Contas" e fixa e representa transferencia interna.
+// A categoria "Mov. Contas" e fixa e representa transferência interna.
 
-var CATEGORIA_MOV_CONTAS = { nome: 'Mov. Contas', tipo: 'transferencia', fixa: true };
+var CATEGORIA_MOV_CONTAS = { nome: 'Mov. Contas', tipo: 'transferência', fixa: true };
 
 var DC_CC = [
   { nome: 'Salario', tipo: 'receita' },
@@ -225,7 +225,7 @@ function saveCatsCC(lista, clientId) {
   localStorage.setItem(catsCCStorageKey(alvo), JSON.stringify(normalizada));
   var syncPromise = persistirCategoriasClienteNoSupabase('cc', normalizada, alvo);
   syncPromise.catch(function(err) {
-    console.error('Nao foi possivel sincronizar categorias CC no Supabase:', err);
+    console.error('Não foi possível sincronizar categorias CC no Supabase:', err);
   });
   return syncPromise;
 }
@@ -336,7 +336,7 @@ function saveCatsCartao(lista, clientId) {
   localStorage.setItem(catsCartaoStorageKey(alvo), JSON.stringify(normalizada));
   var syncPromise = persistirCategoriasClienteNoSupabase('cartao', normalizada, alvo);
   syncPromise.catch(function(err) {
-    console.error('Nao foi possivel sincronizar categorias de cartao no Supabase:', err);
+    console.error('Não foi possível sincronizar categorias de cartão no Supabase:', err);
   });
   return syncPromise;
 }
@@ -372,7 +372,7 @@ function saveCatsFinanceiro(lista, clientId) {
     }
   })();
   syncPromise.catch(function(err) {
-    console.error('Nao foi possivel sincronizar categorias financeiras no Supabase:', err);
+    console.error('Não foi possível sincronizar categorias financeiras no Supabase:', err);
   });
   return syncPromise;
 }
@@ -405,7 +405,7 @@ function saveCentrosCusto(lista, clientId) {
     }
   })();
   syncPromise.catch(function(err) {
-    console.error('Nao foi possivel sincronizar centros de custo no Supabase:', err);
+    console.error('Não foi possível sincronizar centros de custo no Supabase:', err);
   });
   return syncPromise;
 }
@@ -427,7 +427,7 @@ function nomesCentrosCusto(clientId) {
 }
 
 function tipoCat(nomeCategoria, clientId) {
-  if (isCategoriaMovContas(nomeCategoria)) return 'transferencia';
+  if (isCategoriaMovContas(nomeCategoria)) return 'transferência';
   var cats = loadCatsCC(clientId);
   var found = cats.find(function(c) {
     return normalizarNomeCategoria(c.nome) === normalizarNomeCategoria(nomeCategoria);

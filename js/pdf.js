@@ -31,7 +31,7 @@ function exportPDF() {
   var mesFiltro = periodosFiltro.length === 1 ? periodosFiltro[0] : '';
   var periodoLabel = periodosFiltro.length
     ? periodosFiltro.map(formatPeriodoLabel).join(', ')
-    : 'Periodo selecionado';
+    : 'Período selecionado';
 
   doc.setFillColor(30, 35, 54);
   doc.rect(0, 0, W, 28, 'F');
@@ -41,8 +41,8 @@ function exportPDF() {
   doc.text('Granafy', M, 12);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('Relatorio Financeiro - ' + c.name, M + 30, 12);
-  doc.text('Periodo: ' + periodoLabel, M + 30, 18);
+  doc.text('Relatório Financeiro - ' + c.name, M + 30, 12);
+  doc.text('Período: ' + periodoLabel, M + 30, 18);
   doc.text('Gerado em ' + hoje, W - M, 19, { align: 'right' });
   doc.setFontSize(8);
   doc.setTextColor(150, 175, 220);
@@ -94,7 +94,7 @@ function exportPDF() {
     ['Total Receitas', fmtPos(tR), '#1fad90'],
     ['Total Despesas', fmtNeg(tD), '#e03b3b'],
     ['Resultado', fmtSigned(saldo), saldo >= 0 ? '#1fad90' : '#e03b3b'],
-    ['Fatura Cartao', fmtNeg(faturaTotal), '#d4900a']
+    ['Fatura Cartão', fmtNeg(faturaTotal), '#d4900a']
   ];
   var cw = (W - M * 2 - 9) / 4;
   cards.forEach(function(card, i) {

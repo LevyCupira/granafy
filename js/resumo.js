@@ -65,7 +65,7 @@ function getTransacoes(clienteId) {
 
   (c.cartao || []).filter(function(l) { return l.tipo !== 'estorno'; }).forEach(function(l, idx) {
     var cc = (c.cartoes || []).find(function(x) { return x.id === l.cartaoId; });
-    var fonte = cc ? 'Cartao ' + cc.nome : 'Cartao de Credito';
+    var fonte = cc ? 'Cartao ' + cc.nome : 'Cartão de Crédito';
     result.push({
       data: l.data,
       desc: l.desc,
@@ -89,7 +89,7 @@ function isCategoriaCartaoCreditoResumo(cat) {
     .toLowerCase()
     .replace(/\s+/g, ' ');
 
-  return normalizada === 'cartao de credito';
+  return normalizada === 'cartão de crédito';
 }
 
 function filtrarExtratoResumoDuplicados(lancamentos) {
@@ -204,7 +204,7 @@ function lerPeriodosSelecionados(id, meses, atual) {
 
 function buildPeriodoMultiSelect(id, meses, selecionados, onChange) {
   var selectedMap = new Set(selecionados || []);
-  var label = (selecionados || []).length ? selecionados.map(formatPeriodoLabel).join(', ') : 'Selecionar periodo';
+  var label = (selecionados || []).length ? selecionados.map(formatPeriodoLabel).join(', ') : 'Selecionar período';
   var checks = meses.map(function(m) {
     return '<label class="period-option"><input type="checkbox" value="' + m + '"' + (selectedMap.has(m) ? ' checked' : '') + '/><span>' + formatPeriodoLabel(m) + '</span></label>';
   }).join('');
@@ -255,7 +255,7 @@ function renderResumo() {
   var movEntradas = movContas.filter(function(l) { return resumoEhCredito(l.tipo); }).reduce(function(s, l) { return s + l.valor; }, 0);
   var movSaidas = movContas.filter(function(l) { return resumoEhDebito(l.tipo); }).reduce(function(s, l) { return s + l.valor; }, 0);
 
-  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um periodo';
+  var periodoTexto = periodos.length ? periodos.map(formatPeriodoLabel).join(', ') : 'Selecione um período';
 
   var barR = receitas.map(function(entry) {
     var cat = entry.cat, val = entry.valor;
@@ -274,7 +274,7 @@ function renderResumo() {
   var transacoesTabela = movContas.concat(consolidado.analiticas);
   var tabela = transacoesTabela.length === 0
     ? '<div class="empty-state" style="padding:26px"><div class="icon">&#128202;</div>Nenhum lançamento no período.</div>'
-    : '<table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Descricao</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>'
+    : '<table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>'
       + transacoesTabela.slice().sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); }).map(function(l) {
           var ehCredito = resumoEhCredito(l.tipo);
           var tipoLabel = ehCredito ? 'Receita' : 'Despesa';
@@ -293,8 +293,8 @@ function renderResumo() {
       + '</tbody></table>';
 
   var observacoes = movContas.length
-    ? '<div class="form-card" style="margin-top:18px"><h3>Observacoes do periodo</h3>'
-      + '<p style="color:var(--muted);font-size:.82rem;line-height:1.5">A categoria <strong style="color:var(--text)">Mov. Contas</strong> representa transferencia interna entre contas. Por isso ela nao entra como receita nem como despesa nos totais.</p>'
+    ? '<div class="form-card" style="margin-top:18px"><h3>Observacoes do período</h3>'
+      + '<p style="color:var(--muted);font-size:.82rem;line-height:1.5">A categoria <strong style="color:var(--text)">Mov. Contas</strong> representa transferência interna entre contas. Por isso ela não entra como receita nem como despesa nos totais.</p>'
       + '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:.84rem">'
       + '<span>Entradas internas: <strong style="color:var(--success)">' + fmt(movEntradas) + '</strong></span>'
       + '<span>Saidas internas: <strong style="color:var(--danger)">' + fmt(movSaidas) + '</strong></span>'
@@ -307,9 +307,9 @@ function renderResumo() {
   var resumoHeader =
     '<div class="resumo-workbench-hero">'
       + '<div class="resumo-workbench-head">'
-        + '<div><h3>Resumo</h3><p class="cartao-helper-text">Consolide receitas, despesas, resultado e movimentos do periodo selecionado.</p></div>'
+        + '<div><h3>Resumo</h3><p class="cartao-helper-text">Consolide receitas, despesas, resultado e movimentos do período selecionado.</p></div>'
         + '<div class="resumo-period-control">'
-          + '<span class="period-label">Periodo</span>'
+          + '<span class="period-label">Período</span>'
           + buildPeriodoMultiSelect('resumo-periodos-sel', meses, periodos, 'renderResumo()')
         + '</div>'
       + '</div>'
@@ -326,7 +326,7 @@ function renderResumo() {
     '<div class="resumo-workbench-tabs">'
       + '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'geral' ? ' active' : '') + '" onclick="setResumoView(\'geral\')"><span>Visao geral</span><strong>' + periodos.length + '</strong></button>'
       + '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'categorias' ? ' active' : '') + '" onclick="setResumoView(\'categorias\')"><span>Categorias</span><strong>' + (receitas.length + despesas.length) + '</strong></button>'
-      + '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'lancamentos' ? ' active' : '') + '" onclick="setResumoView(\'lancamentos\')"><span>Lancamentos</span><strong>' + transacoesTabela.length + '</strong></button>'
+      + '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'lancamentos' ? ' active' : '') + '" onclick="setResumoView(\'lancamentos\')"><span>Lançamentos</span><strong>' + transacoesTabela.length + '</strong></button>'
       + (movContas.length ? '<button type="button" class="resumo-workbench-tab' + (_resumoView === 'observacoes' ? ' active' : '') + '" onclick="setResumoView(\'observacoes\')"><span>Observacoes</span><strong>' + movContas.length + '</strong></button>' : '')
     + '</div>';
   var categoriasView =
@@ -336,7 +336,7 @@ function renderResumo() {
     + '</div>';
   var geralView =
     '<div class="resumo-panel-grid">'
-      + '<div class="form-card resumo-insight-card"><h3>Resultado do periodo</h3><strong class="' + (resultado >= 0 ? 'val-pos' : 'val-neg') + '">' + fmt(resultado) + '</strong><p class="cartao-helper-text">Receitas menos despesas no periodo selecionado.</p></div>'
+      + '<div class="form-card resumo-insight-card"><h3>Resultado do período</h3><strong class="' + (resultado >= 0 ? 'val-pos' : 'val-neg') + '">' + fmt(resultado) + '</strong><p class="cartao-helper-text">Receitas menos despesas no período selecionado.</p></div>'
       + '<div class="form-card resumo-insight-card"><h3>Margem</h3><strong class="' + (resultado >= 0 ? 'val-pos' : 'val-neg') + '">' + (tR > 0 ? Math.round((resultado / tR) * 1000) / 10 : 0).toLocaleString('pt-BR') + '%</strong><p class="cartao-helper-text">Quanto do faturamento virou resultado.</p></div>'
       + '<div class="form-card resumo-insight-card"><h3>Maior receita</h3><strong class="val-pos">' + (receitas[0] ? fmt(receitas[0].valor) : fmt(0)) + '</strong><p class="cartao-helper-text">' + esc(receitas[0] ? receitas[0].cat : 'Sem receitas') + '</p></div>'
       + '<div class="form-card resumo-insight-card"><h3>Maior despesa</h3><strong class="val-neg">' + (despesas[0] ? fmt(despesas[0].valor) : fmt(0)) + '</strong><p class="cartao-helper-text">' + esc(despesas[0] ? despesas[0].cat : 'Sem despesas') + '</p></div>'
@@ -344,7 +344,7 @@ function renderResumo() {
     + categoriasView;
   var activeView = geralView;
   if (_resumoView === 'categorias') activeView = categoriasView;
-  if (_resumoView === 'lancamentos') activeView = '<div class="form-card resumo-table-card"><div class="resumo-section-head"><div><h3>Lancamentos do periodo</h3><p class="cartao-helper-text">Movimentos considerados no resumo consolidado.</p></div></div>' + tabela + '</div>';
+  if (_resumoView === 'lancamentos') activeView = '<div class="form-card resumo-table-card"><div class="resumo-section-head"><div><h3>Lançamentos do período</h3><p class="cartao-helper-text">Movimentos considerados no resumo consolidado.</p></div></div>' + tabela + '</div>';
   if (_resumoView === 'observacoes') activeView = observacoes || '';
 
   document.getElementById('resumo-content').innerHTML = resumoHeader + resumoCards + tabs + '<div class="resumo-workbench-view">' + activeView + '</div>';

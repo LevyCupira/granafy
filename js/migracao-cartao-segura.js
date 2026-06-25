@@ -1,7 +1,7 @@
 window.migrarCartaoSemDuplicar = async function () {
   const uid = currentUserId();
   if (!uid) {
-    alert('Entre com um usuario antes de migrar os cartoes.');
+    alert('Entre com um usuário antes de migrar os cartões.');
     return;
   }
 
@@ -88,7 +88,7 @@ window.migrarCartaoSemDuplicar = async function () {
     for (const it of (cliente.cartao || [])) {
       const cartaoIdNovo = it.cartaoId ? mapaCartoes[it.cartaoId] || null : null;
       if (!cartaoIdNovo) {
-        console.warn('Lancamento de cartao ignorado sem cartao vinculado:', nomeCliente, it);
+        console.warn('Lançamento de cartão ignorado sem cartão vinculado:', nomeCliente, it);
         continue;
       }
 

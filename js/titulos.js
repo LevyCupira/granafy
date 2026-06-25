@@ -407,7 +407,7 @@ function tfExportRows() {
 function tfExportXlsx() {
   if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente.');
   var rows = tfExportRows();
-  if (!rows.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  if (!rows.length) return alert('Não ha dados para exportar com os filtros atuais.');
   var cliente = tfClienteAtivo();
   var resumo = [
     ['Cliente', cliente.name || ''],
@@ -416,7 +416,7 @@ function tfExportXlsx() {
     ['Pessoa', _tfPessoa || ''],
     ['Descricao', _tfDescricao || ''],
     ['Vencimento de', _tfVencimentoDe ? formatDate(_tfVencimentoDe) : ''],
-    ['Vencimento ate', _tfVencimentoAte ? formatDate(_tfVencimentoAte) : ''],
+    ['Vencimento até', _tfVencimentoAte ? formatDate(_tfVencimentoAte) : ''],
     ['Valor', (_tfValorModo === 'todos' || !_tfValor) ? '' : (_tfValorModo + ' ' + fmt(_tfValor))],
     ['Centro de custo', _tfCentroCusto === '__sem_centro__' ? 'Sem centro' : (tfNomeCentroCustoById(_tfCentroCusto) || '')],
     [tfEventosLabel(), _tfEvento === '__sem_evento__' ? 'Sem ' + tfEventosLabel().toLowerCase() : (tfNomeEventoById(_tfEvento) || '')],
@@ -442,17 +442,17 @@ function tfImportGuideHtml() {
     + '<div class="import-guide-grid">'
     + '<span class="import-guide-chip required">vencimento</span>'
     + '<span class="import-guide-chip required">pessoa</span>'
-    + '<span class="import-guide-chip">descricao</span>'
+    + '<span class="import-guide-chip">descrição</span>'
     + '<span class="import-guide-chip required">valor</span>'
-    + '<span class="import-guide-chip">observacao</span>'
+    + '<span class="import-guide-chip">observação</span>'
     + '<span class="import-guide-chip">natureza</span>'
     + (tfEventosEnabled() ? '<span class="import-guide-chip">' + esc(tfEventosLabel().toLowerCase()) + '</span>' : '')
     + '</div>'
     + '<ul class="import-guide-list">'
     + '<li>Sem a coluna <strong>natureza</strong>, importa para a aba aberta: A Receber ou A Pagar.</li>'
     + '<li>Use <strong>receber</strong> ou <strong>pagar</strong> na coluna natureza quando quiser misturar no mesmo arquivo.</li>'
-    + '<li>A coluna <strong>descricao</strong> e opcional; quando vazia, o sistema cria uma descricao automatica.</li>'
-    + '<li>Linhas duplicadas iguais a titulos ja cadastrados serao ignoradas.</li>'
+    + '<li>A coluna <strong>descrição</strong> é opcional; quando vazia, o sistema cria uma descrição automática.</li>'
+    + '<li>Linhas duplicadas iguais a títulos já cadastrados serao ignoradas.</li>'
     + '</ul>'
     + '</div>';
 }
@@ -473,7 +473,7 @@ function tfExportImportTemplate() {
 }
 
 function tfAbrirImportacaoTitulos() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente primeiro.');
   var input = document.getElementById('importTitulosXlsxInput');
   if (input) input.click();
@@ -525,7 +525,7 @@ async function importTitulosXlsx(event) {
   var file = event.target.files[0];
   if (!file) return;
   if (!activeClient) return alert('Selecione um cliente primeiro.');
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var reader = new FileReader();
   reader.onload = async function(e) {
@@ -543,7 +543,7 @@ async function importTitulosXlsx(event) {
     var iEvento = tfHeaderIndex(header, ['evento', 'projeto', 'obra', 'campanha', 'contrato']);
 
     if (iVenc < 0 || iPessoa < 0 || iVal < 0) {
-      return alert('Planilha invalida. Colunas obrigatorias: vencimento, pessoa e valor.');
+      return alert('Planilha inválida. Colunas obrigatórias: vencimento, pessoa e valor.');
     }
 
     var cliente = tfClienteAtivo();
@@ -597,7 +597,7 @@ async function importTitulosXlsx(event) {
     });
 
     if (!payloads.length) {
-      return alert('Nenhum titulo valido para importar.' + (ignorados ? ' ' + ignorados + ' linha(s) ignorada(s).' : ''));
+      return alert('Nenhum título valido para importar.' + (ignorados ? ' ' + ignorados + ' linha(s) ignorada(s).' : ''));
     }
 
     var response = await supabaseClient
@@ -605,14 +605,14 @@ async function importTitulosXlsx(event) {
       .insert(payloads);
 
     if (response.error) {
-      console.error('Erro ao importar titulos financeiros:', response.error);
-      return alert('Nao foi possivel importar os titulos. Verifique a planilha e a migracao do Financeiro PJ.');
+      console.error('Erro ao importar títulos financeiros:', response.error);
+      return alert('Não foi possível importar os títulos. Verifique a planilha e a migração do Financeiro PJ.');
     }
 
     if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'importacao_titulos');
     await loadData();
     renderFinanceiro();
-    alert(payloads.length + ' titulo(s) importado(s) com sucesso!' + (ignorados ? ' ' + ignorados + ' linha(s) ignorada(s).' : ''));
+    alert(payloads.length + ' título(s) importado(s) com sucesso!' + (ignorados ? ' ' + ignorados + ' linha(s) ignorada(s).' : ''));
   };
 
   reader.readAsArrayBuffer(file);
@@ -624,7 +624,7 @@ function tfExportPDF() {
   if (!jsPDF) return alert('Biblioteca PDF não carregada.');
   if (!activeClient || !tfClienteAtivo()) return alert('Selecione um cliente.');
   var rows = tfExportRows();
-  if (!rows.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  if (!rows.length) return alert('Não ha dados para exportar com os filtros atuais.');
   var cliente = tfClienteAtivo();
   var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   var hoje = new Date().toLocaleString('pt-BR');
@@ -640,7 +640,7 @@ function tfExportPDF() {
   doc.text('Gerado em ' + hoje, 283, 19, { align: 'right' });
   doc.setFontSize(9);
   doc.setTextColor(90, 96, 122);
-  doc.text('Status: ' + (_tfStatus || 'todos') + ' | Pessoa: ' + (_tfPessoa || '-') + ' | Descricao: ' + (_tfDescricao || '-') + ' | Busca: ' + (_tfBusca || '-'), 14, 31);
+  doc.text('Status: ' + (_tfStatus || 'todos') + ' | Pessoa: ' + (_tfPessoa || '-') + ' | Descrição: ' + (_tfDescricao || '-') + ' | Busca: ' + (_tfBusca || '-'), 14, 31);
   doc.autoTable({
     startY: 36,
     head: [['Vencimento', 'Pessoa', 'Descricao', 'Status', 'Total', 'Baixado', 'Saldo', 'Observacao']],
@@ -840,7 +840,7 @@ function tfOrcamentoOptionsHtml(naturezaTitulo, eventoId, selectedId, includeEmp
     if (categoriaComp) return categoriaComp;
     return String(tfNomeEventoById(a.eventoId) || '').localeCompare(String(tfNomeEventoById(b.eventoId) || ''), 'pt-BR', { sensitivity: 'base' });
   });
-  return '<option value="">' + esc(includeEmptyLabel || 'Sem vinculo com orcamento') + '</option>' + linhas.map(function(linha) {
+  return '<option value="">' + esc(includeEmptyLabel || 'Sem vínculo com orçamento') + '</option>' + linhas.map(function(linha) {
     return '<option value="' + esc(linha.id) + '"' + (linha.id === atual ? ' selected' : '') + '>' + esc(tfOrcamentoLabelLinha(linha)) + '</option>';
   }).join('');
 }
@@ -915,8 +915,8 @@ function tfStatusEventoLabel(status) {
 }
 
 async function tfEnableEventosModulo() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (!tfClienteEhPJ()) return alert('O modulo de eventos/projetos esta disponivel apenas para clientes PJ.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  if (!tfClienteEhPJ()) return alert('O módulo de eventos/projetos está disponível apenas para clientes PJ.');
 
   var label = formatDescriptionTitleCase((document.getElementById('tf-eventos-enable-label') || {}).value || 'Eventos') || 'Eventos';
   var response = await applyUserScope(
@@ -959,17 +959,17 @@ function tfEventoFormHtml(evento) {
       + '<div class="form-group" style="max-width:170px"><label>Status</label><select id="' + idAttr + '-status">'
         + '<option value="planejado"' + (evento.status === 'planejado' ? ' selected' : '') + '>Planejado</option>'
         + '<option value="em_andamento"' + ((!evento.status || evento.status === 'em_andamento') ? ' selected' : '') + '>Em andamento</option>'
-        + '<option value="concluido"' + (evento.status === 'concluido' ? ' selected' : '') + '>Concluido</option>'
+        + '<option value="concluido"' + (evento.status === 'concluido' ? ' selected' : '') + '>Concluído</option>'
         + '<option value="cancelado"' + (evento.status === 'cancelado' ? ' selected' : '') + '>Cancelado</option>'
       + '</select></div>'
-      + '<div class="form-group" style="max-width:150px"><label>Ativo</label><select id="' + idAttr + '-ativo"><option value="true"' + (evento.ativo !== false ? ' selected' : '') + '>Sim</option><option value="false"' + (evento.ativo === false ? ' selected' : '') + '>Nao</option></select></div>'
+      + '<div class="form-group" style="max-width:150px"><label>Ativo</label><select id="' + idAttr + '-ativo"><option value="true"' + (evento.ativo !== false ? ' selected' : '') + '>Sim</option><option value="false"' + (evento.ativo === false ? ' selected' : '') + '>Não</option></select></div>'
     + '</div>'
     + '<div class="form-row">'
-      + '<div class="form-group" style="max-width:170px"><label>Inicio</label><input type="text" id="' + idAttr + '-inicio" class="flex-date-input" value="' + esc(evento.dataInicio ? formatDate(evento.dataInicio) : '') + '" placeholder="dd/mm/aaaa"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Inicio</label><input type="text" id="' + idAttr + '-início" class="flex-date-input" value="' + esc(evento.dataInicio ? formatDate(evento.dataInicio) : '') + '" placeholder="dd/mm/aaaa"/></div>'
       + '<div class="form-group" style="max-width:170px"><label>Fim</label><input type="text" id="' + idAttr + '-fim" class="flex-date-input" value="' + esc(evento.dataFim ? formatDate(evento.dataFim) : '') + '" placeholder="dd/mm/aaaa"/></div>'
-      + '<div class="form-group" style="max-width:190px"><label>Orcamento previsto</label><input type="text" id="' + idAttr + '-orcamento" class="money-input" value="' + esc(Number(evento.orcamentoPrevisto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
+      + '<div class="form-group" style="max-width:190px"><label>Orçamento previsto</label><input type="text" id="' + idAttr + '-orçamento" class="money-input" value="' + esc(Number(evento.orcamentoPrevisto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
     + '</div>'
-    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="' + idAttr + '-obs" value="' + esc(evento.observacao || '') + '" placeholder="Detalhes internos"/></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>Observação</label><input type="text" id="' + idAttr + '-obs" value="' + esc(evento.observacao || '') + '" placeholder="Detalhes internos"/></div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">'
       + (evento.id ? '<button type="button" class="btn-sm red" onclick="tfCancelEventoEdit()">Cancelar</button>' : '')
       + '<button type="button" class="btn-add" style="margin-top:0" onclick="' + (evento.id ? 'tfSaveEvento(\'' + evento.id + '\')' : 'tfAddEvento()') + '">' + (evento.id ? 'Salvar ' : 'Cadastrar ') + esc(tfEventosLabel().slice(0, -1) || 'evento') + '</button>'
@@ -981,17 +981,17 @@ function tfReadEventoPayload(prefix) {
   var nome = formatDescriptionTitleCase((document.getElementById(prefix + '-nome') || {}).value || '');
   var status = ((document.getElementById(prefix + '-status') || {}).value || 'em_andamento').trim();
   var ativo = ((document.getElementById(prefix + '-ativo') || {}).value || 'true') === 'true';
-  var inicioEl = document.getElementById(prefix + '-inicio');
+  var inícioEl = document.getElementById(prefix + '-início');
   var fimEl = document.getElementById(prefix + '-fim');
-  var dataInicio = inicioEl ? readFlexibleDateInput(inicioEl) : '';
+  var dataInicio = inícioEl ? readFlexibleDateInput(inícioEl) : '';
   var dataFim = fimEl ? readFlexibleDateInput(fimEl) : '';
-  if (inicioEl && inicioEl.value.trim() && !dataInicio) return alert('Informe uma data valida para inicio.'), null;
-  if (fimEl && fimEl.value.trim() && !dataFim) return alert('Informe uma data valida para fim.'), null;
+  if (inícioEl && inícioEl.value.trim() && !dataInicio) return alert('Informe uma data válida para início.'), null;
+  if (fimEl && fimEl.value.trim() && !dataFim) return alert('Informe uma data válida para fim.'), null;
   return {
     nome: nome,
     status: status,
     ativo: ativo,
-    data_inicio: dataInicio || null,
+    data_início: dataInicio || null,
     data_fim: dataFim || null,
     orcamento_previsto: parseMoney(document.getElementById(prefix + '-orcamento')) || 0,
     observacao: ((document.getElementById(prefix + '-obs') || {}).value || '').trim() || null
@@ -999,8 +999,8 @@ function tfReadEventoPayload(prefix) {
 }
 
 async function tfAddEvento() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (!tfEventosEnabled()) return alert('Habilite o modulo de eventos no cadastro do cliente PJ.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  if (!tfEventosEnabled()) return alert('Habilite o módulo de eventos no cadastro do cliente PJ.');
   var payload = tfReadEventoPayload('tf-evento-new');
   if (!payload) return;
   if (!payload.nome) return alert('Informe o nome do ' + tfEventosLabel().toLowerCase() + '.');
@@ -1035,7 +1035,7 @@ function tfCancelEventoEdit() {
 }
 
 async function tfSaveEvento(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var payload = tfReadEventoPayload('tf-evento-edit');
   if (!payload) return;
   if (!payload.nome) return alert('Informe o nome do ' + tfEventosLabel().toLowerCase() + '.');
@@ -1049,7 +1049,7 @@ async function tfSaveEvento(id) {
 
   if (response.error) {
     console.error('Erro ao salvar evento:', response.error);
-    alert('Nao foi possivel salvar o evento.');
+    alert('Não foi possível salvar o evento.');
     return;
   }
 
@@ -1059,11 +1059,11 @@ async function tfSaveEvento(id) {
 }
 
 async function tfDeleteEvento(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var usado = tfTitulosCliente().some(function(item) { return item.eventoId === id; });
-  if (usado) return alert('Este evento esta vinculado a titulos financeiros. Remova o vinculo antes de excluir.');
+  if (usado) return alert('Este evento está vinculado a títulos financeiros. Remova o vínculo antes de excluir.');
   var temOrcamento = tfOrcamentoLinhasEvento(id).length > 0;
-  if (temOrcamento) return alert('Este evento tem linhas de orcamento. Exclua o orcamento antes de remover o evento.');
+  if (temOrcamento) return alert('Este evento tem linhas de orçamento. Exclua o orçamento antes de remover o evento.');
   var ok = await appConfirm('Excluir este evento/projeto?', { title: 'Excluir evento', confirmText: 'Excluir' });
   if (!ok) return;
 
@@ -1076,7 +1076,7 @@ async function tfDeleteEvento(id) {
 
   if (response.error) {
     console.error('Erro ao excluir evento:', response.error);
-    alert('Nao foi possivel excluir o evento.');
+    alert('Não foi possível excluir o evento.');
     return;
   }
 
@@ -1134,11 +1134,11 @@ function tfUpdateLocalOrcamentoLinha(row) {
 }
 
 async function tfAddOrcamentoLinha() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (!tfEventosEnabled()) return alert('Habilite o modulo de eventos antes de cadastrar orcamento.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  if (!tfEventosEnabled()) return alert('Habilite o módulo de eventos antes de cadastrar orçamento.');
   var payload = tfReadOrcamentoLinhaPayload('tf-orc-new');
   if (!payload.evento_id) return alert('Selecione o evento.');
-  if (!payload.categoria) return alert('Informe a categoria do orcamento.');
+  if (!payload.categoria) return alert('Informe a categoria do orçamento.');
   if (payload.valor_orcado <= 0 && payload.valor_previsto <= 0) return alert('Informe ao menos o valor orcado ou previsto.');
 
   var response = await supabaseClient
@@ -1150,7 +1150,7 @@ async function tfAddOrcamentoLinha() {
     .single();
 
   if (response.error) {
-    console.error('Erro ao cadastrar linha de orcamento:', response.error);
+    console.error('Erro ao cadastrar linha de orçamento:', response.error);
     alert('Nao foi possivel cadastrar a linha. Rode a migracao 20260615_orcamento_eventos.sql no Supabase.');
     return;
   }
@@ -1172,10 +1172,10 @@ function tfCancelOrcamentoLinhaEdit() {
 }
 
 async function tfSaveOrcamentoLinha(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var payload = tfReadOrcamentoLinhaPayload('tf-orc-edit');
   if (!payload.evento_id) return alert('Selecione o evento.');
-  if (!payload.categoria) return alert('Informe a categoria do orcamento.');
+  if (!payload.categoria) return alert('Informe a categoria do orçamento.');
 
   var response = await applyUserScope(
     supabaseClient
@@ -1185,8 +1185,8 @@ async function tfSaveOrcamentoLinha(id) {
   ).select().single();
 
   if (response.error) {
-    console.error('Erro ao salvar linha de orcamento:', response.error);
-    alert('Nao foi possivel salvar a linha de orcamento.');
+    console.error('Erro ao salvar linha de orçamento:', response.error);
+    alert('Não foi possível salvar a linha de orçamento.');
     return;
   }
 
@@ -1197,10 +1197,10 @@ async function tfSaveOrcamentoLinha(id) {
 }
 
 async function tfDeleteOrcamentoLinha(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (tfTitulosPorOrcamentoLinha(id).length) return alert('Esta linha ja tem titulos financeiros vinculados. Remova o vinculo antes de excluir.');
-  if (tfOrcamentoRealizacoesLinha(id).length) return alert('Esta linha tem realizacoes conciliadas no Extrato. Desconcilie os valores antes de excluir.');
-  var ok = await appConfirm('Excluir esta linha de orcamento?', { title: 'Excluir orcamento', confirmText: 'Excluir' });
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  if (tfTitulosPorOrcamentoLinha(id).length) return alert('Está linha já tem títulos financeiros vinculados. Remova o vínculo antes de excluir.');
+  if (tfOrcamentoRealizacoesLinha(id).length) return alert('Está linha tem realizações conciliadas no Extrato. Desconcilie os valores antes de excluir.');
+  var ok = await appConfirm('Excluir está linha de orçamento?', { title: 'Excluir orçamento', confirmText: 'Excluir' });
   if (!ok) return;
 
   var response = await applyUserScope(
@@ -1211,8 +1211,8 @@ async function tfDeleteOrcamentoLinha(id) {
   );
 
   if (response.error) {
-    console.error('Erro ao excluir linha de orcamento:', response.error);
-    alert('Nao foi possivel excluir a linha.');
+    console.error('Erro ao excluir linha de orçamento:', response.error);
+    alert('Não foi possível excluir a linha.');
     return;
   }
 
@@ -1223,23 +1223,23 @@ async function tfDeleteOrcamentoLinha(id) {
 }
 
 async function tfGerarTituloDoOrcamento(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var linha = tfOrcamentoLinhaById(id);
   if (!linha) return;
-  if (tfTitulosPorOrcamentoLinha(linha.id).length) return alert('Esta linha do orcamento ja tem conta vinculada. Use a conta existente para registrar novas baixas.');
+  if (tfTitulosPorOrcamentoLinha(linha.id).length) return alert('Está linha do orçamento já tem conta vinculada. Use a conta existente para registrar novas baixas.');
   var naturezaTitulo = linha.natureza === 'receita' ? 'receber' : 'pagar';
   var realizacoesDiretas = tfOrcamentoRealizacoesLinha(linha.id);
   var totalRealizadoDireto = realizacoesDiretas.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
   var valor = totalRealizadoDireto > 0 ? totalRealizadoDireto : tfOrcamentoPrevistoLinha(linha);
-  if (valor <= 0) return alert('Informe um valor previsto antes de gerar o titulo.');
+  if (valor <= 0) return alert('Informe um valor previsto antes de gerar o título.');
   var pessoa = linha.pessoaNome || (naturezaTitulo === 'receber' ? 'Cliente do evento' : 'Fornecedor do evento');
   var descricao = linha.descricao || linha.categoria || tfNomeEventoById(linha.eventoId);
 
   var ok = await appConfirm(
     (realizacoesDiretas.length ? 'Confirmar o valor realizado e gerar' : 'Gerar') + ' conta a '
-      + (naturezaTitulo === 'receber' ? 'receber' : 'pagar') + ' de ' + fmt(valor) + ' para esta linha?'
-      + (realizacoesDiretas.length ? ' As ' + realizacoesDiretas.length + ' conciliacao(oes) do Extrato serao levadas para a conta.' : ''),
-    { title: realizacoesDiretas.length ? 'Confirmar realizacao' : 'Gerar titulo financeiro', confirmText: realizacoesDiretas.length ? 'Confirmar e gerar' : 'Gerar' }
+      + (naturezaTitulo === 'receber' ? 'receber' : 'pagar') + ' de ' + fmt(valor) + ' para está linha?'
+      + (realizacoesDiretas.length ? ' As ' + realizacoesDiretas.length + ' conciliação(oes) do Extrato serao levadas para a conta.' : ''),
+    { title: realizacoesDiretas.length ? 'Confirmar realizacao' : 'Gerar título financeiro', confirmText: realizacoesDiretas.length ? 'Confirmar e gerar' : 'Gerar' }
   );
   if (!ok) return;
 
@@ -1264,7 +1264,7 @@ async function tfGerarTituloDoOrcamento(id) {
     .single();
 
   if (response.error) {
-    console.error('Erro ao gerar titulo pelo orcamento:', response.error);
+    console.error('Erro ao gerar título pelo orçamento:', response.error);
     alert('Nao foi possivel gerar o titulo. Rode a migracao 20260615_orcamento_eventos.sql no Supabase.');
     return;
   }
@@ -1276,16 +1276,16 @@ async function tfGerarTituloDoOrcamento(id) {
         cliente_id: activeClient,
         data_baixa: item.data || new Date().toISOString().slice(0, 10),
         valor: Number(item.valor || 0),
-        observacao: item.observacao || ('Realizado diretamente pelo orcamento: ' + (linha.categoria || '')),
+        observacao: item.observacao || ('Realizado diretamente pelo orçamento: ' + (linha.categoria || '')),
         origem: 'extrato',
         extrato_lancamento_id: item.lancamentoId
       }, getUserScopePayload());
     });
     var baixasResponse = await supabaseClient.from('titulos_financeiros_baixas').insert(baixasPayload);
     if (baixasResponse.error) {
-      console.error('Erro ao transferir realizacoes para o titulo:', baixasResponse.error);
+      console.error('Erro ao transferir realizações para o título:', baixasResponse.error);
       await applyUserScope(supabaseClient.from('titulos_financeiros').delete().eq('id', response.data.id));
-      alert('A conta nao foi gerada porque nao foi possivel transferir as conciliacoes do orcamento. Nenhuma realizacao foi perdida.');
+      alert('A conta não foi gerada porque não foi possível transferir as conciliacoes do orçamento. Nenhuma realizacao foi perdida.');
       return;
     }
 
@@ -1294,9 +1294,9 @@ async function tfGerarTituloDoOrcamento(id) {
       supabaseClient.from('orcamento_eventos_realizacoes').delete().in('id', realizacoesIds)
     );
     if (remocaoResponse.error) {
-      console.error('Erro ao concluir transferencia das realizacoes:', remocaoResponse.error);
+      console.error('Erro ao concluir transferência das realizações:', remocaoResponse.error);
       await applyUserScope(supabaseClient.from('titulos_financeiros').delete().eq('id', response.data.id));
-      alert('A conta nao foi gerada porque a transferencia nao pode ser concluida. As conciliacoes continuam no orcamento.');
+      alert('A conta não foi gerada porque a transferência não pode ser concluida. As conciliacoes continuam no orçamento.');
       return;
     }
 
@@ -1304,7 +1304,7 @@ async function tfGerarTituloDoOrcamento(id) {
       .from('orcamento_eventos_linhas')
       .update({ valor_previsto: valor, status: 'realizado' })
       .eq('id', linha.id);
-    if (linhaResponse.error) console.warn('Nao foi possivel atualizar o status final da linha:', linhaResponse.error);
+    if (linhaResponse.error) console.warn('Não foi possível atualizar o status final da linha:', linhaResponse.error);
   }
 
   if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'titulo_orcamento_criado');
@@ -1315,7 +1315,7 @@ async function tfGerarTituloDoOrcamento(id) {
 }
 
 async function tfConfirmarRealizacoesOrcamento(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var linha = tfOrcamentoLinhaById(id);
   if (!linha) return;
   var realizacoesDiretas = tfOrcamentoRealizacoesLinha(linha.id);
@@ -1323,17 +1323,17 @@ async function tfConfirmarRealizacoesOrcamento(id) {
 
   var titulos = tfTitulosPorOrcamentoLinha(linha.id);
   if (!titulos.length) return tfGerarTituloDoOrcamento(id);
-  if (titulos.length > 1) return alert('Esta linha possui mais de uma conta vinculada. Use Ver contas para escolher onde registrar a baixa.');
+  if (titulos.length > 1) return alert('Está linha possui mais de uma conta vinculada. Use Ver contas para escolher onde registrar a baixa.');
 
   var titulo = titulos[0];
   var totalRealizadoDireto = realizacoesDiretas.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
-  if (totalRealizadoDireto <= 0) return alert('Nao ha valor realizado para confirmar nesta linha.');
+  if (totalRealizadoDireto <= 0) return alert('Não ha valor realizado para confirmar nesta linha.');
   if (totalRealizadoDireto > tfSaldo(titulo) + 0.01) {
     return alert('O valor realizado ultrapassa o saldo da conta vinculada. Ajuste a conta antes de confirmar.');
   }
 
   var ok = await appConfirm(
-    'Confirmar ' + fmt(totalRealizadoDireto) + ' realizado no orcamento dentro da conta "' + (titulo.descricao || titulo.pessoaNome || linha.categoria || '') + '"?',
+    'Confirmar ' + fmt(totalRealizadoDireto) + ' realizado no orçamento dentro da conta "' + (titulo.descricao || titulo.pessoaNome || linha.categoria || '') + '"?',
     { title: 'Confirmar realizacao', confirmText: 'Confirmar na conta' }
   );
   if (!ok) return;
@@ -1344,7 +1344,7 @@ async function tfConfirmarRealizacoesOrcamento(id) {
       cliente_id: activeClient,
       data_baixa: item.data || new Date().toISOString().slice(0, 10),
       valor: Number(item.valor || 0),
-      observacao: item.observacao || ('Realizado diretamente pelo orcamento: ' + (linha.categoria || '')),
+      observacao: item.observacao || ('Realizado diretamente pelo orçamento: ' + (linha.categoria || '')),
       origem: 'extrato',
       extrato_lancamento_id: item.lancamentoId
     }, getUserScopePayload());
@@ -1352,8 +1352,8 @@ async function tfConfirmarRealizacoesOrcamento(id) {
 
   var baixasResponse = await supabaseClient.from('titulos_financeiros_baixas').insert(baixasPayload);
   if (baixasResponse.error) {
-    console.error('Erro ao transferir realizacoes para a conta vinculada:', baixasResponse.error);
-    alert('Nao foi possivel confirmar as realizacoes na conta vinculada.');
+    console.error('Erro ao transferir realizações para a conta vinculada:', baixasResponse.error);
+    alert('Não foi possível confirmar as realizações na conta vinculada.');
     return;
   }
 
@@ -1362,8 +1362,8 @@ async function tfConfirmarRealizacoesOrcamento(id) {
     supabaseClient.from('orcamento_eventos_realizacoes').delete().in('id', realizacoesIds)
   );
   if (remocaoResponse.error) {
-    console.error('Erro ao concluir transferencia das realizacoes:', remocaoResponse.error);
-    alert('As baixas foram registradas, mas nao foi possivel limpar as realizacoes diretas do orcamento. Atualize e confira a linha.');
+    console.error('Erro ao concluir transferência das realizações:', remocaoResponse.error);
+    alert('As baixas foram registradas, mas não foi possível limpar as realizações diretas do orçamento. Atualize e confira a linha.');
     return;
   }
 
@@ -1371,7 +1371,7 @@ async function tfConfirmarRealizacoesOrcamento(id) {
     .from('orcamento_eventos_linhas')
     .update({ status: 'realizado' })
     .eq('id', linha.id);
-  if (linhaResponse.error) console.warn('Nao foi possivel atualizar o status final da linha:', linhaResponse.error);
+  if (linhaResponse.error) console.warn('Não foi possível atualizar o status final da linha:', linhaResponse.error);
 
   if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'realizacao_orcamento_confirmada');
   await loadData();
@@ -1395,7 +1395,7 @@ function tfOpenVincularTituloOrcamentoModal(linhaId) {
   if (!linha) return;
   var titulos = tfTitulosVinculaveisOrcamento(linha);
   var jaVinculados = tfTitulosPorOrcamentoLinha(linha.id);
-  document.getElementById('modalTitle').textContent = 'Vincular conta ao orcamento';
+  document.getElementById('modalTitle').textContent = 'Vincular conta ao orçamento';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-card-badges" style="margin:0 0 14px 0">'
       + '<span class="settings-card-badge">' + esc(tfNaturezaOrcamentoLabel(linha.natureza)) + '</span>'
@@ -1415,14 +1415,14 @@ function tfOpenVincularTituloOrcamentoModal(linhaId) {
       : '<div class="empty-state" style="padding:22px">Nenhuma conta compativel encontrada neste evento.</div>')
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
       + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
-      + (titulos.length ? '<button class="btn-add" type="button" style="margin-top:0" onclick="tfSalvarVinculosOrcamento(\'' + linha.id + '\')">Salvar vinculos</button>' : '')
+      + (titulos.length ? '<button class="btn-add" type="button" style="margin-top:0" onclick="tfSalvarVinculosOrcamento(\'' + linha.id + '\')">Salvar vínculos</button>' : '')
     + '</div>';
   document.getElementById('modalOverlay').classList.add('open');
   document.addEventListener('keydown', handleMainModalEscape);
 }
 
 async function tfSalvarVinculosOrcamento(linhaId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var linha = tfOrcamentoLinhaById(linhaId);
   if (!linha) return;
   var selecionados = Array.from(document.querySelectorAll('.tf-link-title-item input[type="checkbox"]:checked')).map(function(input) {
@@ -1442,8 +1442,8 @@ async function tfSalvarVinculosOrcamento(linhaId) {
         .in('id', paraVincular)
     );
     if (vincularRes.error) {
-      console.error('Erro ao vincular titulos ao orcamento:', vincularRes.error);
-      alert('Nao foi possivel vincular as contas ao orcamento.');
+      console.error('Erro ao vincular títulos ao orçamento:', vincularRes.error);
+      alert('Não foi possível vincular as contas ao orçamento.');
       return;
     }
   }
@@ -1456,8 +1456,8 @@ async function tfSalvarVinculosOrcamento(linhaId) {
         .in('id', paraDesvincular)
     );
     if (desvincularRes.error) {
-      console.error('Erro ao desvincular titulos do orcamento:', desvincularRes.error);
-      alert('Nao foi possivel remover alguns vinculos.');
+      console.error('Erro ao desvincular títulos do orçamento:', desvincularRes.error);
+      alert('Não foi possível remover alguns vínculos.');
       return;
     }
   }
@@ -1520,14 +1520,14 @@ function tfOrcamentoFormHtml(linha) {
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>Fornecedor / pagador</label><input type="text" id="' + prefix + '-pessoa" value="' + esc(linha.pessoaNome || '') + '" placeholder="Opcional"/></div>'
-      + '<div class="form-group"><label>Descricao</label><input type="text" id="' + prefix + '-descricao" value="' + esc(linha.descricao || '') + '" placeholder="Opcional"/></div>'
+      + '<div class="form-group"><label>Descrição</label><input type="text" id="' + prefix + '-descricao" value="' + esc(linha.descricao || '') + '" placeholder="Opcional"/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group" style="max-width:170px"><label>Valor orcado</label><input type="text" id="' + prefix + '-orcado" class="money-input" value="' + esc(Number(linha.valorOrcado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
       + '<div class="form-group" style="max-width:170px"><label>Valor previsto</label><input type="text" id="' + prefix + '-previsto" class="money-input" value="' + esc(Number(linha.valorPrevisto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
       + '<div class="form-group" style="max-width:170px"><label>Status</label><select id="' + prefix + '-status"><option value="previsto"' + ((!linha.status || linha.status === 'previsto') ? ' selected' : '') + '>Previsto</option><option value="contratado"' + (linha.status === 'contratado' ? ' selected' : '') + '>Contratado</option><option value="realizado"' + (linha.status === 'realizado' ? ' selected' : '') + '>Realizado</option><option value="cancelado"' + (linha.status === 'cancelado' ? ' selected' : '') + '>Cancelado</option></select></div>'
     + '</div>'
-    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="' + prefix + '-obs" value="' + esc(linha.observacao || '') + '" placeholder="Detalhes internos"/></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>Observação</label><input type="text" id="' + prefix + '-obs" value="' + esc(linha.observacao || '') + '" placeholder="Detalhes internos"/></div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">'
       + (linha.id ? '<button type="button" class="btn-sm red" onclick="tfCancelOrcamentoLinhaEdit()">Cancelar</button>' : '')
       + '<button type="button" class="btn-add" style="margin-top:0" onclick="' + (linha.id ? 'tfSaveOrcamentoLinha(\'' + linha.id + '\')' : 'tfAddOrcamentoLinha()') + '">' + (linha.id ? 'Salvar linha' : 'Adicionar linha') + '</button>'
@@ -1554,7 +1554,7 @@ function tfOrcamentoLinhasHtml(eventoId) {
     if (a.natureza !== b.natureza) return a.natureza === 'receita' ? -1 : 1;
     return String(a.categoria || '').localeCompare(String(b.categoria || ''), 'pt-BR', { sensitivity: 'base' });
   });
-  if (!linhas.length) return '<div class="empty-state" style="padding:22px">Nenhuma linha de orcamento cadastrada para este evento.</div>';
+  if (!linhas.length) return '<div class="empty-state" style="padding:22px">Nenhuma linha de orçamento cadastrada para este evento.</div>';
   return '<div class="tf-budget-table">'
     + linhas.map(function(linha) {
         var previsto = tfOrcamentoPrevistoLinha(linha);
@@ -1573,7 +1573,7 @@ function tfOrcamentoLinhasHtml(eventoId) {
         var vinculoResumo = titulos.length
           ? titulos.length + ' conta(s) - Total ' + fmt(totalContas) + ' - Baixado ' + fmt(baixadoContas) + ' - Saldo ' + fmt(saldoContas)
           : (realizacoesDiretas.length
-            ? realizacoesDiretas.length + ' lancamento(s) do Extrato aguardando confirmacao'
+            ? realizacoesDiretas.length + ' lançamento(s) do Extrato aguardando confirmacao'
             : 'Nenhuma conta vinculada');
         var botoesOrcamento = '';
         if (realizacoesDiretas.length) {
@@ -1615,14 +1615,14 @@ function tfOrcamentoLinhasHtml(eventoId) {
 
 function tfOrcamentoEventosHtml() {
   var eventos = tfEventosCliente(true);
-  if (!eventos.length) return '<div class="empty-state" style="padding:22px">Cadastre um evento antes de criar o orcamento.</div>';
+  if (!eventos.length) return '<div class="empty-state" style="padding:22px">Cadastre um evento antes de criar o orçamento.</div>';
   if (!_tfOrcamentoEventoId || !eventos.some(function(ev) { return ev.id === _tfOrcamentoEventoId; })) {
     _tfOrcamentoEventoId = (eventos.find(function(ev) { return ev.ativo !== false; }) || eventos[0]).id;
   }
   var eventoAtual = eventos.find(function(ev) { return ev.id === _tfOrcamentoEventoId; }) || eventos[0];
   return '<div class="tf-budget-shell">'
     + '<div class="tf-section-head">'
-      + '<div><h3>Orcamento e resultado</h3><p class="cartao-helper-text">Planeje receitas e custos sem criar contas ate o valor ficar real.</p></div>'
+      + '<div><h3>Orçamento e resultado</h3><p class="cartao-helper-text">Planeje receitas e custos sem criar contas até o valor ficar real.</p></div>'
       + '<div class="form-group" style="max-width:320px;margin:0"><label>' + esc(tfEventosLabel()) + '</label><select onchange="_tfOrcamentoEventoId=this.value;_tfOrcamentoLinhaEditId=null;renderFinanceiro()">' + eventos.map(function(ev) { return '<option value="' + esc(ev.id) + '"' + (ev.id === eventoAtual.id ? ' selected' : '') + '>' + esc(ev.nome) + (ev.ativo === false ? ' (inativo)' : '') + '</option>'; }).join('') + '</select></div>'
     + '</div>'
     + tfOrcamentoEventoResumoCardsHtml(eventoAtual.id)
@@ -1636,9 +1636,9 @@ function tfOrcamentoEventosHtml() {
 function tfEventosResumoHtml() {
   if (!tfEventosEnabled()) {
     return '<div class="settings-section-card" style="margin:0">'
-      + '<div class="settings-card-head"><div><h5>Modulo de eventos/projetos desabilitado</h5><p>Ative para separar receitas, custos, recebimentos e pagamentos por evento neste cliente PJ.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Módulo de eventos/projetos desabilitado</h5><p>Ative para separar receitas, custos, recebimentos e pagamentos por evento neste cliente PJ.</p></div></div>'
       + '<div class="form-row">'
-        + '<div class="form-group"><label>Nome do modulo</label><input type="text" id="tf-eventos-enable-label" value="' + esc(tfEventosLabel()) + '" placeholder="Eventos, Projetos, Obras..."/></div>'
+        + '<div class="form-group"><label>Nome do módulo</label><input type="text" id="tf-eventos-enable-label" value="' + esc(tfEventosLabel()) + '" placeholder="Eventos, Projetos, Obras..."/></div>'
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">'
         + '<button type="button" class="btn-add" style="margin-top:0" onclick="tfEnableEventosModulo()">Habilitar eventos</button>'
@@ -1662,7 +1662,7 @@ function tfEventosResumoHtml() {
         + '<div><span>Margem realizada</span><strong>' + margemRealizada.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</strong></div>'
       + '</div>'
       + '<div class="tf-event-meta"><span>Aberto a receber: ' + fmt(ind.emAbertoReceber) + '</span><span>Aberto a pagar: ' + fmt(ind.emAbertoPagar) + '</span><span>Maior custo: ' + esc(maiorCusto ? maiorCusto.nome : '-') + (maiorCusto ? ' (' + fmt(maiorCusto.valor) + ')' : '') + '</span></div>'
-      + '<div class="tf-event-actions"><button class="btn-sm" onclick="tfStartEventoEdit(\'' + evento.id + '\')">Editar</button><button class="btn-sm" onclick="_tfEvento=\'' + evento.id + '\';_tfFinanceiroView=\'titulos\';renderFinanceiro()">Ver titulos</button><button class="btn-icon danger" onclick="tfDeleteEvento(\'' + evento.id + '\')" title="Excluir evento">&#128465;</button></div>'
+      + '<div class="tf-event-actions"><button class="btn-sm" onclick="tfStartEventoEdit(\'' + evento.id + '\')">Editar</button><button class="btn-sm" onclick="_tfEvento=\'' + evento.id + '\';_tfFinanceiroView=\'titulos\';renderFinanceiro()">Ver títulos</button><button class="btn-icon danger" onclick="tfDeleteEvento(\'' + evento.id + '\')" title="Excluir evento">&#128465;</button></div>'
       + '</div>';
   }).join('');
 
@@ -1697,7 +1697,7 @@ function tfNormalizeDateFieldValue(fieldId, label) {
   if (!raw) return '';
   var normalized = readFlexibleDateInput(el);
   if (!normalized) {
-    alert('Informe uma data valida para ' + label + '. Use dd/mm ou dd/mm/aaaa.');
+    alert('Informe uma data válida para ' + label + '. Use dd/mm ou dd/mm/aaaa.');
     el.focus();
     return null;
   }
@@ -1851,7 +1851,7 @@ function tfContaOptionsHtml(selectedId) {
   var atual = String(selectedId || '');
   var contas = tfContasCliente();
   if (!contas.length) return '<option value="">Sem conta cadastrada</option>';
-  return '<option value="">Nao movimentar extrato</option>' + contas.map(function(conta) {
+  return '<option value="">Não movimentar extrato</option>' + contas.map(function(conta) {
     return '<option value="' + esc(conta.id) + '"' + (conta.id === atual ? ' selected' : '') + '>' + esc(tfNomeConta(conta)) + '</option>';
   }).join('');
 }
@@ -1863,12 +1863,12 @@ function tfStatusResumoLabel(item) {
 }
 
 async function tfIncorporarRealizacoesOrcamento(tituloId) {
-  if (!canEditActiveClient()) return alert('Este cliente esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente está disponível apenas para visualização.');
   var titulo = tfFindTituloById(tituloId);
-  if (!titulo || !titulo.orcamentoLinhaId) return alert('Esta conta nao esta vinculada a uma linha do orcamento.');
+  if (!titulo || !titulo.orcamentoLinhaId) return alert('Está conta não está vinculada a uma linha do orçamento.');
   var linha = tfOrcamentoLinhaById(titulo.orcamentoLinhaId);
   var realizacoes = tfOrcamentoRealizacoesLinha(titulo.orcamentoLinhaId);
-  if (!realizacoes.length) return alert('Nao ha realizacoes do orcamento pendentes para incorporar.');
+  if (!realizacoes.length) return alert('Não ha realizações do orçamento pendentes para incorporar.');
 
   var lancamentosJaBaixados = new Set((titulo.baixas || []).map(function(baixa) { return baixa.lancamentoId; }).filter(Boolean));
   var novasRealizacoes = realizacoes.filter(function(item) { return !item.lancamentoId || !lancamentosJaBaixados.has(item.lancamentoId); });
@@ -1878,9 +1878,9 @@ async function tfIncorporarRealizacoesOrcamento(tituloId) {
   var totalFinal = Math.max(totalOriginal, totalBaixadoAtual + valorIncorporar);
 
   var ok = await appConfirm(
-    'Incorporar ' + fmt(valorIncorporar) + ' realizado pelo orcamento na conta ' + (titulo.descricao || titulo.pessoaNome || '') + '?'
+    'Incorporar ' + fmt(valorIncorporar) + ' realizado pelo orçamento na conta ' + (titulo.descricao || titulo.pessoaNome || '') + '?'
       + (totalFinal > totalOriginal ? ' O total da conta sera atualizado para ' + fmt(totalFinal) + '.' : ''),
-    { title: 'Incorporar realizacoes', confirmText: 'Incorporar' }
+    { title: 'Incorporar realizações', confirmText: 'Incorporar' }
   );
   if (!ok) return;
 
@@ -1890,7 +1890,7 @@ async function tfIncorporarRealizacoesOrcamento(tituloId) {
     );
     if (totalResponse.error) {
       console.error('Erro ao ajustar total da conta:', totalResponse.error);
-      alert('Nao foi possivel ajustar o valor total da conta.');
+      alert('Não foi possível ajustar o valor total da conta.');
       return;
     }
   }
@@ -1903,16 +1903,16 @@ async function tfIncorporarRealizacoesOrcamento(tituloId) {
         cliente_id: activeClient,
         data_baixa: item.data || new Date().toISOString().slice(0, 10),
         valor: Number(item.valor || 0),
-        observacao: item.observacao || ('Incorporado do orcamento: ' + ((linha && linha.categoria) || '')),
+        observacao: item.observacao || ('Incorporado do orçamento: ' + ((linha && linha.categoria) || '')),
         origem: 'extrato',
         extrato_lancamento_id: item.lancamentoId || null
       }, getUserScopePayload());
     });
     var baixasResponse = await supabaseClient.from('titulos_financeiros_baixas').insert(payload).select();
     if (baixasResponse.error) {
-      console.error('Erro ao incorporar realizacoes:', baixasResponse.error);
+      console.error('Erro ao incorporar realizações:', baixasResponse.error);
       if (totalFinal !== totalOriginal) await applyUserScope(supabaseClient.from('titulos_financeiros').update({ valor_total: totalOriginal }).eq('id', titulo.id));
-      alert('Nao foi possivel incorporar os valores. As realizacoes continuam preservadas no orcamento.');
+      alert('Não foi possível incorporar os valores. As realizações continuam preservadas no orçamento.');
       return;
     }
     baixasInseridas = baixasResponse.data || [];
@@ -1928,7 +1928,7 @@ async function tfIncorporarRealizacoesOrcamento(tituloId) {
       await applyUserScope(supabaseClient.from('titulos_financeiros_baixas').delete().in('id', baixasInseridas.map(function(item) { return item.id; })));
     }
     if (totalFinal !== totalOriginal) await applyUserScope(supabaseClient.from('titulos_financeiros').update({ valor_total: totalOriginal }).eq('id', titulo.id));
-    alert('A incorporacao nao foi concluida. Nenhum valor foi perdido.');
+    alert('A incorporacao não foi concluida. Nenhum valor foi perdido.');
     return;
   }
 
@@ -1983,16 +1983,16 @@ function tfTituloCardHtml(item) {
       + '<div class="tf-title-progress"><span style="width:' + pct + '%"></span></div>'
     + '</div>'
     + '<div class="tf-title-actions">'
-      + (realizacoesOrcamento.length ? '<button class="btn-sm" type="button" onclick="tfIncorporarRealizacoesOrcamento(\'' + item.id + '\')" title="Transformar o realizado do orcamento em baixa desta conta">Incorporar ' + esc(fmt(valorRealizacoesOrcamento)) + '</button>' : '')
-      + '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\')" title="Ver e editar os dados do titulo">Ver/editar</button>'
-      + (saldo > 0 ? '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\', \'baixa\')" title="Registrar uma baixa neste titulo">' + (item.natureza === 'receber' ? 'Registrar recebimento' : 'Registrar pagamento') + '</button>' : '')
-      + '<button class="btn-icon danger" type="button" onclick="tfDeleteTitulo(\'' + item.id + '\')" title="Excluir titulo">&#128465;</button>'
+      + (realizacoesOrcamento.length ? '<button class="btn-sm" type="button" onclick="tfIncorporarRealizacoesOrcamento(\'' + item.id + '\')" title="Transformar o realizado do orçamento em baixa desta conta">Incorporar ' + esc(fmt(valorRealizacoesOrcamento)) + '</button>' : '')
+      + '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\')" title="Ver e editar os dados do título">Ver/editar</button>'
+      + (saldo > 0 ? '<button class="btn-sm" type="button" onclick="tfOpenTituloModal(\'' + item.id + '\', \'baixa\')" title="Registrar uma baixa neste título">' + (item.natureza === 'receber' ? 'Registrar recebimento' : 'Registrar pagamento') + '</button>' : '')
+      + '<button class="btn-icon danger" type="button" onclick="tfDeleteTitulo(\'' + item.id + '\')" title="Excluir título">&#128465;</button>'
     + '</div>'
     + '</article>';
 }
 
 function tfBuildListaTitulos(items) {
-  if (!items.length) return '<div class="empty-state" style="padding:26px 20px">Nenhum titulo encontrado com os filtros atuais.</div>';
+  if (!items.length) return '<div class="empty-state" style="padding:26px 20px">Nenhum título encontrado com os filtros atuais.</div>';
   return tfBulkEventosHtml(items) + '<div class="tf-title-list">' + items.map(tfTituloCardHtml).join('') + '</div>';
 }
 
@@ -2034,17 +2034,17 @@ function tfBulkEventosHtml(items) {
 }
 
 async function tfApplyBulkEvento() {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (!tfEventosEnabled()) return alert('Habilite o modulo de eventos antes de aplicar em lote.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  if (!tfEventosEnabled()) return alert('Habilite o módulo de eventos antes de aplicar em lote.');
   var ids = Array.from(_tfBulkSelected).filter(function(id) {
     return tfTitulosCliente().some(function(item) { return item.id === id; });
   });
-  if (!ids.length) return alert('Selecione ao menos um titulo.');
+  if (!ids.length) return alert('Selecione ao menos um título.');
 
   var eventoId = ((document.getElementById('tf-bulk-evento') || {}).value || '').trim() || null;
   var eventoNome = eventoId ? tfNomeEventoById(eventoId) : '';
   var ok = await appConfirm(
-    'Aplicar ' + (eventoNome || 'sem evento') + ' em ' + ids.length + ' titulo(s) selecionado(s)?',
+    'Aplicar ' + (eventoNome || 'sem evento') + ' em ' + ids.length + ' título(s) selecionado(s)?',
     { title: 'Evento em lote', confirmText: 'Aplicar' }
   );
   if (!ok) return;
@@ -2058,7 +2058,7 @@ async function tfApplyBulkEvento() {
 
   if (response.error) {
     console.error('Erro ao aplicar evento em lote:', response.error);
-    alert('Nao foi possivel aplicar o evento em lote. Verifique se a migracao de eventos foi aplicada.');
+    alert('Não foi possível aplicar o evento em lote. Verifique se a migração de eventos foi aplicada.');
     return;
   }
 
@@ -2101,8 +2101,8 @@ function tfResumoBaixa(baixa) {
 }
 
 async function tfCadastrarContaParaBaixa(tituloId) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
-  if (typeof abrirFormularioContaCliente !== 'function') return alert('Cadastro de conta indisponivel nesta tela.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  if (typeof abrirFormularioContaCliente !== 'function') return alert('Cadastro de conta indisponível nesta tela.');
   var conta = await abrirFormularioContaCliente({ tipo: 'caixa', banco: 'Carteira', saldoInicial: 0 });
   if (!conta) return;
 
@@ -2119,7 +2119,7 @@ async function tfCadastrarContaParaBaixa(tituloId) {
 
   if (result.error) {
     console.error('Erro ao cadastrar conta pelo financeiro:', result.error);
-    alert('Nao foi possivel cadastrar a conta.');
+    alert('Não foi possível cadastrar a conta.');
     return;
   }
 
@@ -2134,9 +2134,9 @@ async function tfInsertLancamentoBaixa(item, dataBaixa, valor, observacao, conta
     data_lancamento: dataBaixa || null,
     descricao: desc,
     descricao_original: desc,
-    categoria: item.natureza === 'receber' ? 'Recebimento de titulo' : 'Pagamento de titulo',
+    categoria: item.natureza === 'receber' ? 'Recebimento de título' : 'Pagamento de título',
     centro_custo_id: item.natureza === 'pagar' ? (item.centroCustoId || null) : null,
-    tipo: item.natureza === 'receber' ? 'credito' : 'debito',
+    tipo: item.natureza === 'receber' ? 'crédito' : 'débito',
     valor: Number(valor || 0),
     conta_id: contaId || null,
     relacionamento_id: null,
@@ -2191,7 +2191,7 @@ function tfOpenTituloModal(id, foco) {
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group"><label>' + (item.natureza === 'receber' ? 'Cliente pagador' : 'Favorecido / fornecedor') + '</label><input type="text" id="tf-edit-pessoa" value="' + esc(item.pessoaNome || '') + '"/></div>'
-      + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-edit-descricao" value="' + esc(item.descricao || '') + '" placeholder="Opcional"/></div>'
+      + '<div class="form-group"><label>Descrição</label><input type="text" id="tf-edit-descricao" value="' + esc(item.descricao || '') + '" placeholder="Opcional"/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="tf-edit-vencimento" class="flex-date-input" value="' + esc(item.vencimento ? formatDate(item.vencimento) : '') + '" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
@@ -2200,17 +2200,17 @@ function tfOpenTituloModal(id, foco) {
     + ((item.natureza === 'pagar' || tfEventosEnabled()) ? '<div class="form-row">'
       + (item.natureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="tf-edit-centro-custo">' + tfCentrosCustoOptionsHtml(item.centroCustoId || '') + '</select></div>' : '')
       + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="tf-edit-evento" onchange="tfSyncOrcamentoOptions(\'tf-edit\',\'' + item.natureza + '\')">' + tfEventosOptionsHtml(item.eventoId || '') + '</select></div>' : '')
-      + (tfEventosEnabled() ? '<div class="form-group"><label>Linha do orcamento</label><select id="tf-edit-orcamento-linha">' + tfOrcamentoOptionsHtml(item.natureza, item.eventoId || '', item.orcamentoLinhaId || '') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>Linha do orçamento</label><select id="tf-edit-orcamento-linha">' + tfOrcamentoOptionsHtml(item.natureza, item.eventoId || '', item.orcamentoLinhaId || '') + '</select></div>' : '')
     + '</div>' : '')
     + '<div class="form-row">'
-      + '<div class="form-group"><label>Observacao</label><textarea id="tf-edit-observacao" rows="3" placeholder="Informacoes importantes deste titulo">' + esc(item.observacao || '') + '</textarea></div>'
+      + '<div class="form-group"><label>Observação</label><textarea id="tf-edit-observacao" rows="3" placeholder="Informações importantes deste título">' + esc(item.observacao || '') + '</textarea></div>'
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:4px 0 18px">'
       + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
-      + '<button class="btn-add" type="button" style="margin-top:0" onclick="tfSaveTitulo(\'' + id + '\')">Salvar titulo</button>'
+      + '<button class="btn-add" type="button" style="margin-top:0" onclick="tfSaveTitulo(\'' + id + '\')">Salvar título</button>'
     + '</div>'
     + '<div class="settings-section-card">'
-      + '<div class="settings-card-head"><div><h5>Baixas registradas</h5><p>Registre recebimentos ou pagamentos parciais para acompanhar o saldo deste titulo.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Baixas registradas</h5><p>Registre recebimentos ou pagamentos parciais para acompanhar o saldo deste título.</p></div></div>'
       + baixasHtml
       + '<div class="form-row" style="margin-top:16px">'
         + '<div class="form-group" style="max-width:170px"><label>Data da baixa</label><input type="text" id="tf-baixa-data" class="flex-date-input" value="' + esc(formatDate(new Date().toISOString().slice(0, 10))) + '" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
@@ -2218,7 +2218,7 @@ function tfOpenTituloModal(id, foco) {
         + '<div class="form-group"><label>Conta movimentada <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="tfCadastrarContaParaBaixa(\'' + id + '\')">(+ caixa/carteira)</span></label><select id="tf-baixa-conta">' + tfContaOptionsHtml('') + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="margin-top:8px">'
-        + '<div class="form-group"><label>Observacao</label><input type="text" id="tf-baixa-observacao" placeholder="Ex.: Pix, TED, boleto"/></div>'
+        + '<div class="form-group"><label>Observação</label><input type="text" id="tf-baixa-observacao" placeholder="Ex.: Pix, TED, boleto"/></div>'
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end"><button class="btn-add" type="button" style="margin-top:6px" onclick="tfRegistrarBaixa(\'' + id + '\')">' + baixarLabel + '</button></div>'
     + '</div>';
@@ -2254,7 +2254,7 @@ async function tfSaveTitulo(id) {
   if (!tfEventosEnabled() && !payload.evento_id && !item.eventoId) delete payload.evento_id;
   if (!payload.orcamento_linha_id && !item.orcamentoLinhaId) delete payload.orcamento_linha_id;
   if (orcamentoLinha && !tfOrcamentoLinhaCompativelComTitulo(orcamentoLinha, Object.assign({}, item, { eventoId: payload.evento_id }))) {
-    alert('A linha do orcamento precisa ser do mesmo tipo e evento deste titulo.');
+    alert('A linha do orçamento precisa ser do mesmo tipo e evento deste título.');
     return;
   }
 
@@ -2274,7 +2274,7 @@ async function tfSaveTitulo(id) {
 
   if (response.error) {
     console.error(response.error);
-    alert('Nao foi possivel salvar o titulo.');
+    alert('Não foi possível salvar o título.');
     return;
   }
 
@@ -2287,7 +2287,7 @@ async function tfSaveTitulo(id) {
 async function tfDeleteTitulo(id) {
   var item = tfFindTituloById(id);
   if (!item) return;
-  var ok = await appConfirm('Excluir este titulo financeiro? As baixas registradas tambem serao removidas.', { title: 'Excluir titulo', confirmText: 'Excluir' });
+  var ok = await appConfirm('Excluir este título financeiro? As baixas registradas também serao removidas.', { title: 'Excluir título', confirmText: 'Excluir' });
   if (!ok) return;
 
   var response = await applyUserScope(
@@ -2299,7 +2299,7 @@ async function tfDeleteTitulo(id) {
 
   if (response.error) {
     console.error(response.error);
-    alert('Nao foi possivel excluir o titulo.');
+    alert('Não foi possível excluir o título.');
     return;
   }
 
@@ -2311,7 +2311,7 @@ async function tfDeleteTitulo(id) {
 }
 
 async function tfRegistrarBaixa(id) {
-  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var item = tfFindTituloById(id);
   if (!item) return;
   var dataBaixa = tfNormalizeDateFieldValue('tf-baixa-data', 'data da baixa');
@@ -2332,7 +2332,7 @@ async function tfRegistrarBaixa(id) {
     var lancamentoResponse = await tfInsertLancamentoBaixa(item, dataBaixa, valor, observacao, contaId);
     if (lancamentoResponse.error) {
       console.error(lancamentoResponse.error);
-      alert('Nao foi possivel registrar a movimentacao no Extrato.');
+      alert('Não foi possível registrar a movimentação no Extrato.');
       return;
     }
     lancamentoId = lancamentoResponse.data && lancamentoResponse.data.id;
@@ -2357,7 +2357,7 @@ async function tfRegistrarBaixa(id) {
     if (lancamentoId) {
       await applyUserScope(supabaseClient.from('lancamentos').delete().eq('id', lancamentoId));
     }
-    alert('Nao foi possivel registrar a baixa.');
+    alert('Não foi possível registrar a baixa.');
     return;
   }
 
@@ -2380,7 +2380,7 @@ async function tfRegistrarBaixa(id) {
 }
 
 async function tfDeleteBaixa(tituloId, baixaId) {
-  var ok = await appConfirm('Excluir esta baixa registrada?', { title: 'Excluir baixa', confirmText: 'Excluir' });
+  var ok = await appConfirm('Excluir está baixa registrada?', { title: 'Excluir baixa', confirmText: 'Excluir' });
   if (!ok) return;
   var titulo = tfFindTituloById(tituloId);
   var baixaAtual = titulo && (titulo.baixas || []).find(function(baixa) { return baixa.id === baixaId; });
@@ -2394,7 +2394,7 @@ async function tfDeleteBaixa(tituloId, baixaId) {
 
   if (response.error) {
     console.error(response.error);
-    alert('Nao foi possivel excluir a baixa.');
+    alert('Não foi possível excluir a baixa.');
     return;
   }
 
@@ -2417,7 +2417,7 @@ function renderFinanceiroNovo(root) {
   }
 
   if (!tfClienteEhPJ()) {
-    root.innerHTML = '<div class="empty-state"><div class="icon">PJ</div>O modulo Financeiro esta disponivel apenas para clientes PJ.</div>';
+    root.innerHTML = '<div class="empty-state"><div class="icon">PJ</div>O módulo Financeiro está disponível apenas para clientes PJ.</div>';
     return;
   }
 
@@ -2434,19 +2434,19 @@ function renderFinanceiroNovo(root) {
       + (_tfNatureza === 'receber'
         ? '<div class="summary-card"><div class="s-label">Total a receber</div><div class="s-val blue">' + fmt(resumo.totalReceber) + '</div></div>'
           + '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Já recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
         : '<div class="summary-card"><div class="s-label">Total a pagar</div><div class="s-val blue">' + fmt(resumo.totalPagar) + '</div></div>'
           + '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
+          + '<div class="summary-card"><div class="s-label">Já pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Títulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
     + '</div>';
 
   var pendenciasHtml =
     '<div class="summary-grid pending-grid">'
-      + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">Não conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
       + '<div class="summary-card pending-card"><div class="s-label">Pendentes de estorno</div><div class="s-val red">' + pendencias.extratoPendentesEstorno.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoPendentesEstorno.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'pendentes_estorno\')">Abrir no Extrato</button></div>'
-      + '<div class="summary-card pending-card"><div class="s-label">Lancamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
+      + '<div class="summary-card pending-card"><div class="s-label">Lançamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
       + '<div class="summary-card pending-card"><div class="s-label">A receber vencido</div><div class="s-val red">' + pendencias.receberVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.receberVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'atrasado\')">Abrir no Financeiro</button></div>'
       + '<div class="summary-card pending-card"><div class="s-label">A pagar vencido</div><div class="s-val red">' + pendencias.pagarVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'atrasado\')">Abrir no Financeiro</button></div>'
       + '<div class="summary-card pending-card"><div class="s-label">Receber parcial</div><div class="s-val yellow">' + pendencias.receberParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.receberParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'parcial\')">Abrir no Financeiro</button></div>'
@@ -2457,12 +2457,12 @@ function renderFinanceiroNovo(root) {
     '<div class="form-row">'
       + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
       + '<div class="form-group"><label>Pessoa</label><input type="text" id="tf-filtro-pessoa" value="' + esc(_tfPessoa) + '" placeholder="Cliente ou fornecedor" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao, evento, centro ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Descrição</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descrição, evento, centro ou observação" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento de</label><input type="text" id="tf-filtro-vencimento-de" class="flex-date-input" value="' + esc(_tfVencimentoDe ? formatDate(_tfVencimentoDe) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group" style="max-width:170px"><label>Vencimento ate</label><input type="text" id="tf-filtro-vencimento-ate" class="flex-date-input" value="' + esc(_tfVencimentoAte ? formatDate(_tfVencimentoAte) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento até</label><input type="text" id="tf-filtro-vencimento-ate" class="flex-date-input" value="' + esc(_tfVencimentoAte ? formatDate(_tfVencimentoAte) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
       + '<div class="form-group" style="max-width:160px"><label>Valor</label><select id="tf-filtro-valor-modo"><option value="todos"' + (_tfValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="igual"' + (_tfValorModo === 'igual' ? ' selected' : '') + '>Igual a</option><option value="acima"' + (_tfValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_tfValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option></select></div>'
       + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="tf-filtro-valor" class="money-input" value="' + esc(Number(_tfValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
       + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="tf-filtro-centro-custo">' + tfCentrosCustoFilterOptionsHtml(_tfCentroCusto) + '</select></div>' : '')
@@ -2471,8 +2471,8 @@ function renderFinanceiroNovo(root) {
 
   var novoFormHtml =
     '<div class="form-row">'
-      + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem esta envolvido neste titulo"/></div>'
-      + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Opcional"/></div>'
+      + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem está envolvido neste título"/></div>'
+      + '<div class="form-group"><label>Descrição</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Opcional"/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
@@ -2481,10 +2481,10 @@ function renderFinanceiroNovo(root) {
     + ((_tfNatureza === 'pagar' || tfEventosEnabled()) ? '<div class="form-row">'
       + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="' + tfFormPrefix() + '-centro-custo">' + tfCentrosCustoOptionsHtml('') + '</select></div>' : '')
       + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="' + tfFormPrefix() + '-evento" onchange="tfSyncOrcamentoOptions(\'' + tfFormPrefix() + '\',\'' + _tfNatureza + '\')">' + tfEventosOptionsHtml(_tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '') + '</select></div>' : '')
-      + (tfEventosEnabled() ? '<div class="form-group"><label>Linha do orcamento</label><select id="' + tfFormPrefix() + '-orcamento-linha">' + tfOrcamentoOptionsHtml(_tfNatureza, _tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '', '') + '</select></div>' : '')
+      + (tfEventosEnabled() ? '<div class="form-group"><label>Linha do orçamento</label><select id="' + tfFormPrefix() + '-orcamento-linha">' + tfOrcamentoOptionsHtml(_tfNatureza, _tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '', '') + '</select></div>' : '')
     + '</div>' : '')
     + '<div class="form-row">'
-      + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informacoes complementares deste titulo"></textarea></div>'
+      + '<div class="form-group"><label>Observação</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informações complementares deste título"></textarea></div>'
     + '</div>'
     + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>';
 
@@ -2499,41 +2499,41 @@ function renderFinanceiroNovo(root) {
   var headerHtml =
     '<div class="tf-finance-hero">'
       + '<div class="tf-finance-hero-head">'
-        + '<div><h3>Financeiro PJ</h3><p class="cartao-helper-text">Controle os titulos, baixas, eventos e pendencias da empresa em areas separadas.</p></div>'
+        + '<div><h3>Financeiro PJ</h3><p class="cartao-helper-text">Controle os títulos, baixas, eventos e pendências da empresa em áreas separadas.</p></div>'
         + '<div class="tipo-toggle">'
           + '<button type="button" class="tipo-btn credito' + (_tfNatureza === 'receber' ? ' active' : '') + '" onclick="tfSetNatureza(\'receber\')">A Receber</button>'
           + '<button type="button" class="tipo-btn debito' + (_tfNatureza === 'pagar' ? ' active' : '') + '" onclick="tfSetNatureza(\'pagar\')">A Pagar</button>'
         + '</div>'
       + '</div>'
       + '<div class="tf-finance-actions">'
-        + '<button class="btn-sm" onclick="tfOpenNovoTitulo()">Novo titulo</button>'
+        + '<button class="btn-sm" onclick="tfOpenNovoTitulo()">Novo título</button>'
         + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'importar\')">Importar planilha</button>'
         + (tfEventosEnabled() ? '<button class="btn-sm" onclick="tfSetFinanceiroView(\'eventos\')">' + esc(tfEventosLabel()) + '</button>' : '')
-        + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'pendencias\')">Ver pendencias</button>'
+        + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'pendencias\')">Ver pendências</button>'
       + '</div>'
     + '</div>';
   var tabsHtml =
     '<div class="tf-finance-tabs">'
-      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'titulos' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'titulos\')"><span>Titulos</span><strong>' + resumo.total + '</strong></button>'
+      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'titulos' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'titulos\')"><span>Títulos</span><strong>' + resumo.total + '</strong></button>'
       + (tfEventosEnabled() ? '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'eventos' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'eventos\')"><span>' + esc(tfEventosLabel()) + '</span><strong>' + tfEventosCliente(false).length + '</strong></button>' : '')
-      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'pendencias' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'pendencias\')"><span>Pendencias</span><strong>' + pendenciasCount + '</strong></button>'
+      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'pendencias' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'pendencias\')"><span>Pendências</span><strong>' + pendenciasCount + '</strong></button>'
       + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'importar' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'importar\')"><span>Importar</span><strong>XLSX</strong></button>'
     + '</div>';
   var titulosViewHtml =
     '<div class="tf-view-head">'
       + '<div><h3>' + esc(tituloAtivo) + '</h3><p class="cartao-helper-text">Filtre, acompanhe saldos e registre baixas sem sair da lista.</p></div>'
-      + '<button class="btn-add" onclick="tfOpenNovoTitulo()">+ Novo titulo</button>'
+      + '<button class="btn-add" onclick="tfOpenNovoTitulo()">+ Novo título</button>'
     + '</div>'
-    + (_tfPanels.novo ? '<div class="form-card tf-inline-form"><div class="tf-section-head"><div><h3>Novo titulo</h3><p class="cartao-helper-text">' + esc(tituloAtivo) + '</p></div><button class="btn-sm red" onclick="_tfPanels.novo=false;renderFinanceiro()">Fechar</button></div>' + novoFormHtml + '</div>' : '')
+    + (_tfPanels.novo ? '<div class="form-card tf-inline-form"><div class="tf-section-head"><div><h3>Novo título</h3><p class="cartao-helper-text">' + esc(tituloAtivo) + '</p></div><button class="btn-sm red" onclick="_tfPanels.novo=false;renderFinanceiro()">Fechar</button></div>' + novoFormHtml + '</div>' : '')
     + '<div class="form-card tf-filter-strip"><div class="tf-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">A busca considera pessoa, descricao, observacao, centro e ' + esc(tfEventosLabel().toLowerCase()) + '.</p></div><div class="tf-export-actions"><button class="btn-sm" onclick="tfApplyFilters()">Aplicar</button><button class="btn-sm red" onclick="tfClearFilters()">Limpar</button><button class="btn-sm" onclick="tfExportPDF()">PDF</button><button class="btn-sm" onclick="tfExportXlsx()">XLSX</button></div></div>' + filtrosHtml + '</div>'
     + '<div class="tf-list-shell"><div class="section-title">' + esc(tituloAtivo) + '</div>' + areaHtml + '</div>';
   var activeViewHtml = titulosViewHtml;
   if (_tfFinanceiroView === 'eventos') {
     activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>' + esc(tfEventosLabel()) + '</h3><p class="cartao-helper-text">Cadastre e compare receitas, custos e resultados por evento.</p></div></div>' + eventosHtml + '</div>';
   } else if (_tfFinanceiroView === 'pendencias') {
-    activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>Painel de pendencias</h3><p class="cartao-helper-text">Atalhos para o que ainda precisa de atencao no Extrato e no Financeiro.</p></div></div>' + pendenciasHtml + '</div>';
+    activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>Painel de pendências</h3><p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p></div></div>' + pendenciasHtml + '</div>';
   } else if (_tfFinanceiroView === 'importar') {
-    activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>Importar titulos via planilha</h3><p class="cartao-helper-text">Use o modelo para importar contas a receber e contas a pagar em lote.</p></div></div>' + importPanelBody + '</div>';
+    activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>Importar títulos via planilha</h3><p class="cartao-helper-text">Use o modelo para importar contas a receber e contas a pagar em lote.</p></div></div>' + importPanelBody + '</div>';
   }
 
   root.innerHTML = headerHtml + resumoHtml + tabsHtml + '<div class="tf-finance-view">' + activeViewHtml + '</div>';
@@ -2554,7 +2554,7 @@ function renderFinanceiro() {
   }
 
   if (!tfClienteEhPJ()) {
-    root.innerHTML = '<div class="empty-state"><div class="icon">🏢</div>O modulo Financeiro esta disponivel apenas para clientes PJ.</div>';
+    root.innerHTML = '<div class="empty-state"><div class="icon">🏢</div>O módulo Financeiro está disponível apenas para clientes PJ.</div>';
     return;
   }
 
@@ -2570,18 +2570,18 @@ function renderFinanceiro() {
     '<div class="summary-grid">'
       + (_tfNatureza === 'receber'
         ? '<div class="summary-card"><div class="s-label">A receber em aberto</div><div class="s-val green">' + fmt(resumo.receber) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
+          + '<div class="summary-card"><div class="s-label">Já recebido</div><div class="s-val green">' + fmt(resumo.recebido) + '</div></div>'
         : '<div class="summary-card"><div class="s-label">A pagar em aberto</div><div class="s-val red">' + fmt(resumo.pagar) + '</div></div>'
-          + '<div class="summary-card"><div class="s-label">Ja pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
+          + '<div class="summary-card"><div class="s-label">Já pago</div><div class="s-val red">' + fmt(resumo.pago) + '</div></div>')
       + '<div class="summary-card"><div class="s-label">Vencidos</div><div class="s-val yellow">' + resumo.vencidos + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Titulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Títulos</div><div class="s-val blue">' + resumo.total + '</div></div>'
     + '</div>';
   var pendenciasHtml =
     '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p>'
       + '<div class="summary-grid pending-grid">'
-        + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Não conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Pendentes de estorno</div><div class="s-val red">' + pendencias.extratoPendentesEstorno.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoPendentesEstorno.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'pendentes_estorno\')">Abrir no Extrato</button></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Lancamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Lançamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">A receber vencido</div><div class="s-val red">' + pendencias.receberVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.receberVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'atrasado\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">A pagar vencido</div><div class="s-val red">' + pendencias.pagarVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'atrasado\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Receber parcial</div><div class="s-val yellow">' + pendencias.receberParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.receberParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'parcial\')">Abrir no Financeiro</button></div>'
@@ -2593,12 +2593,12 @@ function renderFinanceiro() {
     '<div class="form-row">'
       + '<div class="form-group" style="max-width:180px"><label>Status</label><select id="tf-filtro-status"><option value="todos"' + (_tfStatus === 'todos' ? ' selected' : '') + '>Todos</option><option value="aberto"' + (_tfStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option><option value="parcial"' + (_tfStatus === 'parcial' ? ' selected' : '') + '>Parcial</option><option value="quitado"' + (_tfStatus === 'quitado' ? ' selected' : '') + '>Quitado</option><option value="atrasado"' + (_tfStatus === 'atrasado' ? ' selected' : '') + '>Atrasado</option></select></div>'
       + '<div class="form-group"><label>Pessoa</label><input type="text" id="tf-filtro-pessoa" value="' + esc(_tfPessoa) + '" placeholder="Cliente ou fornecedor" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group"><label>Descricao</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descricao, evento, centro ou observacao" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Descrição</label><input type="text" id="tf-filtro-descricao" value="' + esc(_tfDescricao) + '" placeholder="Digite ao menos 3 letras" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group"><label>Busca geral</label><input type="text" id="tf-filtro-busca" value="' + esc(_tfBusca) + '" placeholder="Pessoa, descrição, evento, centro ou observação" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
     + '</div>'
     + '<div class="form-row">'
       + '<div class="form-group" style="max-width:170px"><label>Vencimento de</label><input type="text" id="tf-filtro-vencimento-de" class="flex-date-input" value="' + esc(_tfVencimentoDe ? formatDate(_tfVencimentoDe) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
-      + '<div class="form-group" style="max-width:170px"><label>Vencimento ate</label><input type="text" id="tf-filtro-vencimento-ate" class="flex-date-input" value="' + esc(_tfVencimentoAte ? formatDate(_tfVencimentoAte) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
+      + '<div class="form-group" style="max-width:170px"><label>Vencimento até</label><input type="text" id="tf-filtro-vencimento-ate" class="flex-date-input" value="' + esc(_tfVencimentoAte ? formatDate(_tfVencimentoAte) : '') + '" placeholder="dd/mm/aaaa" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
       + '<div class="form-group" style="max-width:160px"><label>Valor</label><select id="tf-filtro-valor-modo"><option value="todos"' + (_tfValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="igual"' + (_tfValorModo === 'igual' ? ' selected' : '') + '>Igual a</option><option value="acima"' + (_tfValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_tfValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option></select></div>'
       + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="tf-filtro-valor" class="money-input" value="' + esc(Number(_tfValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')tfApplyFilters()"/></div>'
       + (_tfNatureza === 'pagar' ? '<div class="form-group"><label>Centro de custo</label><select id="tf-filtro-centro-custo">' + tfCentrosCustoFilterOptionsHtml(_tfCentroCusto) + '</select></div>' : '')
@@ -2611,13 +2611,13 @@ function renderFinanceiro() {
     financeiroPanel('resumo', 'Resumo financeiro', resumoHtml)
     + financeiroPanel('eventos', tfEventosLabel(), eventosHtml)
     + '<div class="form-card collapsible-card financeiro-collapsible-card' + (_tfPanels.pendencias ? ' open' : '') + '">'
-      + '<button type="button" class="collapse-head" onclick="toggleFinanceiroPanel(\'pendencias\')" aria-expanded="' + !!_tfPanels.pendencias + '"><span>Painel de pendencias</span><span class="collapse-chevron" aria-hidden="true">&#9662;</span></button>'
+      + '<button type="button" class="collapse-head" onclick="toggleFinanceiroPanel(\'pendencias\')" aria-expanded="' + !!_tfPanels.pendencias + '"><span>Painel de pendências</span><span class="collapse-chevron" aria-hidden="true">&#9662;</span></button>'
       + (_tfPanels.pendencias ? '<div class="collapse-body">'
       + '<p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p>'
       + '<div class="summary-grid pending-grid">'
-        + '<div class="summary-card pending-card"><div class="s-label">Nao conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Não conciliados</div><div class="s-val yellow">' + pendencias.extratoNaoConciliados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoNaoConciliados.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'nao_conciliados\')">Abrir no Extrato</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Pendentes de estorno</div><div class="s-val red">' + pendencias.extratoPendentesEstorno.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoPendentesEstorno.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaExtrato(\'pendentes_estorno\')">Abrir no Extrato</button></div>'
-        + '<div class="summary-card pending-card"><div class="s-label">Lancamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
+        + '<div class="summary-card pending-card"><div class="s-label">Lançamentos rateados</div><div class="s-val blue">' + pendencias.extratoRateados.count + '</div><div class="pending-meta">' + fmt(pendencias.extratoRateados.valor) + '</div><button class="btn-sm" onclick="switchTab(\'extrato\')">Abrir no Extrato</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">A receber vencido</div><div class="s-val red">' + pendencias.receberVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.receberVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'atrasado\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">A pagar vencido</div><div class="s-val red">' + pendencias.pagarVencido.count + '</div><div class="pending-meta">' + fmt(pendencias.pagarVencido.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'pagar\', \'atrasado\')">Abrir no Financeiro</button></div>'
         + '<div class="summary-card pending-card"><div class="s-label">Receber parcial</div><div class="s-val yellow">' + pendencias.receberParcial.count + '</div><div class="pending-meta">' + fmt(pendencias.receberParcial.valor) + '</div><button class="btn-sm" onclick="tfAbrirPendenciaFinanceiro(\'receber\', \'parcial\')">Abrir no Financeiro</button></div>'
@@ -2632,10 +2632,10 @@ function renderFinanceiro() {
         + '<button type="button" class="tipo-btn debito' + (_tfNatureza === 'pagar' ? ' active' : '') + '" onclick="tfSetNatureza(\'pagar\')">A Pagar</button>'
       + '</div>'
     + '</div>'
-    + financeiroPanel('novo', '+ Novo titulo - ' + tituloAtivo,
+    + financeiroPanel('novo', '+ Novo título - ' + tituloAtivo,
       '<div class="form-row">'
         + '<div class="form-group"><label>' + pessoaLabel + '</label><input type="text" id="' + tfFormPrefix() + '-pessoa" placeholder="Quem está envolvido neste título"/></div>'
-        + '<div class="form-group"><label>Descricao</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Opcional"/></div>'
+        + '<div class="form-group"><label>Descrição</label><input type="text" id="' + tfFormPrefix() + '-descricao" placeholder="Opcional"/></div>'
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:170px"><label>Vencimento</label><input type="text" id="' + tfFormPrefix() + '-vencimento" class="flex-date-input" placeholder="dd/mm ou dd/mm/aaaa"/></div>'
@@ -2646,11 +2646,11 @@ function renderFinanceiro() {
         + (tfEventosEnabled() ? '<div class="form-group"><label>' + esc(tfEventosLabel()) + '</label><select id="' + tfFormPrefix() + '-evento">' + tfEventosOptionsHtml(_tfEvento && _tfEvento !== '__sem_evento__' ? _tfEvento : '') + '</select></div>' : '')
       + '</div>' : '')
       + '<div class="form-row">'
-        + '<div class="form-group"><label>Observacao</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informações complementares deste título"></textarea></div>'
+        + '<div class="form-group"><label>Observação</label><textarea id="' + tfFormPrefix() + '-observacao" rows="3" placeholder="Informações complementares deste título"></textarea></div>'
       + '</div>'
       + '<button class="btn-add" onclick="tfAddTitulo()">' + btnLabel + '</button>'
     )
-    + financeiroPanel('importar', 'Importar titulos via planilha', importPanelBody)
+    + financeiroPanel('importar', 'Importar títulos via planilha', importPanelBody)
     + financeiroPanel('filtros', 'Filtros', filtrosHtml)
     + financeiroPanel('lista', tituloAtivo, areaHtml);
 

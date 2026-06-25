@@ -18,7 +18,7 @@ function beginAppLoading(message) {
   appLoadingDepth += 1;
   clearTimeout(appLoadingHideTimer);
   var messageEl = document.getElementById('appLoadingMessage');
-  if (messageEl) messageEl.textContent = message || 'Atualizando informacoes';
+  if (messageEl) messageEl.textContent = message || 'Atualizando informações';
 
   var overlay = document.getElementById('appLoadingOverlay');
   if (!overlay || overlay.classList.contains('open') || appLoadingShowTimer) return;
@@ -120,7 +120,7 @@ function scheduleWorkspaceDataRefresh(payload) {
         refreshOpenExtratoConciliationOptions();
       }
     } catch (error) {
-      console.error('Nao foi possivel sincronizar os dados entre as abas:', error);
+      console.error('Não foi possível sincronizar os dados entre as abas:', error);
     } finally {
       workspaceDataSyncLoading = false;
       if (workspaceDataSyncQueued) {
@@ -189,7 +189,7 @@ function isActiveClientPJ() {
 }
 
 async function loadData() {
-  beginAppLoading('Atualizando informacoes');
+  beginAppLoading('Atualizando informações');
   try {
     return await loadDataFromSupabase();
   } finally {
@@ -383,8 +383,8 @@ async function loadDataFromSupabase() {
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
   if (loadError) {
-    console.error('Erro ao carregar dados do usuario:', loadError);
-    alert('Nao foi possivel carregar os dados do usuario. Verifique se as migracoes mais recentes ja foram aplicadas no Supabase.');
+    console.error('Erro ao carregar dados do usuário:', loadError);
+    alert('Não foi possível carregar os dados do usuário. Verifique se as migrações mais recentes já foram aplicadas no Supabase.');
     return;
   }
 
@@ -395,52 +395,52 @@ async function loadDataFromSupabase() {
   const lancCartaoRows = lancCartaoRes.data || [];
   const contasRes = await carregarContasComEscopo();
   if (contasRes.error) {
-    console.warn('Nao foi possivel carregar contas cadastradas:', contasRes.error);
+    console.warn('Não foi possível carregar contas cadastradas:', contasRes.error);
   }
   const contasRows = contasRes.data || [];
   const categoriasRes = await carregarCategoriasComEscopo();
   if (categoriasRes.error) {
-    console.warn('Nao foi possivel carregar categorias personalizadas:', categoriasRes.error);
+    console.warn('Não foi possível carregar categorias personalizadas:', categoriasRes.error);
   }
   const categoriasRows = categoriasRes.data || [];
   const centrosCustoRes = await carregarCentrosCustoComEscopo();
   if (centrosCustoRes.error) {
-    console.warn('Nao foi possivel carregar centros de custo:', centrosCustoRes.error);
+    console.warn('Não foi possível carregar centros de custo:', centrosCustoRes.error);
   }
   const centrosCustoRows = centrosCustoRes.data || [];
   const eventosRes = await carregarEventosComEscopo();
   if (eventosRes.error) {
-    console.warn('Nao foi possivel carregar eventos/projetos:', eventosRes.error);
+    console.warn('Não foi possível carregar eventos/projetos:', eventosRes.error);
   }
   const eventosRows = eventosRes.data || [];
   const orcamentoEventosRes = await carregarOrcamentoEventosComEscopo();
   if (orcamentoEventosRes.error) {
-    console.warn('Nao foi possivel carregar orcamento de eventos:', orcamentoEventosRes.error);
+    console.warn('Não foi possível carregar orçamento de eventos:', orcamentoEventosRes.error);
   }
   const orcamentoEventosRows = orcamentoEventosRes.data || [];
   const orcamentoRealizacoesRes = await carregarOrcamentoRealizacoesComEscopo();
   if (orcamentoRealizacoesRes.error) {
-    console.warn('Nao foi possivel carregar realizacoes do orcamento:', orcamentoRealizacoesRes.error);
+    console.warn('Não foi possível carregar realizações do orçamento:', orcamentoRealizacoesRes.error);
   }
   const orcamentoRealizacoesRows = orcamentoRealizacoesRes.data || [];
   const relacionamentosRes = await carregarRelacionamentosComEscopo();
   if (relacionamentosRes.error) {
-    console.warn('Nao foi possivel carregar relacionamentos personalizados:', relacionamentosRes.error);
+    console.warn('Não foi possível carregar relacionamentos personalizados:', relacionamentosRes.error);
   }
   const relacionamentosRows = relacionamentosRes.data || [];
   const titulosRes = await carregarTitulosComEscopo();
   if (titulosRes.error) {
-    console.warn('Nao foi possivel carregar titulos financeiros:', titulosRes.error);
+    console.warn('Não foi possível carregar títulos financeiros:', titulosRes.error);
   }
   const titulosRows = titulosRes.data || [];
   const baixasTitulosRes = await carregarBaixasTitulosComEscopo();
   if (baixasTitulosRes.error) {
-    console.warn('Nao foi possivel carregar baixas de titulos:', baixasTitulosRes.error);
+    console.warn('Não foi possível carregar baixas de títulos:', baixasTitulosRes.error);
   }
   const baixasTitulosRows = baixasTitulosRes.data || [];
   const acessosClientesRes = await carregarAcessosClientes();
   if (acessosClientesRes.error) {
-    console.warn('Nao foi possivel carregar acessos compartilhados:', acessosClientesRes.error);
+    console.warn('Não foi possível carregar acessos compartilhados:', acessosClientesRes.error);
   }
   const acessosClientesRows = acessosClientesRes.data || [];
 

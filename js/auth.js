@@ -365,7 +365,7 @@ function renderAuthUser() {
   }
 
   box.innerHTML = authUser
-    ? '<span>' + authEsc((authProfile && authProfile.nome) || authUser.email || 'Usuario conectado') + '</span><button type="button" onclick="logoutUsuario()">Sair</button>'
+    ? '<span>' + authEsc((authProfile && authProfile.nome) || authUser.email || 'Usuário conectado') + '</span><button type="button" onclick="logoutUsuario()">Sair</button>'
     : '<span>Sem login</span><button type="button" onclick="forcarLogin()">Entrar</button>';
 
   applyRoleVisibility();

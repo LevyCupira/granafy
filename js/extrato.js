@@ -173,14 +173,14 @@ function extratoImportGuideHtml() {
     + '<div class="import-guide-head">Formato da planilha</div>'
     + '<div class="import-guide-grid">'
     + '<span class="import-guide-chip required">data</span>'
-    + '<span class="import-guide-chip required">descricao</span>'
+    + '<span class="import-guide-chip required">descrição</span>'
     + '<span class="import-guide-chip required">valor</span>'
     + '<span class="import-guide-chip">categoria</span>'
     + '</div>'
     + '<ul class="import-guide-list">'
-    + '<li>Valor positivo vira <strong>credito</strong>.</li>'
-    + '<li>Valor negativo vira <strong>debito</strong>.</li>'
-    + '<li>A coluna <strong>tipo</strong> nao e mais necessaria.</li>'
+    + '<li>Valor positivo vira <strong>crédito</strong>.</li>'
+    + '<li>Valor negativo vira <strong>débito</strong>.</li>'
+    + '<li>A coluna <strong>tipo</strong> não e mais necessária.</li>'
     + '</ul>'
     + '</div>';
 }
@@ -210,8 +210,8 @@ function extratoCategoriasOptionsHtml(categoriaAtual, incluirVazio) {
     categorias.push(atual);
   }
   categorias = categorias.sort(compararCategoriaNome);
-  var inicio = incluirVazio === false ? '' : '<option value="">Selecione</option>';
-  return inicio + categorias.map(function(nome) {
+  var início = incluirVazio === false ? '' : '<option value="">Selecione</option>';
+  return início + categorias.map(function(nome) {
     return '<option value="' + esc(nome) + '"' + (normalizarNomeCategoria(nome) === normalizarNomeCategoria(atual) ? ' selected' : '') + '>' + esc(nome) + '</option>';
   }).join('');
 }
@@ -277,7 +277,7 @@ function extratoResumoEstorno(cliente, lanc) {
   var origem = extratoLancamentoOrigemDoEstorno(cliente, lanc && lanc.id);
   if (origem) {
     var resumoOrigem = extratoResumoValorEstorno(cliente, origem);
-    return '<span class="badge badge-estorno-vinculado">Lancamento de estorno</span> de ' + esc(origem.desc || origem.descOriginal || '-') + ' ' + fmt(lanc.valor || 0) + (resumoOrigem.parcial ? ' - parcial' : '');
+    return '<span class="badge badge-estorno-vinculado">Lançamento de estorno</span> de ' + esc(origem.desc || origem.descOriginal || '-') + ' ' + fmt(lanc.valor || 0) + (resumoOrigem.parcial ? ' - parcial' : '');
   }
 
   var status = extratoStatusEstornoValor(lanc);
@@ -291,7 +291,7 @@ function extratoResumoEstorno(cliente, lanc) {
   if (status === 'estornado') {
     var destino = lanc && lanc.estornoLancamentoId ? (cliente.extrato || []).find(function(item) { return item.id === lanc.estornoLancamentoId; }) : null;
     var resumoConcluido = extratoResumoValorEstorno(cliente, lanc);
-    var texto = '<span class="badge badge-estorno-concluido">' + (resumoConcluido.parcial ? 'Estorno parcial' : 'Ja estornado') + '</span> ' + esc(resumoConcluido.texto);
+    var texto = '<span class="badge badge-estorno-concluido">' + (resumoConcluido.parcial ? 'Estorno parcial' : 'Já estornado') + '</span> ' + esc(resumoConcluido.texto);
     if (lanc && lanc.estornoData) texto += ' em ' + esc(formatDate(lanc.estornoData));
     if (destino) texto += ' - vinculado a ' + esc(destino.desc || destino.descOriginal || '-') + ' ' + fmt(destino.valor || 0);
     if (lanc && lanc.estornoObservacao) texto += ' - ' + esc(lanc.estornoObservacao);
@@ -325,7 +325,7 @@ function extratoLancamentosElegiveisEstorno(cliente, lanc) {
 
 function extratoEstornoOptionsHtml(cliente, lanc, selecionadoId) {
   var itens = extratoLancamentosElegiveisEstorno(cliente, lanc);
-  if (!itens.length) return '<option value="">Nenhum lancamento elegivel</option>';
+  if (!itens.length) return '<option value="">Nenhum lançamento elegível</option>';
   return '<option value="">Selecione o estorno no extrato</option>' + itens.map(function(item) {
     return '<option value="' + esc(item.id) + '" data-data="' + esc(item.data || '') + '" data-valor="' + esc(String(Number(item.valor || 0))) + '"' + (item.id === selecionadoId ? ' selected' : '') + '>'
       + esc(formatDate(item.data))
@@ -417,7 +417,7 @@ function extratoConciliacaoCategoriasHtml(lanc) {
 
   return '<div class="conciliation-classification">'
     + '<div class="conciliation-classification-head">'
-      + '<div><span>Classificacao do Extrato</span><strong>' + (rateios.length ? 'Lancamento rateado' : 'Categoria unica') + '</strong></div>'
+      + '<div><span>Classificacao do Extrato</span><strong>' + (rateios.length ? 'Lançamento rateado' : 'Categoria única') + '</strong></div>'
       + '<small>' + (rateios.length ? itens.length + ' categorias - ' : '') + fmt(total) + '</small>'
     + '</div>'
     + '<div class="conciliation-category-list">'
@@ -425,7 +425,7 @@ function extratoConciliacaoCategoriasHtml(lanc) {
         return '<div><span>' + esc(item.categoria || 'Sem categoria') + '</span><strong>' + fmt(item.valor || 0) + '</strong></div>';
       }).join('')
     + '</div>'
-    + (rateios.length ? '<p>Use estes valores para distribuir o lancamento entre as linhas correspondentes do orcamento.</p>' : '')
+    + (rateios.length ? '<p>Use estes valores para distribuir o lançamento entre as linhas correspondentes do orçamento.</p>' : '')
   + '</div>';
 }
 
@@ -490,7 +490,7 @@ function exportExtratoXlsx() {
   if (!activeClient) return alert('Selecione um cliente.');
   var cliente = data.clients[activeClient];
   var filtrados = extratoLancamentosFiltrados(cliente);
-  if (!filtrados.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  if (!filtrados.length) return alert('Não ha dados para exportar com os filtros atuais.');
   var rows = filtrados
     .slice()
     .sort(function(a, b) { return String(b.data || '').localeCompare(String(a.data || '')); })
@@ -543,7 +543,7 @@ function exportExtratoPDF() {
   if (!activeClient) return alert('Selecione um cliente.');
   var cliente = data.clients[activeClient];
   var filtrados = extratoLancamentosFiltrados(cliente);
-  if (!filtrados.length) return alert('Nao ha dados para exportar com os filtros atuais.');
+  if (!filtrados.length) return alert('Não ha dados para exportar com os filtros atuais.');
   var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   var hoje = new Date().toLocaleString('pt-BR');
   doc.setFillColor(30, 35, 54);
@@ -558,10 +558,10 @@ function exportExtratoPDF() {
   doc.text('Gerado em ' + hoje, 283, 19, { align: 'right' });
   doc.setFontSize(9);
   doc.setTextColor(90, 96, 122);
-  doc.text('Filtros: tipo ' + (_exFiltroTipo || 'todos') + ' | categoria ' + (_exFiltroCat || 'todas') + ' | periodo ' + (_exFiltroPeriodoValor ? (_exFiltroPeriodoModo + ' ' + extratoPeriodoDisplayValue()) : 'todos') + ' | valor ' + ((_exFiltroValorModo === 'todos' || !_exFiltroValor) ? 'todos' : (_exFiltroValorModo + ' ' + fmt(_exFiltroValor))) + ' | busca ' + (_exFiltroBusca || '-'), 14, 31);
+  doc.text('Filtros: tipo ' + (_exFiltroTipo || 'todos') + ' | categoria ' + (_exFiltroCat || 'todas') + ' | período ' + (_exFiltroPeriodoValor ? (_exFiltroPeriodoModo + ' ' + extratoPeriodoDisplayValue()) : 'todos') + ' | valor ' + ((_exFiltroValorModo === 'todos' || !_exFiltroValor) ? 'todos' : (_exFiltroValorModo + ' ' + fmt(_exFiltroValor))) + ' | busca ' + (_exFiltroBusca || '-'), 14, 31);
   doc.autoTable({
     startY: 36,
-    head: [['Data', 'Conta', 'Descricao', 'Categoria', 'Valor', 'Conciliacao/Rateio']],
+    head: [['Data', 'Conta', 'Descricao', 'Categoria', 'Valor', 'Conciliação/Rateio']],
     body: filtrados
       .slice()
       .sort(function(a, b) { return String(b.data || '').localeCompare(String(a.data || '')); })
@@ -602,7 +602,7 @@ function openExtratoRateioModal(i) {
   document.getElementById('modalTitle').textContent = 'Rateio por categoria';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-section-card">'
-      + '<div class="settings-card-head"><div><h5>' + esc(lanc.desc || 'Lancamento') + '</h5><p>Distribua o valor total desse lancamento entre as categorias do Extrato.</p></div>'
+      + '<div class="settings-card-head"><div><h5>' + esc(lanc.desc || 'Lancamento') + '</h5><p>Distribua o valor total desse lançamento entre as categorias do Extrato.</p></div>'
       + '<div class="settings-card-badges"><span class="settings-card-badge subtle">Tipo ' + esc(extratoEhCredito(lanc.tipo) ? 'Credito' : 'Debito') + '</span><span class="settings-card-badge">' + fmt(lanc.valor || 0) + '</span></div></div>'
       + '<div id="ex-rateio-rows"></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-sm" type="button" onclick="adicionarLinhaRateioExtrato()">+ Linha de rateio</button><button class="btn-sm red" type="button" onclick="limparRateioExtrato()">Limpar rateio</button></div>'
@@ -666,7 +666,7 @@ function atualizarResumoRateioExtrato(valorOriginal) {
   var total = rows.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
   var base = extratoRateioValorBase(valorOriginal);
   var diff = Math.abs(total - base);
-  info.innerHTML = 'Rateado: <strong>' + fmt(total) + '</strong> · Total do lancamento: <strong>' + fmt(base) + '</strong>'
+  info.innerHTML = 'Rateado: <strong>' + fmt(total) + '</strong> · Total do lançamento: <strong>' + fmt(base) + '</strong>'
     + (diff < 0.005 ? ' <span style="color:var(--success)">· Conferido</span>' : ' <span style="color:var(--danger)">· Diferenca ' + fmt(diff) + '</span>');
 }
 
@@ -683,12 +683,12 @@ async function salvarRateioExtrato(i) {
   if (!lanc || !lanc.id) return;
   var rows = coletarRateioExtratoModal();
   if (!rows.length) {
-    var ok = await appConfirm('Nenhum rateio foi informado. Deseja limpar o rateio desse lancamento?', { title: 'Limpar rateio', confirmText: 'Limpar' });
+    var ok = await appConfirm('Nenhum rateio foi informado. Deseja limpar o rateio desse lançamento?', { title: 'Limpar rateio', confirmText: 'Limpar' });
     if (!ok) return;
   }
   var total = rows.reduce(function(sum, item) { return sum + Number(item.valor || 0); }, 0);
   if (rows.length && Math.abs(total - Number(lanc.valor || 0)) >= 0.005) {
-    await appAlert('O total do rateio deve ser igual ao valor do lancamento.');
+    await appAlert('O total do rateio deve ser igual ao valor do lançamento.');
     return;
   }
   var response = await applyUserScope(
@@ -735,10 +735,10 @@ function openExtratoEstornoModal(i) {
 
   var origem = extratoLancamentoOrigemDoEstorno(c, lanc.id);
   if (origem) {
-    document.getElementById('modalTitle').textContent = 'Lancamento de estorno';
+    document.getElementById('modalTitle').textContent = 'Lançamento de estorno';
     document.getElementById('modalBody').innerHTML =
       '<div class="settings-section-card">'
-        + '<div class="settings-card-head"><div><h5>Este lancamento ja foi usado como estorno</h5><p>Ele esta vinculado a um pagamento ou recebimento marcado para devolucao.</p></div></div>'
+        + '<div class="settings-card-head"><div><h5>Este lançamento já foi usado como estorno</h5><p>Ele está vinculado a um pagamento ou recebimento marcado para devolução.</p></div></div>'
         + '<div class="settings-card-badges"><span class="settings-card-badge">Estorno vinculado</span><span class="settings-card-badge subtle">' + esc(formatDate(lanc.data)) + '</span><span class="settings-card-badge subtle">' + esc(fmt(lanc.valor || 0)) + '</span></div>'
         + '<div class="settings-note-box">Origem: <strong>' + esc(origem.desc || origem.descOriginal || '-') + '</strong>' + (origem.estornoData ? ' · marcado em ' + esc(formatDate(origem.estornoData)) : '') + '</div>'
       + '</div>'
@@ -756,10 +756,10 @@ function openExtratoEstornoModal(i) {
   var valorEstornoAtual = extratoValorEstorno(c, lanc);
   var valorEstornoFormatado = Number(valorEstornoAtual || lanc.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  document.getElementById('modalTitle').textContent = 'Controle de devolucao';
+  document.getElementById('modalTitle').textContent = 'Controle de devolução';
   document.getElementById('modalBody').innerHTML =
     '<div class="settings-section-card" style="margin-bottom:16px">'
-      + '<div class="settings-card-head"><div><h5>Pagamento ou recebimento</h5><p>Marque este lancamento como pendente de estorno ou vincule o lancamento que efetivou a devolucao no extrato.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Pagamento ou recebimento</h5><p>Marque este lançamento como pendente de estorno ou vincule o lançamento que efetivou a devolução no extrato.</p></div></div>'
       + '<div class="settings-card-badges">'
         + '<span class="settings-card-badge subtle">' + esc(formatDate(lanc.data)) + '</span>'
         + '<span class="settings-card-badge subtle">' + esc(extratoEhCredito(lanc.tipo) ? 'Credito' : 'Debito') + '</span>'
@@ -769,27 +769,27 @@ function openExtratoEstornoModal(i) {
     + '</div>'
     + '<div class="settings-section-card">'
       + '<div class="form-row">'
-        + '<div class="form-group" style="max-width:220px"><label>Status da devolucao</label><select id="ex-estorno-status" onchange="atualizarCamposExtratoEstornoModal()"><option value="normal"' + (statusAtual === 'normal' ? ' selected' : '') + '>Sem devolucao</option><option value="pendente_estorno"' + (statusAtual === 'pendente_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornado"' + (statusAtual === 'estornado' ? ' selected' : '') + '>Ja estornado</option></select></div>'
+        + '<div class="form-group" style="max-width:220px"><label>Status da devolução</label><select id="ex-estorno-status" onchange="atualizarCamposExtratoEstornoModal()"><option value="normal"' + (statusAtual === 'normal' ? ' selected' : '') + '>Sem devolução</option><option value="pendente_estorno"' + (statusAtual === 'pendente_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornado"' + (statusAtual === 'estornado' ? ' selected' : '') + '>Já estornado</option></select></div>'
       + '</div>'
       + '<div data-estorno-status-block="pendente_estorno" style="display:none">'
         + '<div class="form-row">'
           + '<div class="form-group" style="max-width:180px"><label>Valor a devolver</label><input type="text" id="ex-estorno-valor-pendente" class="money-input" value="' + esc(valorEstornoFormatado) + '"/></div>'
-          + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-estorno-obs-pendente" value="' + esc(statusAtual === 'pendente_estorno' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: valor recebido em duplicidade, cliente cancelou."/></div>'
+          + '<div class="form-group"><label>Observação</label><input type="text" id="ex-estorno-obs-pendente" value="' + esc(statusAtual === 'pendente_estorno' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: valor recebido em duplicidade, cliente cancelou."/></div>'
         + '</div>'
       + '</div>'
       + '<div data-estorno-status-block="estornado" style="display:none">'
         + '<div class="form-row">'
-          + '<div class="form-group"><label>Lancamento do estorno no extrato</label><select id="ex-estorno-lancamento" onchange="syncExtratoEstornoData()">' + selectHtml + '</select></div>'
+          + '<div class="form-group"><label>Lançamento do estorno no extrato</label><select id="ex-estorno-lancamento" onchange="syncExtratoEstornoData()">' + selectHtml + '</select></div>'
         + '</div>'
         + '<div class="form-row">'
-          + '<div class="form-group" style="max-width:180px"><label>Data da devolucao</label><input type="date" id="ex-estorno-data" value="' + esc(dataEstorno) + '"/></div>'
+          + '<div class="form-group" style="max-width:180px"><label>Data da devolução</label><input type="date" id="ex-estorno-data" value="' + esc(dataEstorno) + '"/></div>'
           + '<div class="form-group" style="max-width:180px"><label>Valor estornado</label><input type="text" id="ex-estorno-valor-concluido" class="money-input" value="' + esc(valorEstornoFormatado) + '"/></div>'
-          + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-estorno-obs-concluido" value="' + esc(statusAtual === 'estornado' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: estorno realizado no banco."/></div>'
+          + '<div class="form-group"><label>Observação</label><input type="text" id="ex-estorno-obs-concluido" value="' + esc(statusAtual === 'estornado' ? (lanc.estornoObservacao || '') : '') + '" placeholder="Ex.: estorno realizado no banco."/></div>'
         + '</div>'
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
         + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
-        + '<button class="btn-add" type="button" style="margin-top:0" onclick="salvarExtratoEstorno(' + i + ')">Salvar devolucao</button>'
+        + '<button class="btn-add" type="button" style="margin-top:0" onclick="salvarExtratoEstorno(' + i + ')">Salvar devolução</button>'
       + '</div>'
     + '</div>';
 
@@ -822,7 +822,7 @@ async function salvarExtratoEstorno(i) {
       return;
     }
     if (valorPendente - valorOriginal > 0.005) {
-      await appAlert('O valor do estorno nao pode ser maior que o valor original do lancamento.');
+      await appAlert('O valor do estorno não pode ser maior que o valor original do lançamento.');
       return;
     }
     payload.status_estorno = 'pendente_estorno';
@@ -837,24 +837,24 @@ async function salvarExtratoEstorno(i) {
     var valorConcluido = parseMoney(document.getElementById('ex-estorno-valor-concluido'));
 
     if (!lancamentoEstornoId) {
-      await appAlert('Selecione o lancamento do extrato que efetivou o estorno.');
+      await appAlert('Selecione o lançamento do extrato que efetivou o estorno.');
       return;
     }
 
     var lancamentoEstorno = (c.extrato || []).find(function(item) { return item.id === lancamentoEstornoId; });
     if (!lancamentoEstorno) {
-      await appAlert('Lancamento de estorno nao encontrado.');
+      await appAlert('Lançamento de estorno não encontrado.');
       return;
     }
 
     var origemExistente = extratoLancamentoOrigemDoEstorno(c, lancamentoEstornoId);
     if (origemExistente && origemExistente.id !== lanc.id) {
-      await appAlert('Esse lancamento ja esta vinculado como estorno de outro registro.');
+      await appAlert('Esse lançamento já está vinculado como estorno de outro registro.');
       return;
     }
 
     if (lancamentoEstorno.tipo === lanc.tipo) {
-      await appAlert('O lancamento vinculado ao estorno precisa ter tipo oposto ao original.');
+      await appAlert('O lançamento vinculado ao estorno precisa ter tipo oposto ao original.');
       return;
     }
 
@@ -863,11 +863,11 @@ async function salvarExtratoEstorno(i) {
       return;
     }
     if (valorConcluido - valorOriginal > 0.005) {
-      await appAlert('O valor do estorno nao pode ser maior que o valor original do lancamento.');
+      await appAlert('O valor do estorno não pode ser maior que o valor original do lançamento.');
       return;
     }
     if (Math.abs(valorConcluido - Number(lancamentoEstorno.valor || 0)) >= 0.005) {
-      await appAlert('O valor estornado precisa ser igual ao valor do lancamento vinculado.');
+      await appAlert('O valor estornado precisa ser igual ao valor do lançamento vinculado.');
       return;
     }
 
@@ -930,7 +930,7 @@ function aplicarAjustesVisuaisExtrato(area, lncs) {
       actions.insertBefore(btn, actions.firstChild);
     }
 
-    if (clienteAtivoEhPJ() && !actions.querySelector('button[title="Devolucao"]')) {
+    if (clienteAtivoEhPJ() && !actions.querySelector('button[title="Devolução"]')) {
       var refundBtn = document.createElement('button');
       refundBtn.className = 'btn-icon';
       refundBtn.type = 'button';
@@ -971,8 +971,8 @@ function centrosCustoOptionsCliente(centroCustoIdAtual, incluirVazio) {
     return compararCategoriaNome(String(a && a.nome || ''), String(b && b.nome || ''));
   });
   if (!centros.length) return '<option value="">' + esc(incluirVazio === false ? 'Sem centro cadastrado' : 'Sem centro') + '</option>';
-  var inicio = incluirVazio === false ? '' : '<option value="">Sem centro</option>';
-  return inicio + centros.map(function(centro) {
+  var início = incluirVazio === false ? '' : '<option value="">Sem centro</option>';
+  return início + centros.map(function(centro) {
     return '<option value="' + esc(centro.id) + '"' + (centro.id === centroCustoIdAtual ? ' selected' : '') + '>' + esc(centro.nome || '') + '</option>';
   }).join('');
 }
@@ -1034,7 +1034,7 @@ function resumoConciliacaoLancamento(lanc) {
   var restante = restanteConciliacaoEmCentavos(lanc) / 100;
   var somenteOrcamento = realizacoes.length && !baixas.length;
   var prefixo = somenteOrcamento
-    ? (restante > 0 ? 'Orcamento parcial' : 'Orcamento conciliado')
+    ? (restante > 0 ? 'Orçamento parcial' : 'Orçamento conciliado')
     : (restante > 0 ? 'Financeiro parcial' : 'Financeiro conciliado');
   return prefixo + ': ' + fmt(conciliado) + (restante > 0 ? ' · saldo pendente ' + fmt(restante) : '');
 }
@@ -1053,7 +1053,7 @@ function tipoRelacionamentoLabel(tipo) {
 }
 
 function nomeRelacionamento(item) {
-  return item && item.nome ? item.nome : 'Nao vinculado';
+  return item && item.nome ? item.nome : 'Não vinculado';
 }
 
 function normalizarTextoRelacionamento(valor) {
@@ -1126,8 +1126,8 @@ function relacionamentoOptionsCliente(relacionamentoIdAtual, incluirVazio) {
     return compararCategoriaNome(nomeRelacionamento(a), nomeRelacionamento(b));
   });
 
-  var inicio = incluirVazio === false ? '' : '<option value="">Nao vinculado</option>';
-  return inicio + relacionamentos.map(function(rel) {
+  var início = incluirVazio === false ? '' : '<option value="">Não vinculado</option>';
+  return início + relacionamentos.map(function(rel) {
     return '<option value="' + esc(rel.id) + '"' + (rel.id === relacionamentoIdAtual ? ' selected' : '') + '>'
       + esc(nomeRelacionamento(rel))
       + ' (' + esc(tipoRelacionamentoLabel(rel.tipo)) + ')'
@@ -1137,7 +1137,7 @@ function relacionamentoOptionsCliente(relacionamentoIdAtual, incluirVazio) {
 
 function relacionamentoSuggestionHtml(sugestao, selectId, applyFnName) {
   if (!sugestao) {
-    return '<div class="rel-suggestion rel-suggestion-muted">Sem sugestao automatica para este texto.</div>';
+    return '<div class="rel-suggestion rel-suggestion-muted">Sem sugestao automática para este texto.</div>';
   }
   return '<div class="rel-suggestion">'
     + '<span>Sugestao: <strong>' + esc(sugestao.nome) + '</strong> <small>(' + esc(sugestao.tipo) + ')</small></span>'
@@ -1195,7 +1195,7 @@ function registrarInteracaoManualRelacionamento(selectId) {
 }
 
 function nomeContaCliente(conta) {
-  if (!conta) return 'Nao informada';
+  if (!conta) return 'Não informada';
   var tipo = String(conta.tipo || '').toLowerCase() === 'poupanca' ? 'CP' : 'CC';
   var banco = conta.banco || 'Banco';
   var dados = [conta.agencia, conta.numero].filter(Boolean).join('/');
@@ -1210,7 +1210,7 @@ function resumirNumeroConta(numero) {
 }
 
 function nomeContaClienteCompacta(conta) {
-  if (!conta) return 'Nao informada';
+  if (!conta) return 'Não informada';
   var tipo = String(conta.tipo || '').toLowerCase() === 'poupanca' ? 'CP' : 'CC';
   var banco = String(conta.banco || 'Banco').trim();
   var numero = resumirNumeroConta(conta.numero || '');
@@ -1218,7 +1218,7 @@ function nomeContaClienteCompacta(conta) {
 }
 
 function nomeContaCliente(conta) {
-  if (!conta) return 'Nao informada';
+  if (!conta) return 'Não informada';
   var tipoConta = String(conta.tipo || '').toLowerCase();
   if (tipoConta === 'caixa') return 'CX ' + (conta.banco || 'Caixa');
   var tipo = tipoConta === 'poupanca' ? 'CP' : 'CC';
@@ -1228,7 +1228,7 @@ function nomeContaCliente(conta) {
 }
 
 function nomeContaClienteCompacta(conta) {
-  if (!conta) return 'Nao informada';
+  if (!conta) return 'Não informada';
   var tipoConta = String(conta.tipo || '').toLowerCase();
   if (tipoConta === 'caixa') return 'CX ' + String(conta.banco || 'Caixa').trim();
   var tipo = tipoConta === 'poupanca' ? 'CP' : 'CC';
@@ -1238,13 +1238,13 @@ function nomeContaClienteCompacta(conta) {
 }
 
 function nomeContaPorId(cliente, contaId) {
-  if (!cliente || !contaId) return 'Nao informada';
+  if (!cliente || !contaId) return 'Não informada';
   var conta = (cliente.contas || []).find(item => item.id === contaId);
   return nomeContaCliente(conta);
 }
 
 function nomeContaCompactaPorId(cliente, contaId) {
-  if (!cliente || !contaId) return 'Nao informada';
+  if (!cliente || !contaId) return 'Não informada';
   var conta = (cliente.contas || []).find(item => item.id === contaId);
   return nomeContaClienteCompacta(conta);
 }
@@ -1361,14 +1361,14 @@ async function insertLancamentoComFallback(payload) {
 
   if (payload.conta_id && isMissingContaSchemaError(completo.error)) {
     delete basico.conta_id;
-    console.warn('Tentando salvar lancamento sem conta_id apos erro no schema:', completo.error);
+    console.warn('Tentando salvar lançamento sem conta_id após erro no schema:', completo.error);
     return supabaseClient
       .from('lancamentos')
       .insert([Object.assign(basico, getUserScopePayload())]);
   }
   if (payload.centro_custo_id && isMissingCentroCustoSchemaError(completo.error)) {
     delete basico.centro_custo_id;
-    console.warn('Tentando salvar lancamento sem centro_custo_id apos erro no schema:', completo.error);
+    console.warn('Tentando salvar lançamento sem centro_custo_id após erro no schema:', completo.error);
     return supabaseClient
       .from('lancamentos')
       .insert([Object.assign(basico, getUserScopePayload())]);
@@ -1400,7 +1400,7 @@ async function cadastrarContaCliente() {
       alert('A estrutura de contas ainda nao esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
       return;
     }
-    alert('Nao foi possivel cadastrar a conta: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível cadastrar a conta: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -1412,7 +1412,7 @@ async function editarContaCliente(contaId) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
 
   var conta = contasClienteAtivo().find(item => item.id === contaId);
-  if (!conta) return alert('Conta nao encontrada.');
+  if (!conta) return alert('Conta não encontrada.');
 
   var dados = await abrirFormularioContaCliente(conta);
   if (!dados) return;
@@ -1436,7 +1436,7 @@ async function editarContaCliente(contaId) {
       alert('A estrutura de contas ainda nao esta atualizada no Supabase. Rode os arquivos sql/20260419_contas_clientes.sql e sql/20260606_saldo_inicial_contas_caixa.sql no SQL Editor.');
       return;
     }
-    alert('Nao foi possivel editar a conta: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível editar a conta: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -1477,7 +1477,7 @@ async function cadastrarRelacionamentoCliente() {
       alert('A tabela de relacionamentos ainda nao existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
       return;
     }
-    alert('Nao foi possivel cadastrar o relacionamento: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível cadastrar o relacionamento: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -1488,7 +1488,7 @@ async function cadastrarRelacionamentoCliente() {
 async function editarRelacionamentoCliente(relacionamentoId) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
   var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
-  if (!rel) return alert('Relacionamento nao encontrado.');
+  if (!rel) return alert('Relacionamento não encontrado.');
 
   var dados = await abrirFormularioRelacionamentoCliente(rel);
   if (!dados) return;
@@ -1527,7 +1527,7 @@ async function editarRelacionamentoCliente(relacionamentoId) {
       alert('A tabela de relacionamentos ainda nao existe no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
       return;
     }
-    alert('Nao foi possivel editar o relacionamento: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível editar o relacionamento: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -1540,7 +1540,7 @@ async function excluirRelacionamentoCliente(relacionamentoId) {
   var rel = relacionamentosClienteAtivo().find(function(item) { return item.id === relacionamentoId; });
   if (!rel) return;
 
-  var texto = 'Excluir o relacionamento "' + nomeRelacionamento(rel) + '"? Os lancamentos vinculados permanecerao no extrato, mas sem este relacionamento.';
+  var texto = 'Excluir o relacionamento "' + nomeRelacionamento(rel) + '"? Os lançamentos vinculados permanecerão no extrato, mas sem este relacionamento.';
   if (!(await appConfirm(texto, { title: 'Excluir relacionamento', confirmText: 'Excluir' }))) return;
 
   const { error } = await applyUserScope(
@@ -1552,7 +1552,7 @@ async function excluirRelacionamentoCliente(relacionamentoId) {
 
   if (error) {
     console.error('Erro ao excluir relacionamento:', error);
-    alert('Nao foi possivel excluir o relacionamento: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível excluir o relacionamento: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -1580,7 +1580,7 @@ function abrirFormularioRelacionamentoCliente(relacionamento) {
       '</select></div>' +
       '</div>' +
       '<div class="form-group"><label>Palavras-chave</label><input type="text" id="relPalavras" value="' + esc((relacionamento && (relacionamento.palavrasChave || relacionamento.palavras_chave)) || '') + '" placeholder="Ex: levy lima, pix levy, transf levy"/></div>' +
-      '<div class="form-group"><label>Observacao</label><input type="text" id="relObs" value="' + esc((relacionamento && relacionamento.observacao) || '') + '" placeholder="Ex: Pagamento pessoal feito para a empresa"/></div>' +
+      '<div class="form-group"><label>Observação</label><input type="text" id="relObs" value="' + esc((relacionamento && relacionamento.observacao) || '') + '" placeholder="Ex: Pagamento pessoal feito para a empresa"/></div>' +
       '<div class="account-form-error" id="relFormError"></div>' +
       '</div>';
     actionsEl.innerHTML =
@@ -1898,7 +1898,7 @@ async function aplicarCategoriaEmLoteExtrato() {
   var categoria = categoriaEl ? String(categoriaEl.value || '').trim() : '';
   var ids = Array.from(_exSelecionados);
   if (!ids.length) {
-    alert('Selecione ao menos um lancamento.');
+    alert('Selecione ao menos um lançamento.');
     return;
   }
   if (!categoria) {
@@ -1917,7 +1917,7 @@ async function aplicarCategoriaEmLoteExtrato() {
 
   if (response.error) {
     console.error('Erro ao atualizar categorias em lote do extrato:', response.error);
-    alert('Nao foi possivel atualizar as categorias selecionadas.');
+    alert('Não foi possível atualizar as categorias selecionadas.');
     return;
   }
 
@@ -2029,7 +2029,7 @@ async function removerDuplicadosSelecionadosExtrato() {
   });
 
   if (!idsParaExcluir.length) return alert('Nenhum duplicado selecionado para exclusao.');
-  if (!(await appConfirm('Excluir ' + idsParaExcluir.length + ' lancamento(s) duplicado(s), mantendo os marcados como "Manter"?', { title: 'Excluir duplicados', confirmText: 'Excluir' }))) return;
+  if (!(await appConfirm('Excluir ' + idsParaExcluir.length + ' lançamento(s) duplicado(s), mantendo os marcados como "Manter"?', { title: 'Excluir duplicados', confirmText: 'Excluir' }))) return;
 
   const { data: removidos, error } = await applyUserScope(
     supabaseClient
@@ -2041,7 +2041,7 @@ async function removerDuplicadosSelecionadosExtrato() {
 
   if (error) {
     console.error('Erro ao excluir duplicados selecionados:', error);
-    alert('Nao foi possivel excluir duplicados: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível excluir duplicados: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -2053,7 +2053,7 @@ async function removerDuplicadosSelecionadosExtrato() {
   chavesResolvidas.forEach(grupo => resolverDuplicadoExtrato(grupo.chave, grupo.linhas, 'excluir'));
   await loadData();
   renderExtrato();
-  alert(removidos.length + ' lancamento(s) duplicado(s) removido(s).');
+  alert(removidos.length + ' lançamento(s) duplicado(s) removido(s).');
 }
 
 async function removerDuplicadoGrupoExtrato(chaveCodificada) {
@@ -2081,7 +2081,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
     return;
   }
 
-  if (!(await appConfirm('Excluir ' + idsParaExcluir.length + ' lancamento(s) deste grupo e manter o marcado?', { title: 'Excluir duplicados', confirmText: 'Excluir' }))) return;
+  if (!(await appConfirm('Excluir ' + idsParaExcluir.length + ' lançamento(s) deste grupo e manter o marcado?', { title: 'Excluir duplicados', confirmText: 'Excluir' }))) return;
 
   const { data: removidos, error } = await applyUserScope(
     supabaseClient
@@ -2093,7 +2093,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
 
   if (error) {
     console.error('Erro ao excluir duplicados do grupo:', error);
-    alert('Nao foi possivel excluir duplicados: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível excluir duplicados: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -2105,7 +2105,7 @@ async function removerDuplicadoGrupoExtrato(chaveCodificada) {
   resolverDuplicadoExtrato(chave, grupo.linhas, 'excluir');
   await loadData();
   renderExtrato();
-  alert(removidos.length + ' lancamento(s) removido(s).');
+  alert(removidos.length + ' lançamento(s) removido(s).');
 }
 
 async function removerDuplicadosExtratoClienteAtivo() {
@@ -2122,7 +2122,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
   var resposta = await query;
   if (resposta.error) {
     console.error('Erro ao consultar duplicados:', resposta.error);
-    alert('Nao foi possivel consultar duplicados: ' + (resposta.error.message || 'erro desconhecido'));
+    alert('Não foi possível consultar duplicados: ' + (resposta.error.message || 'erro desconhecido'));
     return;
   }
 
@@ -2150,7 +2150,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
     return;
   }
 
-  if (!(await appConfirm('Foram encontrados ' + duplicados.length + ' lancamento(s) duplicado(s). Deseja remover os repetidos e manter apenas um de cada?', { title: 'Duplicados encontrados', confirmText: 'Remover repetidos' }))) {
+  if (!(await appConfirm('Foram encontrados ' + duplicados.length + ' lançamento(s) duplicado(s). Deseja remover os repetidos e manter apenas um de cada?', { title: 'Duplicados encontrados', confirmText: 'Remover repetidos' }))) {
     return;
   }
 
@@ -2165,7 +2165,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
 
   if (error) {
     console.error('Erro ao remover duplicados:', error);
-    alert('Nao foi possivel remover duplicados: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível remover duplicados: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
@@ -2176,7 +2176,7 @@ async function removerDuplicadosExtratoClienteAtivo() {
 
   await loadData();
   renderExtrato();
-  alert(removidos.length + ' lancamento(s) duplicado(s) removido(s).');
+  alert(removidos.length + ' lançamento(s) duplicado(s) removido(s).');
 }
 
 function renderExtrato() {
@@ -2257,7 +2257,7 @@ function renderExtrato() {
     + '</div>';
 
   var relacionamentosPanelBody =
-    '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Use apelidos controlados para identificar a origem ou o destino real do valor, sem perder a descricao original do banco.</p>'
+    '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Use apelidos controlados para identificar a origem ou o destino real do valor, sem perder a descrição original do banco.</p>'
     + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + relacionamentosResumoHtml + '</div>'
     + '<button class="btn-sm" onclick="cadastrarRelacionamentoCliente()">+ Cadastrar relacionamento</button>'
@@ -2266,7 +2266,7 @@ function renderExtrato() {
   var importarPanelBody =
     '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Baixe o modelo, selecione a conta e importe o arquivo.</p>'
     + extratoImportGuideHtml()
-    + (relacionamentoAtivo ? '<div class="rel-suggestion rel-suggestion-muted" style="margin-bottom:14px">Se <strong>Relacionado a</strong> ficar em branco, o sistema tenta sugerir o vinculo pela descricao do banco.</div>' : '')
+    + (relacionamentoAtivo ? '<div class="rel-suggestion rel-suggestion-muted" style="margin-bottom:14px">Se <strong>Relacionado a</strong> ficar em branco, o sistema tenta sugerir o vínculo pela descrição do banco.</div>' : '')
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:260px"><label>Conta do extrato</label><select id="ex-import-conta">' + contasOptionsObrigatoriasCliente('', '-- selecione a conta --') + '</select></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:260px"><label>Relacionado a</label><select id="ex-import-relacionamento">' + relacionamentoOptionsCliente('', true) + '</select></div>' : '')
@@ -2275,12 +2275,12 @@ function renderExtrato() {
 
   var novoPanelBody =
     '<div class="tipo-toggle" style="margin-bottom:12px">'
-    + '<button class="tipo-btn credito" id="ex-tipo-credito" onclick="setTipoExtrato(\'credito\')">Credito</button>'
-    + '<button class="tipo-btn debito" id="ex-tipo-debito" onclick="setTipoExtrato(\'debito\')">Debito</button>'
+    + '<button class="tipo-btn credito" id="ex-tipo-credito" onclick="setTipoExtrato(\'credito\')">Crédito</button>'
+    + '<button class="tipo-btn debito" id="ex-tipo-debito" onclick="setTipoExtrato(\'debito\')">Débito</button>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:150px"><label>Data</label><input type="date" id="ex-data"/></div>'
-    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-desc" placeholder="Ex: salario, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
+    + '<div class="form-group"><label>Descrição</label><input type="text" id="ex-desc" placeholder="Ex: salario, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '<div class="form-group" style="max-width:180px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-cat">' + catOpts + '</select></div>'
     + (centroCustoAtivo ? '<div class="form-group" style="max-width:220px"><label>Centro de custo <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'centros_custo\')">(+ gerir)</span></label><select id="ex-centro-custo">' + centrosCustoOptionsCliente('', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:260px"><label>Conta <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="cadastrarContaCliente()">(+ nova)</span></label><select id="ex-conta">' + contasOptionsCliente('') + '</select></div>'
@@ -2288,22 +2288,22 @@ function renderExtrato() {
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
     + (relacionamentoAtivo ? '<div id="ex-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
-    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-obs" placeholder="Opcional. Ex: Pagamento feito por Levy PF para a Granafy."/></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>Observação</label><input type="text" id="ex-obs" placeholder="Opcional. Ex: Pagamento feito por Levy PF para a Granafy."/></div></div>'
     + '<button class="btn-add" onclick="addExtrato()">Adicionar</button>';
 
   var filtrosPanelBody =
     '<div class="form-row">'
-    + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="credito"' + (_exFiltroTipo === 'credito' ? ' selected' : '') + '>Credito</option><option value="debito"' + (_exFiltroTipo === 'debito' ? ' selected' : '') + '>Debito</option></select></div>'
+    + '<div class="form-group" style="max-width:150px"><label>Tipo</label><select id="ex-filtro-tipo"><option value="todos"' + (_exFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="credito"' + (_exFiltroTipo === 'credito' ? ' selected' : '') + '>Crédito</option><option value="debito"' + (_exFiltroTipo === 'debito' ? ' selected' : '') + '>Débito</option></select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="ex-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
-    + '<div class="form-group" style="max-width:120px"><label>Periodo</label><select id="ex-filtro-periodo-modo" onchange="atualizarPlaceholdersFiltrosExtrato()"><option value="dia"' + (_exFiltroPeriodoModo === 'dia' ? ' selected' : '') + '>Dia</option><option value="mes"' + (_exFiltroPeriodoModo === 'mes' ? ' selected' : '') + '>Mes</option><option value="ano"' + (_exFiltroPeriodoModo === 'ano' ? ' selected' : '') + '>Ano</option></select></div>'
+    + '<div class="form-group" style="max-width:120px"><label>Período</label><select id="ex-filtro-periodo-modo" onchange="atualizarPlaceholdersFiltrosExtrato()"><option value="dia"' + (_exFiltroPeriodoModo === 'dia' ? ' selected' : '') + '>Dia</option><option value="mes"' + (_exFiltroPeriodoModo === 'mes' ? ' selected' : '') + '>Mes</option><option value="ano"' + (_exFiltroPeriodoModo === 'ano' ? ' selected' : '') + '>Ano</option></select></div>'
     + '<div class="form-group" style="max-width:170px"><label>Referencia</label><input type="text" id="ex-filtro-periodo" class="' + (_exFiltroPeriodoModo === 'dia' ? 'flex-date-input' : '') + '" value="' + esc(extratoPeriodoDisplayValue()) + '" placeholder="' + esc(extratoPeriodoPlaceholder()) + '" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-filtro-conta"><option value="">Todas</option>' + filtroContaOpts + '</select></div>'
-    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:180px"><label>Conciliacao</label><select id="ex-filtro-conciliacao"><option value="todos"' + (_exFiltroConciliacao === 'todos' ? ' selected' : '') + '>Todos</option><option value="conciliados"' + (_exFiltroConciliacao === 'conciliados' ? ' selected' : '') + '>Conciliados</option><option value="nao_conciliados"' + (_exFiltroConciliacao === 'nao_conciliados' ? ' selected' : '') + '>Nao conciliados</option></select></div>' : '')
-    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:190px"><label>Devolucao</label><select id="ex-filtro-estorno"><option value="todos"' + (_exFiltroEstorno === 'todos' ? ' selected' : '') + '>Todos</option><option value="pendentes_estorno"' + (_exFiltroEstorno === 'pendentes_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornados"' + (_exFiltroEstorno === 'estornados' ? ' selected' : '') + '>Ja estornados</option></select></div>' : '')
+    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:180px"><label>Conciliação</label><select id="ex-filtro-conciliacao"><option value="todos"' + (_exFiltroConciliacao === 'todos' ? ' selected' : '') + '>Todos</option><option value="conciliados"' + (_exFiltroConciliacao === 'conciliados' ? ' selected' : '') + '>Conciliados</option><option value="nao_conciliados"' + (_exFiltroConciliacao === 'nao_conciliados' ? ' selected' : '') + '>Não conciliados</option></select></div>' : '')
+    + (financeiroPJAtivo ? '<div class="form-group" style="max-width:190px"><label>Devolução</label><select id="ex-filtro-estorno"><option value="todos"' + (_exFiltroEstorno === 'todos' ? ' selected' : '') + '>Todos</option><option value="pendentes_estorno"' + (_exFiltroEstorno === 'pendentes_estorno' ? ' selected' : '') + '>Pendente de estorno</option><option value="estornados"' + (_exFiltroEstorno === 'estornados' ? ' selected' : '') + '>Já estornados</option></select></div>' : '')
     + '<div class="form-group" style="max-width:120px"><label>Valor</label><select id="ex-filtro-valor-modo"><option value="todos"' + (_exFiltroValorModo === 'todos' ? ' selected' : '') + '>Todos</option><option value="acima"' + (_exFiltroValorModo === 'acima' ? ' selected' : '') + '>Acima de</option><option value="abaixo"' + (_exFiltroValorModo === 'abaixo' ? ' selected' : '') + '>Abaixo de</option><option value="igual"' + (_exFiltroValorModo === 'igual' ? ' selected' : '') + '>Igual a</option></select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="ex-filtro-valor" class="money-input" value="' + esc(Number(_exFiltroValor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + (relacionamentoAtivo ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-filtro-relacionamento"><option value="">Todos</option>' + filtroRelacionamentoOpts + '</select></div>' : '')
-    + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descricao ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
+    + '<div class="form-group"><label>Busca</label><input type="text" id="ex-filtro-busca" value="' + esc(_exFiltroBusca) + '" placeholder="Descrição ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosExtrato()"/></div>'
     + '</div>'
     + '<div class="ex-filter-actions"><button class="btn-sm" onclick="aplicarFiltrosExtrato()">Aplicar filtros</button><button class="btn-sm red" onclick="limparFiltrosExtrato()">Limpar</button></div>';
   var idsFiltrados = filtrados.map(function(l) { return l.id; }).filter(Boolean);
@@ -2328,9 +2328,9 @@ function renderExtrato() {
     '<div class="summary-grid">'
       + '<div class="summary-card"><div class="s-label">Saldo</div><div class="s-val ' + (saldo >= 0 ? 'green' : 'red') + '">' + fmt(saldo) + '</div></div>'
       + '<div class="summary-card"><div class="s-label">Saldo inicial</div><div class="s-val blue">' + fmt(saldoInicialBase) + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Creditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Debitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
-      + '<div class="summary-card"><div class="s-label">Lancamentos</div><div class="s-val blue">' + filtradosFinanceiros.length + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Créditos</div><div class="s-val green">' + fmt(totalCredito) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Débitos</div><div class="s-val red">' + fmt(totalDebito) + '</div></div>'
+      + '<div class="summary-card"><div class="s-label">Lançamentos</div><div class="s-val blue">' + filtradosFinanceiros.length + '</div></div>'
     + '</div>';
   var headerHtml =
     '<div class="ex-workbench-hero">'
@@ -2345,25 +2345,25 @@ function renderExtrato() {
     + '</div>';
   var tabsHtml =
     '<div class="ex-workbench-tabs">'
-      + '<button type="button" class="ex-workbench-tab' + (_exView === 'lancamentos' ? ' active' : '') + '" onclick="setExtratoView(\'lancamentos\')"><span>Lancamentos</span><strong>' + filtradosFinanceiros.length + '</strong></button>'
+      + '<button type="button" class="ex-workbench-tab' + (_exView === 'lancamentos' ? ' active' : '') + '" onclick="setExtratoView(\'lancamentos\')"><span>Lançamentos</span><strong>' + filtradosFinanceiros.length + '</strong></button>'
       + '<button type="button" class="ex-workbench-tab' + (_exView === 'importar' ? ' active' : '') + '" onclick="setExtratoView(\'importar\')"><span>Importar</span><strong>XLSX</strong></button>'
       + '<button type="button" class="ex-workbench-tab' + (_exView === 'contas' ? ' active' : '') + '" onclick="setExtratoView(\'contas\')"><span>Contas</span><strong>' + contas.length + '</strong></button>'
       + (relacionamentoAtivo ? '<button type="button" class="ex-workbench-tab' + (_exView === 'relacionamentos' ? ' active' : '') + '" onclick="setExtratoView(\'relacionamentos\')"><span>Relacionamentos</span><strong>' + relacionamentos.length + '</strong></button>' : '')
     + '</div>';
   var activePanelHtml = '';
   if (_exView === 'novo') {
-    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Novo lancamento</h3><p class="cartao-helper-text">Inclua movimentos avulsos no extrato do cliente.</p></div></div>' + novoPanelBody + '</div>';
+    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Novo lançamento</h3><p class="cartao-helper-text">Inclua movimentos avulsos no extrato do cliente.</p></div></div>' + novoPanelBody + '</div>';
   } else if (_exView === 'importar') {
-    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Importar extrato via planilha</h3><p class="cartao-helper-text">Baixe o modelo, selecione a conta e importe os lancamentos em lote.</p></div></div>' + importarPanelBody + '</div>';
+    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Importar extrato via planilha</h3><p class="cartao-helper-text">Baixe o modelo, selecione a conta e importe os lançamentos em lote.</p></div></div>' + importarPanelBody + '</div>';
   } else if (_exView === 'contas') {
     activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Contas do cliente</h3><p class="cartao-helper-text">Gerencie as contas usadas para separar saldos e importacoes.</p></div></div>' + contasPanelBody + '</div>';
   } else if (_exView === 'relacionamentos') {
-    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Relacionamentos</h3><p class="cartao-helper-text">Identifique a origem ou o destino real do valor sem perder a descricao original do banco.</p></div></div>' + relacionamentosPanelBody + '</div>';
+    activePanelHtml = '<div class="form-card ex-workbench-card"><div class="ex-section-head"><div><h3>Relacionamentos</h3><p class="cartao-helper-text">Identifique a origem ou o destino real do valor sem perder a descrição original do banco.</p></div></div>' + relacionamentosPanelBody + '</div>';
   }
   var html = headerHtml + resumoHtml + tabsHtml + activePanelHtml;
 
   if (_exView === 'lancamentos') {
-    html += '<div class="form-card ex-filter-strip"><div class="ex-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">Filtre por periodo, conta, categoria, conciliacao, valor e busca textual.</p></div><div class="ex-export-actions"><button class="btn-sm" onclick="exportExtratoPDF()">PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">XLSX</button></div></div>' + filtrosPanelBody + '</div>';
+    html += '<div class="form-card ex-filter-strip"><div class="ex-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">Filtre por período, conta, categoria, conciliação, valor e busca textual.</p></div><div class="ex-export-actions"><button class="btn-sm" onclick="exportExtratoPDF()">PDF</button><button class="btn-sm" onclick="exportExtratoXlsx()">XLSX</button></div></div>' + filtrosPanelBody + '</div>';
   } else {
     area.innerHTML = html;
     atualizarPlaceholdersFiltrosExtrato();
@@ -2394,8 +2394,8 @@ function renderExtrato() {
       if (!_exManterDuplicado[grupo.chave] && grupo.linhas[0]) _exManterDuplicado[grupo.chave] = grupo.linhas[0].id;
 
       html += '<div class="form-card" style="padding:12px 14px;margin-bottom:12px">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px"><p class="section-title" style="margin-bottom:0">Grupo ' + (gi + 1) + ' - ' + grupo.linhas.length + ' registros iguais</p><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="manterTodosDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Manter todos</button><button class="btn-sm red" onclick="removerDuplicadoGrupoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Excluir nao mantidos</button></span></div>'
-        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px"><p class="section-title" style="margin-bottom:0">Grupo ' + (gi + 1) + ' - ' + grupo.linhas.length + ' registros iguais</p><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="manterTodosDuplicadoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Manter todos</button><button class="btn-sm red" onclick="removerDuplicadoGrupoExtrato(\'' + encodeURIComponent(grupo.chave) + '\')">Excluir não mantidos</button></span></div>'
+        + '<table class="data-table"><thead><tr><th>Manter</th><th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
 
       grupo.linhas.forEach(l => {
         var realIdx = lncs.indexOf(l);
@@ -2427,7 +2427,7 @@ function renderExtrato() {
   if (false && _exMostrarDuplicados && dedupe.duplicados.length) {
     html += '<p class="section-title">Duplicados ocultos</p>'
       + '<table class="data-table" style="margin-bottom:18px">'
-      + '<thead><tr><th>Data</th><th>Descricao</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
+      + '<thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
 
     [...dedupe.duplicados].sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach(l => {
       var realIdx = lncs.indexOf(l);
@@ -2444,13 +2444,13 @@ function renderExtrato() {
   }
 
   if (lncs.length === 0) {
-    html += '<div class="empty-state">Nenhum lancamento</div>';
+    html += '<div class="empty-state">Nenhum lançamento</div>';
   } else if (filtrados.length === 0) {
-    html += '<div class="empty-state">Nenhum lancamento encontrado com os filtros atuais.</div>';
+    html += '<div class="empty-state">Nenhum lançamento encontrado com os filtros atuais.</div>';
   } else {
     html += loteToolbarHtml;
     html += '<table class="data-table">';
-    html += '<thead><tr>' + (_exSelecaoLote ? '<th style="width:42px">Sel.</th>' : '') + '<th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descricao</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
+    html += '<thead><tr>' + (_exSelecaoLote ? '<th style="width:42px">Sel.</th>' : '') + '<th>Data</th><th>Conta</th>' + (centroCustoAtivo ? '<th>Centro de custo</th>' : '') + (relacionamentoAtivo ? '<th>Relacionado a</th>' : '') + '<th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr></thead><tbody>';
     var colspanTabela = 6 + (_exSelecaoLote ? 1 : 0) + (centroCustoAtivo ? 1 : 0) + (relacionamentoAtivo ? 1 : 0);
     var filtradosOrdenados = [...filtrados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
     var gruposDia = [];
@@ -2504,7 +2504,7 @@ function renderExtrato() {
     html += '</tbody></table>';
   }
 
-  html += '<div class="ex-new-fab-wrap"><button type="button" class="ex-new-fab" onclick="setExtratoView(\'novo\')" title="Novo lancamento" aria-label="Novo lancamento">+</button></div>';
+  html += '<div class="ex-new-fab-wrap"><button type="button" class="ex-new-fab" onclick="setExtratoView(\'novo\')" title="Novo lançamento" aria-label="Novo lançamento">+</button></div>';
 
   area.innerHTML = html;
   aplicarAjustesVisuaisExtrato(area, lncs);
@@ -2667,7 +2667,7 @@ async function importExtratoXlsx(event) {
     var iCat = header.findIndex(h => h.includes('cat'));
 
     if (iDate < 0 || iDesc < 0 || iVal < 0) {
-      return alert('Planilha invalida. Colunas obrigatorias: data, descricao, valor.');
+      return alert('Planilha inválida. Colunas obrigatórias: data, descrição, valor.');
     }
 
     var c = data.clients[activeClient];
@@ -2744,7 +2744,7 @@ async function importExtratoXlsx(event) {
 
     await loadData();
     renderExtrato();
-    alert(count + ' lancamento(s) do extrato importado(s) com sucesso!'
+    alert(count + ' lançamento(s) do extrato importado(s) com sucesso!'
       + (duplicados.length ? ' ' + (duplicados.length - duplicadosSelecionados.length) + ' duplicado(s) ignorado(s).' : '')
       + (erros ? ' ' + erros + ' falharam.' : ''));
   };
@@ -2766,25 +2766,25 @@ function openExtratoEditModal(i) {
     '<option value="' + esc(cat) + '"' + (catAtual === String(cat) ? ' selected' : '') + '>' + esc(cat) + '</option>'
   ).join('');
 
-  document.getElementById('modalTitle').textContent = 'Editar lancamento';
+  document.getElementById('modalTitle').textContent = 'Editar lançamento';
   document.getElementById('modalBody').innerHTML =
     '<div class="form-row">'
     + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="date" id="ex-edit-data" value="' + esc(lanc.data || '') + '"/></div>'
-    + '<div class="form-group"><label>Descricao</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex: salario, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
+    + '<div class="form-group"><label>Descrição</label><input type="text" id="ex-edit-desc" value="' + esc(lanc.desc || '') + '" placeholder="Ex: salario, aluguel..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '</div>'
     + '<div class="form-row">'
-    + '<div class="form-group"><label>Descricao do banco</label><input type="text" id="ex-edit-desc-original" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div>'
+    + '<div class="form-group"><label>Descrição do banco</label><input type="text" id="ex-edit-desc-original" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div>'
     + '</div>'
     + '<div class="form-row">'
     + '<div class="form-group" style="max-width:190px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cc\')">(+ gerir)</span></label><select id="ex-edit-cat">' + catOpts + '</select></div>'
     + (extratoCentroCustoAtivo() ? '<div class="form-group" style="max-width:220px"><label>Centro de custo</label><select id="ex-edit-centro-custo">' + centrosCustoOptionsCliente(lanc.centroCustoId || '', true) + '</select></div>' : '')
     + '<div class="form-group" style="max-width:260px"><label>Conta</label><select id="ex-edit-conta">' + contasOptionsCliente(lanc.contaId || '') + '</select></div>'
     + (extratoRelacionamentoAtivo() ? '<div class="form-group" style="max-width:220px"><label>Relacionado a</label><select id="ex-edit-relacionamento">' + relacionamentoOptionsCliente(lanc.relacionamentoId || '', true) + '</select></div>' : '')
-    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="credito"' + (extratoEhCredito(lanc.tipo) ? ' selected' : '') + '>Credito</option><option value="debito"' + (extratoEhDebito(lanc.tipo) ? ' selected' : '') + '>Debito</option></select></div>'
+    + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="ex-edit-tipo"><option value="credito"' + (extratoEhCredito(lanc.tipo) ? ' selected' : '') + '>Crédito</option><option value="debito"' + (extratoEhDebito(lanc.tipo) ? ' selected' : '') + '>Débito</option></select></div>'
     + '<div class="form-group" style="max-width:170px"><label>Valor (R$)</label><input type="text" id="ex-edit-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '</div>'
     + (extratoRelacionamentoAtivo() ? '<div id="ex-edit-rel-suggestion" style="margin:-4px 0 12px"></div>' : '')
-    + '<div class="form-row"><div class="form-group"><label>Observacao</label><input type="text" id="ex-edit-obs" value="' + esc(lanc.observacao || '') + '" placeholder="Opcional. Ex: Pagamento pessoal feito para a empresa."/></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>Observação</label><input type="text" id="ex-edit-obs" value="' + esc(lanc.observacao || '') + '" placeholder="Opcional. Ex: Pagamento pessoal feito para a empresa."/></div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
     + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
     + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveExtratoEditModal(' + i + ')">Salvar alteracoes</button>'
@@ -2809,10 +2809,10 @@ function openExtratoEditModal(i) {
 }
 
 function extratoConciliacaoOptionsHtml(natureza, selecionadoId) {
-  if (typeof tfTitulosDisponiveisParaNatureza !== 'function') return '<option value="">Sem titulos disponiveis</option>';
+  if (typeof tfTitulosDisponiveisParaNatureza !== 'function') return '<option value="">Sem títulos disponiveis</option>';
   var titulos = tfTitulosDisponiveisParaNatureza(natureza);
-  if (!titulos.length) return '<option value="">Sem titulos disponiveis</option>';
-  return '<option value="">Selecione um titulo</option>' + titulos.map(function(item) {
+  if (!titulos.length) return '<option value="">Sem títulos disponiveis</option>';
+  return '<option value="">Selecione um título</option>' + titulos.map(function(item) {
     return '<option value="' + esc(item.id) + '" data-saldo="' + esc(String(tfSaldo(item))) + '"' + (item.id === selecionadoId ? ' selected' : '') + '>'
       + esc(item.pessoaNome || '-')
       + ' - ' + esc(item.descricao || '-')
@@ -2828,7 +2828,7 @@ function refreshOpenExtratoConciliationOptions() {
   var orcamentoIdInput = document.getElementById('ex-conciliar-orcamento-linha');
   if (!select && !orcamentoInput) return;
   var referencia = select || orcamentoInput;
-  var referenciaContainer = referencia.closest ? referencia.closest('[data-lancamento-id]') : null;
+  var referenciaContainer = referencia.closest ? referencia.closest('[data-lançamento-id]') : null;
   var lancamentoId = String(referencia.dataset.lancamentoId || (referenciaContainer && referenciaContainer.dataset.lancamentoId) || '');
   var cliente = data && data.clients ? data.clients[activeClient] : null;
   var lanc = cliente && Array.isArray(cliente.extrato)
@@ -2915,12 +2915,12 @@ function extratoPontuarTituloConciliacao(lanc, titulo, restante) {
 
   if (descricaoTitulo && textoBanco.indexOf(descricaoTitulo) !== -1) {
     score += 18;
-    motivos.push('descricao exata');
+    motivos.push('descrição exata');
   }
 
   if (tfStatusOf(titulo) === 'atrasado') {
     score += 6;
-    motivos.push('titulo vencido');
+    motivos.push('título vencido');
   }
 
   return { score: score, motivos: motivos };
@@ -2952,7 +2952,7 @@ function extratoSugestoesConciliacao(lanc, natureza, restante) {
 function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
   if (!sugestoes.length) return '';
   return '<div class="settings-section-card" style="margin-bottom:16px">'
-    + '<div class="settings-card-head"><div><h5>Sugestoes de conciliacao</h5><p>O Granafy analisou valor, nome e descrição para sugerir os títulos mais prováveis.</p></div></div>'
+    + '<div class="settings-card-head"><div><h5>Sugestões de conciliação</h5><p>O Granafy analisou valor, nome e descrição para sugerir os títulos mais prováveis.</p></div></div>'
     + '<div class="summary-grid pending-grid">'
     + sugestoes.map(function(item) {
       return '<div class="summary-card pending-card">'
@@ -3052,7 +3052,7 @@ function extratoOrcamentoLinhaFormularioHtml(natureza, restante, primeira) {
   var sufixo = primeira ? 'principal' : String(Date.now()) + '-' + String(Math.floor(Math.random() * 10000));
   var listaId = 'ex-conciliar-orcamento-opcoes-' + sufixo;
   return '<div class="ex-conciliar-orcamento-linha" data-restante="' + Number(restante || 0) + '">'
-    + '<div class="form-group"><label>Linha do orcamento</label>'
+    + '<div class="form-group"><label>Linha do orçamento</label>'
       + '<input type="text" ' + (primeira ? 'id="ex-conciliar-orcamento-busca" ' : '') + 'class="ex-conciliar-orcamento-busca" list="' + listaId + '" data-natureza="' + esc(natureza) + '" placeholder="Digite 3 letras para pesquisar" autocomplete="off" oninput="filtrarExtratoOrcamentoLinha(this)"/>'
       + '<input type="hidden" ' + (primeira ? 'id="ex-conciliar-orcamento-linha" ' : '') + 'class="ex-conciliar-orcamento-linha-id"/>'
       + '<datalist id="' + listaId + '"></datalist>'
@@ -3110,7 +3110,7 @@ function atualizarResumoDistribuicaoOrcamento(restante) {
 function extratoSugestoesConciliacaoHtml(sugestoes, restante) {
   if (!sugestoes.length) return '';
   return '<div class="conciliation-section conciliation-suggestion-section">'
-    + '<div class="conciliation-section-head"><div><h5>Sugestoes de conciliacao</h5><p>Titulos mais provaveis pelo valor, nome e descricao.</p></div></div>'
+    + '<div class="conciliation-section-head"><div><h5>Sugestões de conciliação</h5><p>Títulos mais prováveis pelo valor, nome e descrição.</p></div></div>'
     + '<div class="conciliation-suggestions">'
     + sugestoes.map(function(item) {
       var pct = Math.min(100, Math.max(8, Math.round(Number(item.score || 0) * 18)));
@@ -3159,7 +3159,7 @@ function extratoConciliacaoLinhaHtml(natureza, restante, tituloId, primeira) {
   return '<div class="ex-conciliar-linha">'
     + '<div class="form-group"><label>Conta para conciliar</label><select ' + (primeira ? 'id="ex-conciliar-titulo" ' : '') + 'class="ex-conciliar-titulo" onchange="syncExtratoConciliacaoLinha(this,' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloId || '') + '</select></div>'
     + '<div class="form-group"><label>Valor da baixa</label><input type="text" ' + (primeira ? 'id="ex-conciliar-valor" ' : '') + 'class="money-input ex-conciliar-valor" value="0,00"/></div>'
-    + '<button class="btn-icon danger" type="button" title="Remover titulo" onclick="removerLinhaConciliacaoExtrato(this,' + Number(restante || 0) + ')"' + (primeira ? ' style="visibility:hidden"' : '') + '>&#128465;</button>'
+    + '<button class="btn-icon danger" type="button" title="Remover título" onclick="removerLinhaConciliacaoExtrato(this,' + Number(restante || 0) + ')"' + (primeira ? ' style="visibility:hidden"' : '') + '>&#128465;</button>'
     + '</div>';
 }
 
@@ -3194,7 +3194,7 @@ function atualizarResumoDistribuicaoConciliacao(restante) {
 }
 
 function openExtratoConciliacaoModal(i) {
-  if (!clienteAtivoEhPJ()) return alert('A conciliacao financeira esta disponivel apenas para clientes PJ.');
+  if (!clienteAtivoEhPJ()) return alert('A conciliação financeira está disponível apenas para clientes PJ.');
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
@@ -3225,14 +3225,14 @@ function openExtratoConciliacaoModal(i) {
       + '<span class="settings-card-badge subtle">Restante ' + fmt(restante) + '</span>'
     + '</div>'
     + '<div class="settings-section-card" style="margin-bottom:16px">'
-      + '<div class="settings-card-head"><div><h5>Lancamento do extrato</h5><p>Use este crédito ou débito do banco para baixar um título financeiro do cliente PJ.</p></div></div>'
+      + '<div class="settings-card-head"><div><h5>Lançamento do extrato</h5><p>Use este crédito ou débito do banco para baixar um título financeiro do cliente PJ.</p></div></div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="text" value="' + esc(formatDate(lanc.data)) + '" readonly/></div>'
         + '<div class="form-group" style="max-width:180px"><label>Conta</label><input type="text" value="' + esc(nomeContaPorId(c, lanc.contaId)) + '" readonly/></div>'
         + '<div class="form-group" style="max-width:160px"><label>Tipo</label><input type="text" value="' + esc(extratoEhCredito(lanc.tipo) ? 'Credito' : 'Debito') + '" readonly/></div>'
         + '<div class="form-group" style="max-width:170px"><label>Valor</label><input type="text" value="' + esc(fmt(lanc.valor || 0)) + '" readonly/></div>'
       + '</div>'
-      + '<div class="form-row"><div class="form-group"><label>Descricao do banco</label><input type="text" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div></div>'
+      + '<div class="form-row"><div class="form-group"><label>Descrição do banco</label><input type="text" value="' + esc(lanc.descOriginal || lanc.desc || '') + '" readonly/></div></div>'
       + (extratoRelacionamentoAtivo() && lanc.relacionamentoId ? '<div class="form-row"><div class="form-group"><label>Relacionado a</label><input type="text" value="' + esc(nomeRelacionamentoPorId(c, lanc.relacionamentoId)) + '" readonly/></div></div>' : '')
     + '</div>'
     + extratoSugestoesConciliacaoHtml(sugestoes, restante)
@@ -3240,11 +3240,11 @@ function openExtratoConciliacaoModal(i) {
       + '<div class="settings-card-head"><div><h5>Baixas conciliadas</h5><p>Você pode vincular este lançamento a mais de um título, desde que o total conciliado não ultrapasse o valor do banco.</p></div></div>'
       + baixasHtml
       + '<div class="form-row" style="margin-top:16px">'
-        + '<div class="form-group"><label>Titulo para conciliar</label><select id="ex-conciliar-titulo" data-lancamento-id="' + esc(lanc.id) + '" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
+        + '<div class="form-group"><label>Título para conciliar</label><select id="ex-conciliar-titulo" data-lancamento-id="' + esc(lanc.id) + '" onchange="syncExtratoConciliacaoValor(' + Number(restante || 0) + ')">' + extratoConciliacaoOptionsHtml(natureza, tituloSugeridoId) + '</select></div>'
       + '</div>'
       + '<div class="form-row">'
         + '<div class="form-group" style="max-width:170px"><label>Valor da baixa</label><input type="text" id="ex-conciliar-valor" class="money-input" value="' + esc(Number(restante || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + '"/></div>'
-        + '<div class="form-group"><label>Observacao</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: recebimento parcial, pagamento fornecedor"/></div>'
+        + '<div class="form-group"><label>Observação</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: recebimento parcial, pagamento fornecedor"/></div>'
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px">'
         + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
@@ -3259,7 +3259,7 @@ function openExtratoConciliacaoModal(i) {
 }
 
 function openExtratoConciliacaoModal(i) {
-  if (!clienteAtivoEhPJ()) return alert('A conciliacao financeira esta disponivel apenas para clientes PJ.');
+  if (!clienteAtivoEhPJ()) return alert('A conciliação financeira está disponível apenas para clientes PJ.');
   var c = data.clients[activeClient];
   var lanc = c && c.extrato ? c.extrato[i] : null;
   if (!lanc || !lanc.id) return;
@@ -3280,11 +3280,11 @@ function openExtratoConciliacaoModal(i) {
         var linha = typeof tfOrcamentoLinhaById === 'function' ? tfOrcamentoLinhaById(item.orcamentoLinhaId) : null;
         var evento = linha && typeof tfNomeEventoById === 'function' ? tfNomeEventoById(linha.eventoId) : '';
         return '<div class="tf-baixa-item">'
-          + '<div><strong>' + esc((linha && linha.categoria) || 'Linha do orcamento') + '</strong><small>' + esc(evento || 'Sem evento') + ' - ' + esc(formatDate(item.data)) + '</small></div>'
-          + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoOrcamento(\'' + esc(item.id) + '\',' + i + ')" title="Desconciliar do orcamento">&#128465;</button></div>'
+          + '<div><strong>' + esc((linha && linha.categoria) || 'Linha do orçamento') + '</strong><small>' + esc(evento || 'Sem evento') + ' - ' + esc(formatDate(item.data)) + '</small></div>'
+          + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoOrcamento(\'' + esc(item.id) + '\',' + i + ')" title="Desconciliar do orçamento">&#128465;</button></div>'
           + '</div>';
       }).join('') + '</div>'
-    : '<div class="empty-state" style="padding:18px 12px">Nenhuma realizacao vinculada diretamente ao orcamento.</div>';
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma realizacao vinculada diretamente ao orçamento.</div>';
   var baixasHtml = baixas.length
     ? '<div class="conciliation-baixas">' + baixas.map(function(item) {
         return '<div class="tf-baixa-item">'
@@ -3292,7 +3292,7 @@ function openExtratoConciliacaoModal(i) {
           + '<div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--accent3)">' + fmt(item.baixa.valor) + '</strong><button class="btn-icon danger" onclick="desconciliarExtratoBaixa(\'' + esc(lanc.id) + '\',\'' + esc(item.tituloId) + '\',\'' + esc(item.baixa.id) + '\',' + i + ')" title="Desconciliar">&#128465;</button></div>'
           + '</div>';
       }).join('') + '</div>'
-    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliacao registrada neste lancamento.</div>';
+    : '<div class="empty-state" style="padding:18px 12px">Nenhuma conciliação registrada neste lançamento.</div>';
 
   document.getElementById('modalTitle').textContent = acaoLabel;
   document.getElementById('modalBody').innerHTML =
@@ -3300,7 +3300,7 @@ function openExtratoConciliacaoModal(i) {
       + '<div class="conciliation-hero">'
         + '<div class="conciliation-hero-main">'
           + '<span class="settings-card-badge">' + esc(naturezaLabel) + '</span>'
-          + '<h4>' + esc(lanc.descOriginal || lanc.desc || 'Lancamento do extrato') + '</h4>'
+          + '<h4>' + esc(lanc.descOriginal || lanc.desc || 'Lançamento do extrato') + '</h4>'
           + '<div class="conciliation-meta">'
             + '<span>' + esc(formatDate(lanc.data)) + '</span>'
             + '<span>' + esc(nomeContaPorId(c, lanc.contaId)) + '</span>'
@@ -3311,14 +3311,14 @@ function openExtratoConciliacaoModal(i) {
         + '<div class="conciliation-amount-box"><span>Valor do banco</span><strong>' + fmt(lanc.valor || 0) + '</strong></div>'
       + '</div>'
       + '<div class="conciliation-progress-grid">'
-        + '<div><span>Lancamento</span><strong>' + fmt(lanc.valor || 0) + '</strong></div>'
+        + '<div><span>Lançamento</span><strong>' + fmt(lanc.valor || 0) + '</strong></div>'
         + '<div><span>Conciliado</span><strong class="green">' + fmt(conciliado) + '</strong></div>'
         + '<div><span>Restante</span><strong class="' + (restante > 0 ? 'yellow' : 'green') + '">' + fmt(restante) + '</strong></div>'
       + '</div>'
       + extratoConciliacaoCategoriasHtml(lanc)
       + extratoSugestoesConciliacaoHtml(sugestoes, restante)
       + '<div class="conciliation-section conciliation-budget-section">'
-        + '<div class="conciliation-section-head"><div><h5>Distribuir no orcamento</h5><p>Divida este lancamento entre uma ou mais linhas do evento.</p></div>'
+        + '<div class="conciliation-section-head"><div><h5>Distribuir no orçamento</h5><p>Dívida este lançamento entre uma ou mais linhas do evento.</p></div>'
           + (restante > 0 ? '<button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoOrcamento(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar linha</button>' : '')
         + '</div>'
         + realizacoesOrcamentoHtml
@@ -3326,19 +3326,19 @@ function openExtratoConciliacaoModal(i) {
           + extratoOrcamentoLinhaFormularioHtml(natureza, restante, true)
           + '</div>'
           + '<div class="conciliation-allocation-footer"><span id="ex-conciliar-orcamento-resumo"></span><button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoOrcamento(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar outra linha</button></div>'
-          + '<div class="form-group" style="margin-top:12px"><label>Observacao geral</label><input type="text" id="ex-conciliar-orcamento-obs" placeholder="Ex.: pagamento dividido entre categorias"/></div>'
-          + '<div class="conciliation-actions"><button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoComOrcamento(' + i + ')">Conciliar com orcamento</button></div>' : '')
+          + '<div class="form-group" style="margin-top:12px"><label>Observação geral</label><input type="text" id="ex-conciliar-orcamento-obs" placeholder="Ex.: pagamento dividido entre categorias"/></div>'
+          + '<div class="conciliation-actions"><button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoComOrcamento(' + i + ')">Conciliar com orçamento</button></div>' : '')
       + '</div>'
       + '<div class="conciliation-section conciliation-accounts-section">'
-        + '<div class="conciliation-section-head"><div><h5>Distribuir entre contas</h5><p>Use uma ou mais contas financeiras e informe quanto deste lancamento pertence a cada uma.</p></div>'
-          + (restante > 0 ? '<button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar titulo</button>' : '')
+        + '<div class="conciliation-section-head"><div><h5>Distribuir entre contas</h5><p>Use uma ou mais contas financeiras e informe quanto deste lançamento pertence a cada uma.</p></div>'
+          + (restante > 0 ? '<button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar título</button>' : '')
         + '</div>'
         + baixasHtml
         + (restante > 0 ? '<div id="ex-conciliar-linhas" data-lancamento-id="' + esc(lanc.id) + '" data-restante-centavos="' + restanteConciliacaoEmCentavos(lanc) + '" class="conciliation-allocation-list">'
           + extratoConciliacaoLinhaHtml(natureza, restante, tituloSugeridoId, true)
         + '</div>'
-        + '<div class="conciliation-allocation-footer"><span id="ex-conciliar-distribuicao-resumo"></span><button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar outro titulo</button></div>'
-        + '<div class="form-group" style="margin-top:12px"><label>Observacao geral</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: pagamento dividido entre fornecedores"/></div>' : '')
+        + '<div class="conciliation-allocation-footer"><span id="ex-conciliar-distribuicao-resumo"></span><button class="btn-sm" type="button" onclick="adicionarLinhaConciliacaoExtrato(\'' + esc(natureza) + '\',' + Number(restante || 0) + ')">+ Adicionar outro título</button></div>'
+        + '<div class="form-group" style="margin-top:12px"><label>Observação geral</label><input type="text" id="ex-conciliar-obs" placeholder="Ex.: pagamento dividido entre fornecedores"/></div>' : '')
         + '<div class="conciliation-actions">'
           + '<button class="btn-sm red" type="button" onclick="closeModal()">Fechar</button>'
           + (restante > 0 ? '<button class="btn-add" type="button" style="margin-top:0" onclick="conciliarExtratoLancamento(' + i + ')">' + acaoLabel + '</button>' : '')
@@ -3363,7 +3363,7 @@ function openExtratoConciliacaoModal(i) {
 }
 
 async function conciliarExtratoComOrcamento(i) {
-  if (!canEditActiveClient()) return alert('Este cliente esta disponivel apenas para visualizacao.');
+  if (!canEditActiveClient()) return alert('Este cliente está disponível apenas para visualização.');
   var cliente = data.clients[activeClient];
   var lanc = cliente && cliente.extrato ? cliente.extrato[i] : null;
   if (!lanc || !lanc.id) return;
@@ -3381,23 +3381,23 @@ async function conciliarExtratoComOrcamento(i) {
   var distribuicoes = Object.keys(distribuicoesPorLinha).map(function(linhaId) {
     return { linhaId: linhaId, valorCentavos: distribuicoesPorLinha[linhaId] };
   });
-  if (!distribuicoes.length) return alert('Adicione ao menos uma linha do orcamento com valor maior que zero.');
+  if (!distribuicoes.length) return alert('Adicione ao menos uma linha do orçamento com valor maior que zero.');
 
   var restanteCentavos = restanteConciliacaoModalEmCentavos('ex-conciliar-orcamento-linhas', lanc);
   var totalCentavos = ajustarDistribuicoesAoRestante(distribuicoes, restanteCentavos);
-  if (totalCentavos > restanteCentavos) return alert('A soma distribuida ultrapassa o restante disponivel deste lancamento.');
+  if (totalCentavos > restanteCentavos) return alert('A soma distribuida ultrapassa o restante disponível deste lançamento.');
 
   var realizacoesPayload = [];
   var baixasPayload = [];
   for (var d = 0; d < distribuicoes.length; d++) {
     var distribuicao = distribuicoes[d];
     var linha = typeof tfOrcamentoLinhaById === 'function' ? tfOrcamentoLinhaById(distribuicao.linhaId) : null;
-    if (!linha || linha.natureza !== naturezaOrcamento) return alert('Uma das linhas selecionadas nao corresponde ao tipo deste lancamento.');
+    if (!linha || linha.natureza !== naturezaOrcamento) return alert('Uma das linhas selecionadas não corresponde ao tipo deste lançamento.');
 
     var contasDaLinha = typeof tfTitulosPorOrcamentoLinha === 'function' ? tfTitulosPorOrcamentoLinha(linha.id) : [];
     var contasAbertas = contasDaLinha.filter(function(titulo) { return valorMonetarioEmCentavos(tfSaldo(titulo)) > 0; });
     if (contasAbertas.length > 1) return alert('A linha ' + (linha.categoria || '') + ' possui mais de uma conta aberta. Use a secao Contas financeiras para escolher a conta especifica.');
-    if (contasDaLinha.length && !contasAbertas.length) return alert('A conta vinculada a ' + (linha.categoria || 'esta linha') + ' ja esta totalmente conciliada.');
+    if (contasDaLinha.length && !contasAbertas.length) return alert('A conta vinculada a ' + (linha.categoria || 'está linha') + ' já está totalmente conciliada.');
 
     if (contasAbertas.length === 1) {
       if (distribuicao.valorCentavos > valorMonetarioEmCentavos(tfSaldo(contasAbertas[0]))) return alert('O valor de ' + (linha.categoria || 'uma linha') + ' ultrapassa o saldo da conta vinculada.');
@@ -3406,7 +3406,7 @@ async function conciliarExtratoComOrcamento(i) {
         cliente_id: activeClient,
         data_baixa: lanc.data || new Date().toISOString().slice(0, 10),
         valor: distribuicao.valorCentavos / 100,
-        observacao: observacao || ('Conciliado pelo orcamento: ' + (linha.categoria || '')),
+        observacao: observacao || ('Conciliado pelo orçamento: ' + (linha.categoria || '')),
         origem: 'extrato',
         extrato_lancamento_id: lanc.id
       }, getUserScopePayload()));
@@ -3426,8 +3426,8 @@ async function conciliarExtratoComOrcamento(i) {
   if (baixasPayload.length) {
     var baixasResponse = await supabaseClient.from('titulos_financeiros_baixas').insert(baixasPayload).select();
     if (baixasResponse.error) {
-      console.error('Erro ao conciliar contas do orcamento:', baixasResponse.error);
-      return alert('Nao foi possivel conciliar as contas vinculadas ao orcamento.');
+      console.error('Erro ao conciliar contas do orçamento:', baixasResponse.error);
+      return alert('Não foi possível conciliar as contas vinculadas ao orçamento.');
     }
     baixasInseridas = baixasResponse.data || [];
   }
@@ -3435,7 +3435,7 @@ async function conciliarExtratoComOrcamento(i) {
   if (realizacoesPayload.length) {
     var realizacoesResponse = await supabaseClient.from('orcamento_eventos_realizacoes').insert(realizacoesPayload).select();
     if (realizacoesResponse.error) {
-      console.error('Erro ao conciliar extrato com orcamento:', realizacoesResponse.error);
+      console.error('Erro ao conciliar extrato com orçamento:', realizacoesResponse.error);
       if (baixasInseridas.length) {
         await applyUserScope(supabaseClient.from('titulos_financeiros_baixas').delete().in('id', baixasInseridas.map(function(item) { return item.id; })));
       }
@@ -3452,14 +3452,14 @@ async function conciliarExtratoComOrcamento(i) {
 }
 
 async function desconciliarExtratoOrcamento(realizacaoId, extratoIdx) {
-  var ok = await appConfirm('Desconciliar este valor do orcamento?', { title: 'Desconciliar orcamento', confirmText: 'Desconciliar' });
+  var ok = await appConfirm('Desconciliar este valor do orçamento?', { title: 'Desconciliar orçamento', confirmText: 'Desconciliar' });
   if (!ok) return;
   var response = await applyUserScope(
     supabaseClient.from('orcamento_eventos_realizacoes').delete().eq('id', realizacaoId)
   );
   if (response.error) {
-    console.error('Erro ao desfazer conciliacao do orcamento:', response.error);
-    alert('Nao foi possivel desfazer a conciliacao do orcamento.');
+    console.error('Erro ao desfazer conciliação do orçamento:', response.error);
+    alert('Não foi possível desfazer a conciliação do orçamento.');
     return;
   }
   if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'desconciliacao_orcamento_extrato');
@@ -3474,7 +3474,7 @@ async function conciliarExtratoLancamento(i) {
   if (!lanc || !lanc.id) return;
 
   var observacao = ((document.getElementById('ex-conciliar-obs') || {}).value || '').trim();
-  if (typeof tfFindTituloById !== 'function') return alert('O modulo Financeiro nao esta disponivel neste momento.');
+  if (typeof tfFindTituloById !== 'function') return alert('O módulo Financeiro não está disponível neste momento.');
 
   var containerContas = document.getElementById('ex-conciliar-linhas');
   var distribuicoesPorTitulo = Array.from(containerContas ? containerContas.querySelectorAll('.ex-conciliar-linha') : []).reduce(function(mapa, linha) {
@@ -3490,15 +3490,15 @@ async function conciliarExtratoLancamento(i) {
 
   var restanteLancCentavos = restanteConciliacaoModalEmCentavos('ex-conciliar-linhas', lanc);
   var totalCentavos = ajustarDistribuicoesAoRestante(distribuicoes, restanteLancCentavos);
-  if (totalCentavos > restanteLancCentavos) return alert('A soma distribuida ultrapassa o restante disponivel deste lancamento.');
+  if (totalCentavos > restanteLancCentavos) return alert('A soma distribuida ultrapassa o restante disponível deste lançamento.');
 
   var titulos = {};
   for (var d = 0; d < distribuicoes.length; d++) {
     var distribuicao = distribuicoes[d];
     var titulo = tfFindTituloById(distribuicao.tituloId);
-    if (!titulo) return alert('Um dos titulos selecionados nao foi encontrado. Atualize a pagina e tente novamente.');
+    if (!titulo) return alert('Um dos títulos selecionados não foi encontrado. Atualize a pagina e tente novamente.');
     if (distribuicao.valorCentavos > valorMonetarioEmCentavos(tfSaldo(titulo))) {
-      return alert('O valor de ' + (titulo.pessoaNome || titulo.descricao || 'um titulo') + ' ultrapassa o saldo disponivel.');
+      return alert('O valor de ' + (titulo.pessoaNome || titulo.descricao || 'um título') + ' ultrapassa o saldo disponível.');
     }
     titulos[distribuicao.tituloId] = titulo;
   }
@@ -3548,7 +3548,7 @@ async function conciliarExtratoLancamento(i) {
 }
 
 async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extratoIdx) {
-  var ok = await appConfirm('Desconciliar esta baixa do extrato?', { title: 'Desconciliar baixa', confirmText: 'Desconciliar' });
+  var ok = await appConfirm('Desconciliar está baixa do extrato?', { title: 'Desconciliar baixa', confirmText: 'Desconciliar' });
   if (!ok) return;
 
   var response = await applyUserScope(
@@ -3560,7 +3560,7 @@ async function desconciliarExtratoBaixa(lancamentoId, tituloId, baixaId, extrato
 
   if (response.error) {
     console.error(response.error);
-    alert('Nao foi possivel desfazer a conciliacao.');
+    alert('Não foi possível desfazer a conciliação.');
     return;
   }
 
@@ -3601,7 +3601,7 @@ async function deleteExtrato(i) {
     );
     if (estornoError) {
       console.error(estornoError);
-      alert('Nao foi possivel atualizar os lancamentos pendentes de estorno antes de excluir.');
+      alert('Não foi possível atualizar os lançamentos pendentes de estorno antes de excluir.');
       return;
     }
   }
@@ -3618,7 +3618,7 @@ async function deleteExtrato(i) {
       );
       if (baixaError) {
         console.error(baixaError);
-        alert('Nao foi possivel remover as conciliacoes financeiras antes de excluir o lancamento.');
+        alert('Não foi possível remover as conciliacoes financeiras antes de excluir o lançamento.');
         return;
       }
     }
@@ -3680,10 +3680,10 @@ async function saveExtratoEditModal(i) {
     return alert('O novo valor não pode ser menor que o valor já conciliado no Financeiro.');
   }
   if (origemEstorno && extratoTipoNormalizado(novoTipo) !== extratoTipoNormalizado(lanc.tipo || 'credito')) {
-    return alert('Esse lancamento esta vinculado como estorno de outro registro. Desfaca o vinculo antes de mudar o tipo.');
+    return alert('Esse lançamento está vinculado como estorno de outro registro. Desfaça o vínculo antes de mudar o tipo.');
   }
   if (origemEstorno && Math.abs(Number(novoValor || 0) - Number(lanc.valor || 0)) >= 0.005) {
-    return alert('Esse lancamento esta vinculado como estorno de outro registro. Desfaca o vinculo antes de alterar o valor.');
+    return alert('Esse lançamento está vinculado como estorno de outro registro. Desfaça o vínculo antes de alterar o valor.');
   }
 
   const { error } = await applyUserScope(
@@ -3705,12 +3705,12 @@ async function saveExtratoEditModal(i) {
   );
 
   if (error) {
-    console.error('Erro ao editar lancamento:', error);
+    console.error('Erro ao editar lançamento:', error);
     if (isMissingRelacionamentoSchemaError(error)) {
       alert('Os campos de relacionamento ainda nao existem no Supabase. Rode o arquivo sql/20260510_relacionamentos_extrato.sql no SQL Editor.');
       return;
     }
-    alert('Nao foi possivel editar o lancamento: ' + (error.message || 'erro desconhecido'));
+    alert('Não foi possível editar o lançamento: ' + (error.message || 'erro desconhecido'));
     return;
   }
 
