@@ -132,49 +132,56 @@ function openClientFormModal(id) {
   var cliente = id && data.clients ? data.clients[id] : null;
   var tipo = cliente && cliente.tipoCliente ? cliente.tipoCliente : 'pf';
   var accessSection = cliente ? renderClientAccessSection(cliente.id) : '';
+  var modal = document.querySelector('#modalOverlay .modal');
+  if (modal) modal.classList.add('modal-wide');
 
   document.getElementById('modalTitle').textContent = cliente ? 'Editar cliente' : 'Cadastrar cliente';
   document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">'
-      + '<div class="form-group" style="max-width:190px"><label>Tipo do cliente</label>'
-      + '<select id="client-form-tipo" onchange="syncClientFormByType()">'
-      + '<option value="pf"' + (tipo === 'pf' ? ' selected' : '') + '>Pessoa física</option>'
-      + '<option value="pj"' + (tipo === 'pj' ? ' selected' : '') + '>Pessoa jurídica</option>'
-      + '</select></div>'
-    + '</div>'
-    + '<div class="form-row client-form-type client-form-type-pf">'
-      + '<div class="form-group"><label>Nome completo</label><input type="text" id="client-form-nome" value="' + esc(cliente ? (cliente.name || '') : '') + '" placeholder="Nome do cliente"/></div>'
-      + '<div class="form-group"><label>CPF</label><input type="text" id="client-form-documento" value="' + esc(cliente ? (cliente.documento || '') : '') + '" placeholder="000.000.000-00"/></div>'
-    + '</div>'
-    + '<div class="form-row client-form-type client-form-type-pj">'
-      + '<div class="form-group"><label>Nome fantasia</label><input type="text" id="client-form-fantasia" value="' + esc(cliente ? (cliente.nomeFantasia || cliente.name || '') : '') + '" placeholder="Como o cliente aparece no sistema"/></div>'
-      + '<div class="form-group"><label>CNPJ</label><input type="text" id="client-form-documento-pj" value="' + esc(cliente ? (cliente.documento || '') : '') + '" placeholder="00.000.000/0000-00"/></div>'
-    + '</div>'
-    + '<div class="form-row client-form-type client-form-type-pj">'
-      + '<div class="form-group"><label>Razao social</label><input type="text" id="client-form-razao" value="' + esc(cliente ? (cliente.razaoSocial || '') : '') + '" placeholder="Razao social"/></div>'
-      + '<div class="form-group"><label>Responsavel</label><input type="text" id="client-form-responsavel" value="' + esc(cliente ? (cliente.responsavel || '') : '') + '" placeholder="Responsavel pelo contato"/></div>'
-    + '</div>'
-    + '<div class="form-row client-form-type client-form-type-pj">'
-      + '<div class="form-group" style="max-width:220px"><label>Módulo de eventos/projetos</label><select id="client-form-eventos-enabled"><option value="false"' + (!(cliente && cliente.eventosEnabled) ? ' selected' : '') + '>Desabilitado</option><option value="true"' + (cliente && cliente.eventosEnabled ? ' selected' : '') + '>Habilitado</option></select></div>'
-      + '<div class="form-group"><label>Nome do módulo</label><input type="text" id="client-form-eventos-label" value="' + esc(cliente ? (cliente.eventosLabel || 'Eventos') : 'Eventos') + '" placeholder="Eventos, Projetos, Obras..."/></div>'
-    + '</div>'
-    + '<div class="form-row">'
-      + '<div class="form-group"><label>Telefone</label><input type="text" id="client-form-telefone" value="' + esc(cliente ? (cliente.telefone || '') : '') + '" placeholder="(00) 00000-0000"/></div>'
-      + '<div class="form-group"><label>E-mail financeiro</label><input type="email" id="client-form-email" value="' + esc(cliente ? (cliente.emailFinanceiro || '') : '') + '" placeholder="financeiro@empresa.com"/></div>'
-    + '</div>'
-    + '<div class="form-row">'
-      + '<div class="form-group"><label>Observacoes</label><textarea id="client-form-obs" rows="4" placeholder="Informações importantes deste cadastro">' + esc(cliente ? (cliente.observacoes || '') : '') + '</textarea></div>'
-    + '</div>'
-    + '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px">'
-      + '<button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button>'
-      + '<button class="btn-add" type="button" style="margin-top:0" onclick="saveClientForm(' + (cliente ? ('\'' + cliente.id + '\'') : 'null') + ')">' + (cliente ? 'Salvar cliente' : 'Cadastrar cliente') + '</button>'
-    + '</div>'
-    + accessSection;
+    '<div class="client-form-shell">'
+      + '<div class="settings-hero client-form-hero">'
+        + '<div><span class="settings-eyebrow">Cadastro de cliente</span><h4>' + esc(cliente ? (cliente.name || 'Cliente') : 'Novo cliente') + '</h4><p>Organize identificacao, contato, modulo de eventos e acesso compartilhado em um unico lugar.</p></div>'
+        + '<div class="settings-hero-badge">' + esc(tipo === 'pj' ? 'Pessoa juridica' : 'Pessoa fisica') + '</div>'
+      + '</div>'
+      + '<div class="settings-section-card client-form-section">'
+        + '<div class="settings-card-head"><div><h5>Tipo e identificacao</h5><p>Escolha PF ou PJ e preencha os dados principais do cadastro.</p></div></div>'
+        + '<div class="form-row">'
+          + '<div class="form-group" style="max-width:220px"><label>Tipo do cliente</label><select id="client-form-tipo" onchange="syncClientFormByType()"><option value="pf"' + (tipo === 'pf' ? ' selected' : '') + '>Pessoa fisica</option><option value="pj"' + (tipo === 'pj' ? ' selected' : '') + '>Pessoa juridica</option></select></div>'
+        + '</div>'
+        + '<div class="form-row client-form-type client-form-type-pf">'
+          + '<div class="form-group"><label>Nome completo</label><input type="text" id="client-form-nome" value="' + esc(cliente ? (cliente.name || '') : '') + '" placeholder="Nome do cliente"/></div>'
+          + '<div class="form-group"><label>CPF</label><input type="text" id="client-form-documento" value="' + esc(cliente ? (cliente.documento || '') : '') + '" placeholder="000.000.000-00"/></div>'
+        + '</div>'
+        + '<div class="form-row client-form-type client-form-type-pj">'
+          + '<div class="form-group"><label>Nome fantasia</label><input type="text" id="client-form-fantasia" value="' + esc(cliente ? (cliente.nomeFantasia || cliente.name || '') : '') + '" placeholder="Como aparece no sistema"/></div>'
+          + '<div class="form-group"><label>CNPJ</label><input type="text" id="client-form-documento-pj" value="' + esc(cliente ? (cliente.documento || '') : '') + '" placeholder="00.000.000/0000-00"/></div>'
+        + '</div>'
+        + '<div class="form-row client-form-type client-form-type-pj">'
+          + '<div class="form-group"><label>Razao social</label><input type="text" id="client-form-razao" value="' + esc(cliente ? (cliente.razaoSocial || '') : '') + '" placeholder="Razao social"/></div>'
+          + '<div class="form-group"><label>Responsavel</label><input type="text" id="client-form-responsavel" value="' + esc(cliente ? (cliente.responsavel || '') : '') + '" placeholder="Responsavel pelo contato"/></div>'
+        + '</div>'
+      + '</div>'
+      + '<div class="settings-section-card client-form-section">'
+        + '<div class="settings-card-head"><div><h5>Contato e observacoes</h5><p>Dados de contato financeiro e notas internas do cliente.</p></div></div>'
+        + '<div class="form-row">'
+          + '<div class="form-group"><label>Telefone</label><input type="text" id="client-form-telefone" value="' + esc(cliente ? (cliente.telefone || '') : '') + '" placeholder="(00) 00000-0000"/></div>'
+          + '<div class="form-group"><label>E-mail financeiro</label><input type="email" id="client-form-email" value="' + esc(cliente ? (cliente.emailFinanceiro || '') : '') + '" placeholder="financeiro@empresa.com"/></div>'
+        + '</div>'
+        + '<div class="form-row"><div class="form-group"><label>Observacoes</label><textarea id="client-form-obs" rows="4" placeholder="Informacoes importantes deste cadastro">' + esc(cliente ? (cliente.observacoes || '') : '') + '</textarea></div></div>'
+      + '</div>'
+      + '<div class="settings-section-card client-form-section client-form-type client-form-type-pj">'
+        + '<div class="settings-card-head"><div><h5>Eventos e projetos</h5><p>Habilite quando o cliente precisar separar receitas, custos e orcamento por evento, obra ou projeto.</p></div></div>'
+        + '<div class="form-row">'
+          + '<div class="form-group" style="max-width:240px"><label>Modulo de eventos/projetos</label><select id="client-form-eventos-enabled"><option value="false"' + (!(cliente && cliente.eventosEnabled) ? ' selected' : '') + '>Desabilitado</option><option value="true"' + (cliente && cliente.eventosEnabled ? ' selected' : '') + '>Habilitado</option></select></div>'
+          + '<div class="form-group"><label>Nome do modulo</label><input type="text" id="client-form-eventos-label" value="' + esc(cliente ? (cliente.eventosLabel || 'Eventos') : 'Eventos') + '" placeholder="Eventos, Projetos, Obras..."/></div>'
+        + '</div>'
+      + '</div>'
+      + accessSection
+      + '<div class="client-form-actions"><button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button><button class="btn-add" type="button" style="margin-top:0" onclick="saveClientForm(' + (cliente ? ('\'' + cliente.id + '\'') : 'null') + ')">' + (cliente ? 'Salvar cliente' : 'Cadastrar cliente') + '</button></div>'
+    + '</div>';
 
   document.getElementById('modalOverlay').classList.add('open');
   syncClientFormByType();
 }
-
 function buildClientPayloadFromForm() {
   var tipo = document.getElementById('client-form-tipo').value || 'pf';
   var nomePF = (document.getElementById('client-form-nome').value || '').trim();

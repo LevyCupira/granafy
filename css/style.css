@@ -156,6 +156,34 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .settings-card-badge{background:rgba(91,140,255,.14);border:1px solid rgba(91,140,255,.2);color:var(--accent);padding:5px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
 .settings-card-badge.subtle{background:var(--surface);border-color:var(--border);color:var(--muted)}
 .settings-card-footer{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
+.settings-overview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.settings-overview-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px;min-height:168px}
+.settings-overview-card strong{font-size:1rem;color:var(--text);line-height:1.25}
+.settings-overview-card small{color:var(--muted);font-size:.78rem;line-height:1.4;flex:1}
+.settings-overview-card .btn-sm{width:max-content;margin-top:auto}
+.settings-overview-kicker{font-size:.66rem;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.settings-shortcut-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.settings-shortcut{background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;text-align:left;padding:13px 14px;cursor:pointer;transition:border-color var(--tr),background var(--tr)}
+.settings-shortcut:hover{border-color:var(--accent);background:rgba(91,140,255,.08)}
+.settings-shortcut strong{display:block;font-size:.86rem;margin-bottom:4px}
+.settings-shortcut small{display:block;color:var(--muted);font-size:.74rem;line-height:1.35}
+.settings-cat-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+.settings-cat-toolbar .form-group{max-width:360px;margin:0}
+.settings-cat-toolbar-note{color:var(--muted);font-size:.76rem;font-weight:700;white-space:nowrap}
+.settings-cat-empty{grid-column:1/-1;padding:26px 14px;border:1px dashed var(--border);border-radius:10px;background:var(--surface)}
+.client-form-shell{display:flex;flex-direction:column;gap:14px}
+.client-form-hero{margin-bottom:0}
+.client-form-section{margin:0}
+.client-form-actions{position:sticky;bottom:-18px;z-index:2;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:2px;padding:14px 0 0;background:linear-gradient(180deg,rgba(0,0,0,0),var(--surface) 26%)}
+.client-access-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.client-access-card{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 12px}
+.client-access-card strong{display:block;color:var(--text);font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-access-card small{display:block;color:var(--muted);font-size:.72rem;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-access-card span{color:var(--accent);font-size:.72rem;font-weight:700;border:1px solid rgba(91,140,255,.25);background:rgba(91,140,255,.12);border-radius:999px;padding:4px 8px;white-space:nowrap}
+.client-invite-row{display:grid;grid-template-columns:minmax(0,1fr) 190px auto;gap:10px;align-items:end}
+.client-invite-row .form-group{margin:0}
+.client-invite-row .btn-add{margin-top:0;white-space:nowrap}
+.client-form-empty{padding:20px 14px;margin-bottom:14px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)}
 .conciliation-modal{display:grid;grid-template-columns:minmax(320px,5fr) minmax(440px,7fr);gap:14px;align-items:start}
 .conciliation-hero,.conciliation-progress-grid{grid-column:1/-1}
 .conciliation-classification{grid-column:1/-1}
@@ -1011,6 +1039,15 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .modal-tab{flex:0 0 auto;min-height:40px}
   .settings-hero{flex-direction:column;padding:16px}
   .settings-tab-rich{min-width:150px}
+  .settings-overview-grid,.settings-shortcut-row,.client-access-grid{grid-template-columns:1fr}
+  .settings-overview-card{min-height:auto}
+  .settings-cat-toolbar{display:grid;grid-template-columns:1fr;align-items:stretch}
+  .settings-cat-toolbar .form-group{max-width:none}
+  .settings-cat-toolbar-note{white-space:normal}
+  .client-invite-row{grid-template-columns:1fr}
+  .client-invite-row .form-group{max-width:none!important}
+  .client-invite-row .btn-add,.client-form-actions .btn-sm,.client-form-actions .btn-add{width:100%;min-height:42px}
+  .client-form-actions{display:grid;grid-template-columns:1fr;bottom:-16px}
   .backup-card-grid,.settings-cat-grid{grid-template-columns:1fr}
   .settings-cat-item{align-items:flex-start;flex-direction:column}
   .settings-visibility-item{align-items:flex-start;flex-direction:column}

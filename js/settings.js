@@ -2,6 +2,8 @@
 // SETTINGS.JS - Configurações, perfil e backup
 // ====================================================
 
+var _settingsCatSearch = {};
+
 function openModal(section, tab) {
   if (section === 'backup' && typeof canSeeBackup === 'function' && !canSeeBackup()) {
     alert('Backup disponível apenas para perfis Master e Consultor.');
@@ -598,7 +600,9 @@ function renderSettingsModal(activeTabKey) {
   if (showLgpdTab) heroParts.push('acompanhe a trilha de LGPD');
   if (showAuditoriaTab) heroParts.push('revise a auditoria');
   var heroText = heroParts.join(', ') + ' sem misturar dados com os outros clientes da base.';
+  var totalCategoriasConfig = ccCount + cartaoCount + financeiroCount;
   var tabButtons = ''
+    + '<button class="modal-tab settings-tab-rich" data-stab="geral" onclick="switchSettingsTab(\'geral\')"><span class="settings-tab-main">Geral</span><span class="settings-tab-meta">painel</span><span class="settings-tab-count">' + totalCategoriasConfig + '</span></button>'
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cc" onclick="switchSettingsTab(\'cats_cc\')"><span class="settings-tab-main">Conta Corrente</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + ccCount + '</span></button>'
     + '<button class="modal-tab settings-tab-rich" data-stab="cats_cartao" onclick="switchSettingsTab(\'cats_cartao\')"><span class="settings-tab-main">Cartão</span><span class="settings-tab-meta">' + esc(clienteTipo) + '</span><span class="settings-tab-count">' + cartaoCount + '</span></button>';
   if (cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj') {
@@ -628,6 +632,7 @@ function renderSettingsModal(activeTabKey) {
     + '<div class="modal-tabs settings-tabs" id="settingsTabs">'
     + tabButtons
     + '</div>'
+    + '<div id="modal-panel-geral" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cc" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_financeiro" class="modal-panel"></div>'
@@ -635,7 +640,7 @@ function renderSettingsModal(activeTabKey) {
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
     + '<div id="modal-panel-lgpd" class="modal-panel"></div>'
     + '<div id="modal-panel-auditoria" class="modal-panel"></div>';
-  var firstTab = activeTabKey || 'cats_cc';
+  var firstTab = activeTabKey || 'geral';
   if (firstTab === 'auditoria' && !showAuditoriaTab) firstTab = showUsersTab ? 'usuarios' : 'cats_cc';
   if (firstTab === 'usuarios' && !showUsersTab) firstTab = 'cats_cc';
   if (firstTab === 'lgpd' && !showLgpdTab) firstTab = 'cats_cc';
@@ -657,6 +662,7 @@ function switchSettingsTab(tab) {
     return;
   }
   panel.classList.add('active');
+  if (tab === 'geral') renderSettingsOverviewPanel();
   if (tab === 'cats_cc') renderCatsPanel('cc');
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
   if (tab === 'cats_financeiro') renderCatsPanel('financeiro');
@@ -664,6 +670,43 @@ function switchSettingsTab(tab) {
   if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
   if (tab === 'lgpd') renderLgpdPanel();
   if (tab === 'auditoria' && (typeof canSeeAuditoria !== 'function' || canSeeAuditoria())) renderAuditoriaPanel();
+}
+
+function renderSettingsOverviewPanel() {
+  var panel = document.getElementById('modal-panel-geral');
+  if (!panel) return;
+  var cliente = activeClient && data.clients ? data.clients[activeClient] : null;
+  var clienteNome = cliente ? cliente.name : 'Nenhum cliente selecionado';
+  var clienteTipo = cliente && cliente.tipoCliente ? clientTypeLabel(cliente.tipoCliente) : 'Cliente';
+  var isPj = cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj';
+  var eventosLabel = cliente && cliente.eventosEnabled ? (cliente.eventosLabel || 'Eventos') : 'Desabilitado';
+  var tabs = typeof getConfigurableTabs === 'function' && activeClient ? getConfigurableTabs(activeClient) : [];
+  var hidden = typeof loadHiddenTabsForClient === 'function' && activeClient ? loadHiddenTabsForClient(activeClient) : [];
+  var visibleCount = Math.max(0, tabs.length - hidden.length);
+  var ccCount = (loadCatsCC() || []).length;
+  var cartaoCount = (loadCatsCartao() || []).length;
+  var financeiroCount = isPj ? (loadCatsFinanceiro() || []).length : 0;
+  var accessCount = cliente && Array.isArray(cliente.acessos)
+    ? cliente.acessos.filter(function(item) { return item && item.status === 'ativo'; }).length
+    : 0;
+  var clientAction = cliente ? ("openClientFormModal('" + cliente.id + "')") : 'addClient()';
+
+  panel.innerHTML =
+    '<div class="settings-overview-grid">'
+      + '<div class="settings-overview-card"><span class="settings-overview-kicker">Cadastro</span><strong>' + esc(clienteNome) + '</strong><small>' + esc(clienteTipo) + (cliente && cliente.documento ? ' &middot; ' + esc(cliente.documento) : '') + '</small><button class="btn-sm" type="button" onclick="' + esc(clientAction) + '">' + (cliente ? 'Editar cliente' : 'Cadastrar cliente') + '</button></div>'
+      + '<div class="settings-overview-card"><span class="settings-overview-kicker">Categorias</span><strong>' + (ccCount + cartaoCount + financeiroCount) + ' itens</strong><small>Conta Corrente: ' + ccCount + ' &middot; Cartao: ' + cartaoCount + (isPj ? ' &middot; Financeiro: ' + financeiroCount : '') + '</small><button class="btn-sm" type="button" onclick="switchSettingsTab(\'cats_cc\')">Organizar categorias</button></div>'
+      + '<div class="settings-overview-card"><span class="settings-overview-kicker">Interface</span><strong>' + visibleCount + ' abas visiveis</strong><small>Controle o que aparece no cliente ativo.</small><button class="btn-sm" type="button" onclick="switchSettingsTab(\'visual\')" ' + (cliente ? '' : 'disabled') + '>Ajustar abas</button></div>'
+      + '<div class="settings-overview-card"><span class="settings-overview-kicker">' + esc(isPj ? 'Eventos' : 'Acesso') + '</span><strong>' + esc(isPj ? eventosLabel : (accessCount + ' acesso(s)')) + '</strong><small>' + esc(isPj ? 'Modulo habilitavel no cadastro PJ.' : 'Compartilhamento por cliente.') + '</small><button class="btn-sm" type="button" onclick="' + esc(clientAction) + '">' + esc(isPj ? 'Configurar modulo' : 'Gerenciar acesso') + '</button></div>'
+    + '</div>'
+    + '<div class="settings-section-card" style="margin-top:14px">'
+      + '<div class="settings-card-head"><div><h5>Atalhos rapidos</h5><p>Use estes atalhos quando quiser ir direto ao tipo de configuracao que esta revisando.</p></div></div>'
+      + '<div class="settings-shortcut-row">'
+        + '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'cats_cc\')"><strong>Conta Corrente</strong><small>Categorias do Extrato e DRE</small></button>'
+        + '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'cats_cartao\')"><strong>Cartao</strong><small>Categorias da fatura</small></button>'
+        + (isPj ? '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'cats_financeiro\')"><strong>Financeiro</strong><small>Categorias de titulos PJ</small></button>' : '')
+        + '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'usuarios\')"><strong>Usuarios</strong><small>Perfil e permissoes</small></button>'
+      + '</div>'
+    + '</div>';
 }
 
 function renderLgpdPanel() {
@@ -889,6 +932,16 @@ async function solicitarAlteracaoPerfil() {
   renderUsuariosPanel();
 }
 
+function setSettingsCatSearch(tipo, valor) {
+  _settingsCatSearch[tipo] = String(valor || '').toLowerCase().trim();
+  renderCatsPanel(tipo);
+  var input = document.getElementById('settings-cat-search-' + tipo);
+  if (input) {
+    input.focus();
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+  }
+}
+
 function renderCatsPanel(tipo) {
   var panelSuffix = tipo === 'cc' ? 'cc' : (tipo === 'cartao' ? 'cartao' : (tipo === 'financeiro' ? 'financeiro' : 'centros_custo'));
   if (!activeClient || !data.clients || !data.clients[activeClient]) {
@@ -901,10 +954,24 @@ function renderCatsPanel(tipo) {
   var pid = 'modal-panel-cats_' + panelSuffix;
   var TIPOS_DRE = { receita: 'Receita', fixa: 'Fixa', variavel: 'Variavel', transferência: 'Transferencia' };
   var clienteNome = (data.clients[activeClient] && data.clients[activeClient].name) || 'cliente atual';
+  var busca = _settingsCatSearch[tipo] || '';
+  var rows = (cats || []).map(function(c, i) {
+    return {
+      item: c,
+      index: i,
+      nome: tipo === 'cc' ? (c.nome || c) : String(c || '')
+    };
+  }).filter(function(row) {
+    return !busca || String(row.nome || '').toLowerCase().includes(busca);
+  }).sort(function(a, b) {
+    return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' });
+  });
 
   var tagHtml = '';
   if (tipo === 'cc') {
-    tagHtml = cats.map(function(c, i) {
+    tagHtml = rows.map(function(row) {
+      var c = row.item;
+      var i = row.index;
       var nome = c.nome || c;
       var tipoCatVal = c.tipo || 'variavel';
       var fixa = !!c.fixa;
@@ -922,7 +989,9 @@ function renderCatsPanel(tipo) {
         + '</div></div>';
     }).join('');
   } else {
-    tagHtml = cats.map(function(c, i) {
+    tagHtml = rows.map(function(row) {
+      var c = row.item;
+      var i = row.index;
       return '<div class="settings-cat-item">'
         + '<div class="settings-cat-main"><span class="settings-cat-name">' + esc(c) + '</span><span class="settings-cat-flag">Editavel</span></div>'
         + '<div class="settings-cat-actions">'
@@ -931,6 +1000,7 @@ function renderCatsPanel(tipo) {
         + '</div></div>';
     }).join('');
   }
+  if (!tagHtml) tagHtml = '<div class="empty-state settings-cat-empty">Nenhum item encontrado com esse filtro.</div>';
 
   var desc = tipo === 'cc'
     ? 'Categorias da <strong style="color:var(--text)">Conta Corrente</strong> de <strong style="color:var(--text)">' + esc(clienteNome) + '</strong>. Defina o tipo para classificar corretamente no <strong style="color:var(--text)">DRE</strong>.'
@@ -945,6 +1015,10 @@ function renderCatsPanel(tipo) {
   document.getElementById(pid).innerHTML =
     '<div class="settings-section-card">'
     + '<div class="settings-card-head"><div><h5>' + (tipo === 'cc' ? 'Categorias da conta corrente' : (tipo === 'cartao' ? 'Categorias do cartão' : (tipo === 'financeiro' ? 'Categorias do financeiro' : 'Centros de custo'))) + '</h5><p>' + desc + '</p></div><div class="settings-card-badges"><span class="settings-card-badge">' + esc(clienteTipo) + '</span><span class="settings-card-badge subtle">' + totalCats + ' ' + esc(tipo === 'centro_custo' ? 'centros' : 'categorias') + '</span></div></div>'
+    + '<div class="settings-cat-toolbar">'
+    + '<div class="form-group"><label>Buscar</label><input type="text" id="settings-cat-search-' + tipo + '" value="' + esc(busca) + '" placeholder="Digite 3 letras ou mais" oninput="setSettingsCatSearch(\'' + tipo + '\',this.value)"/></div>'
+    + '<div class="settings-cat-toolbar-note">' + rows.length + ' de ' + totalCats + ' visivel(is)</div>'
+    + '</div>'
     + '<div class="settings-cat-grid" id="tagList-' + tipo + '">' + tagHtml + '</div>'
     + '<div class="tag-input-row settings-tag-input-row">'
     + '<input type="text" id="newCatInput-' + tipo + '" placeholder="' + esc(tipo === 'centro_custo' ? 'Novo centro de custo...' : 'Nova categoria...') + '" onkeydown="if(event.key===\'Enter\')addCategory(\'' + tipo + '\')"/>'
