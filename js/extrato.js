@@ -185,6 +185,26 @@ function extratoImportGuideHtml() {
     + '</div>';
 }
 
+function extratoImportGuideHtml() {
+  return '<div class="import-workflow">'
+    + '<div class="import-workflow-head"><div><span class="settings-eyebrow">Importacao XLSX</span><h4>Modelo padrao do Extrato</h4><p>Baixe o modelo, selecione a conta bancaria e importe os lancamentos com valor positivo ou negativo.</p></div><span class="settings-hero-badge">Extrato</span></div>'
+    + '<div class="import-guide">'
+      + '<div class="import-guide-head">Formato da planilha</div>'
+      + '<div class="import-guide-grid">'
+      + '<span class="import-guide-chip required">data</span>'
+      + '<span class="import-guide-chip required">descricao</span>'
+      + '<span class="import-guide-chip required">valor</span>'
+      + '<span class="import-guide-chip">categoria</span>'
+      + '</div>'
+      + '<ul class="import-guide-list">'
+      + '<li>Valor positivo vira <strong>credito</strong>.</li>'
+      + '<li>Valor negativo vira <strong>debito</strong>.</li>'
+      + '<li>A coluna <strong>tipo</strong> nao e mais necessaria.</li>'
+      + '</ul>'
+    + '</div>'
+    + '</div>';
+}
+
 function contasClienteAtivo() {
   var c = data.clients[activeClient];
   return c && Array.isArray(c.contas) ? c.contas : [];

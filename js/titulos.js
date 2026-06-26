@@ -335,7 +335,7 @@ function tfSetNatureza(natureza) {
 }
 
 function tfSetFinanceiroView(view) {
-  var views = ['titulos', 'eventos', 'pendencias', 'importar'];
+  var views = ['titulos', 'eventos', 'pendencias', 'importar', 'cadastros'];
   _tfFinanceiroView = views.includes(view) ? view : 'titulos';
   renderFinanceiro();
 }
@@ -454,6 +454,65 @@ function tfImportGuideHtml() {
     + '<li>A coluna <strong>descrição</strong> é opcional; quando vazia, o sistema cria uma descrição automática.</li>'
     + '<li>Linhas duplicadas iguais a títulos já cadastrados serao ignoradas.</li>'
     + '</ul>'
+    + '</div>';
+}
+
+function tfImportGuideHtml() {
+  return '<div class="import-workflow">'
+    + '<div class="import-workflow-head"><div><span class="settings-eyebrow">Importacao XLSX</span><h4>Modelo padrao do Financeiro</h4><p>Use a mesma logica de importacao do Extrato e do Cartao: baixe o modelo, confira as colunas e importe em lote.</p></div><span class="settings-hero-badge">A receber / A pagar</span></div>'
+    + '<div class="import-guide">'
+      + '<div class="import-guide-head">Formato da planilha</div>'
+      + '<div class="import-guide-grid">'
+      + '<span class="import-guide-chip required">vencimento</span>'
+      + '<span class="import-guide-chip required">pessoa</span>'
+      + '<span class="import-guide-chip">descricao</span>'
+      + '<span class="import-guide-chip required">valor</span>'
+      + '<span class="import-guide-chip">observacao</span>'
+      + '<span class="import-guide-chip">natureza</span>'
+      + (tfEventosEnabled() ? '<span class="import-guide-chip">' + esc(tfEventosLabel().toLowerCase()) + '</span>' : '')
+      + '</div>'
+      + '<ul class="import-guide-list">'
+      + '<li>Sem a coluna <strong>natureza</strong>, importa para a aba aberta: A Receber ou A Pagar.</li>'
+      + '<li>Use <strong>receber</strong> ou <strong>pagar</strong> na coluna natureza quando quiser misturar no mesmo arquivo.</li>'
+      + '<li>A coluna <strong>descricao</strong> e opcional; quando vazia, o sistema cria uma descricao automatica.</li>'
+      + '<li>Linhas duplicadas iguais a titulos ja cadastrados serao ignoradas.</li>'
+      + '</ul>'
+    + '</div>'
+    + '</div>';
+}
+
+function tfCadastrosFinanceirosHtml() {
+  var titulos = tfTitulosCliente();
+  var mapa = {};
+  titulos.forEach(function(item) {
+    var nome = String(item.pessoaNome || '').trim();
+    if (!nome) return;
+    var key = nome.toLowerCase();
+    if (!mapa[key]) mapa[key] = { nome: nome, receber: 0, pagar: 0, abertoReceber: 0, abertoPagar: 0 };
+    if (item.natureza === 'receber') {
+      mapa[key].receber += 1;
+      mapa[key].abertoReceber += tfSaldo(item);
+    } else {
+      mapa[key].pagar += 1;
+      mapa[key].abertoPagar += tfSaldo(item);
+    }
+  });
+  var pessoas = Object.values(mapa).sort(function(a, b) {
+    return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+  });
+  var lista = pessoas.length
+    ? pessoas.map(function(item) {
+        var tipo = item.receber && item.pagar ? 'Cliente e fornecedor' : (item.receber ? 'Cliente' : 'Fornecedor');
+        return '<article class="tf-contact-card">'
+          + '<div><strong>' + esc(item.nome) + '</strong><span>' + esc(tipo) + '</span></div>'
+          + '<div class="tf-contact-metrics"><span>Receber <b>' + fmt(item.abertoReceber) + '</b></span><span>Pagar <b>' + fmt(item.abertoPagar) + '</b></span><span>Titulos <b>' + (item.receber + item.pagar) + '</b></span></div>'
+        + '</article>';
+      }).join('')
+    : '<div class="empty-state" style="padding:22px">Nenhum cliente ou fornecedor identificado nos titulos ainda.</div>';
+  return '<div class="tf-contacts-shell">'
+    + '<div class="settings-hero"><div><span class="settings-eyebrow">Base futura</span><h4>Clientes e fornecedores</h4><p>Esta visao organiza os nomes ja usados no Financeiro. O proximo passo sera transformar isso em cadastro estruturado com documento, contato, banco e historico.</p></div><div class="settings-hero-badge">' + pessoas.length + ' nome(s)</div></div>'
+    + '<div class="tf-contact-roadmap"><div><strong>Agora</strong><span>Lista gerada pelos titulos existentes.</span></div><div><strong>Proximo</strong><span>Cadastro proprio por cliente PJ.</span></div><div><strong>Depois</strong><span>Reuso no Extrato, Orcamento e importacoes.</span></div></div>'
+    + '<div class="tf-contact-list">' + lista + '</div>'
     + '</div>';
 }
 
@@ -2509,6 +2568,7 @@ function renderFinanceiroNovo(root) {
         + '<button class="btn-sm" onclick="tfOpenNovoTitulo()">Novo título</button>'
         + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'importar\')">Importar planilha</button>'
         + (tfEventosEnabled() ? '<button class="btn-sm" onclick="tfSetFinanceiroView(\'eventos\')">' + esc(tfEventosLabel()) + '</button>' : '')
+        + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'cadastros\')">Clientes/fornecedores</button>'
         + '<button class="btn-sm" onclick="tfSetFinanceiroView(\'pendencias\')">Ver pendências</button>'
       + '</div>'
     + '</div>';
@@ -2516,6 +2576,7 @@ function renderFinanceiroNovo(root) {
     '<div class="tf-finance-tabs">'
       + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'titulos' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'titulos\')"><span>Títulos</span><strong>' + resumo.total + '</strong></button>'
       + (tfEventosEnabled() ? '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'eventos' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'eventos\')"><span>' + esc(tfEventosLabel()) + '</span><strong>' + tfEventosCliente(false).length + '</strong></button>' : '')
+      + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'cadastros' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'cadastros\')"><span>Cadastros</span><strong>' + Object.keys(tfTitulosCliente().reduce(function(m, item) { if (item.pessoaNome) m[String(item.pessoaNome).toLowerCase()] = true; return m; }, {})).length + '</strong></button>'
       + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'pendencias' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'pendencias\')"><span>Pendências</span><strong>' + pendenciasCount + '</strong></button>'
       + '<button type="button" class="tf-finance-tab' + (_tfFinanceiroView === 'importar' ? ' active' : '') + '" onclick="tfSetFinanceiroView(\'importar\')"><span>Importar</span><strong>XLSX</strong></button>'
     + '</div>';
@@ -2530,6 +2591,8 @@ function renderFinanceiroNovo(root) {
   var activeViewHtml = titulosViewHtml;
   if (_tfFinanceiroView === 'eventos') {
     activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>' + esc(tfEventosLabel()) + '</h3><p class="cartao-helper-text">Cadastre e compare receitas, custos e resultados por evento.</p></div></div>' + eventosHtml + '</div>';
+  } else if (_tfFinanceiroView === 'cadastros') {
+    activeViewHtml = '<div class="form-card tf-finance-view-card">' + tfCadastrosFinanceirosHtml() + '</div>';
   } else if (_tfFinanceiroView === 'pendencias') {
     activeViewHtml = '<div class="form-card tf-finance-view-card"><div class="tf-section-head"><div><h3>Painel de pendências</h3><p class="cartao-helper-text">Atalhos para o que ainda precisa de atenção no Extrato e no Financeiro.</p></div></div>' + pendenciasHtml + '</div>';
   } else if (_tfFinanceiroView === 'importar') {

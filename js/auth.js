@@ -267,8 +267,18 @@ function renderAuthScreen() {
 
   root.innerHTML =
     '<section class="auth-screen">'
-      + '<div class="auth-panel">'
+      + '<div class="auth-intro-panel">'
         + '<div class="auth-brand">Granafy</div>'
+        + '<h2>Gestão financeira para operar sem perder rastreabilidade.</h2>'
+        + '<p>Controle extrato, cartão, dívidas, financeiro PJ, eventos e orçamento em uma base única.</p>'
+        + '<div class="auth-intro-list">'
+          + '<span>Extrato conciliado</span>'
+          + '<span>Eventos e orçamento</span>'
+          + '<span>Acesso compartilhado</span>'
+        + '</div>'
+      + '</div>'
+      + '<div class="auth-panel">'
+        + '<div class="auth-intro-brand">Granafy</div>'
         + '<h1 id="auth-title">Entrar</h1>'
         + '<p id="auth-subtitle">Use seu e-mail e senha para acessar a gestão financeira.</p>'
         + '<div class="form-group auth-signup-only" style="display:none"><label>Nome completo</label><input id="auth-name" type="text" autocomplete="name" placeholder="Seu nome"/></div>'
@@ -334,6 +344,11 @@ function renderNewPasswordScreen() {
 
   root.innerHTML =
     '<section class="auth-screen">'
+      + '<div class="auth-intro-panel">'
+        + '<div class="auth-intro-brand">Granafy</div>'
+        + '<h2>Redefina o acesso com segurança.</h2>'
+        + '<p>Depois de salvar a nova senha, você volta para sua base normalmente.</p>'
+      + '</div>'
       + '<div class="auth-panel">'
         + '<div class="auth-brand">Granafy</div>'
         + '<h1>Nova senha</h1>'

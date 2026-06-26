@@ -397,6 +397,19 @@ function renderDividas() {
   var pago = dividasFiltradas.reduce((s, d) => s + Number(d.pago || 0), 0);
   var aberto = Math.max(0, total - pago);
   var atrasadas = dividasFiltradas.filter(d => getDvStatus(d) === 'atrasada').length;
+  var qtdQuitadas = dividasFiltradas.filter(d => getDvStatus(d) === 'quitada').length;
+  var dividasHero =
+    '<div class="dv-hero">'
+      + '<div>'
+        + '<span class="settings-eyebrow">Controle de dívidas</span>'
+        + '<h3>Dívidas e renegociações</h3>'
+        + '<p>Simule acordos, cadastre contratos e acompanhe pagamento, parcelas, juros e histórico em um só lugar.</p>'
+      + '</div>'
+      + '<div class="dv-hero-actions">'
+        + '<button class="btn-sm" type="button" onclick="if(!_dvPanels.reneg){toggleDividasPanel(\'reneg\')}">Nova dívida</button>'
+        + '<button class="btn-sm" type="button" onclick="if(!_dvPanels.filtros){toggleDividasPanel(\'filtros\')}">Filtros</button>'
+      + '</div>'
+    + '</div>';
 
   var tipoOpts = DV_TIPOS.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
   var filtroTipoOpts = tiposCadastrados.map(t => '<option value="' + esc(t) + '"' + (_dvFiltroTipo === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
@@ -481,11 +494,13 @@ function renderDividas() {
     }).join('');
 
   area.innerHTML =
-    '<div class="summary-grid">'
+    dividasHero
+    + '<div class="summary-grid">'
     + '<div class="summary-card"><div class="s-label">Total contratado</div><div class="s-val blue">' + fmt(total) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Total pago</div><div class="s-val green">' + fmt(pago) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Em aberto</div><div class="s-val red">' + fmt(aberto) + '</div></div>'
     + '<div class="summary-card"><div class="s-label">Atrasadas</div><div class="s-val yellow">' + atrasadas + '</div></div>'
+    + '<div class="summary-card"><div class="s-label">Quitadas</div><div class="s-val green">' + qtdQuitadas + '</div></div>'
     + '</div>'
     + '<div class="calc-bc">'
     + '<h3>Renegociação / nova dívida</h3>'

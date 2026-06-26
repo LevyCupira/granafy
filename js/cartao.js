@@ -64,6 +64,26 @@ function cartaoImportGuideHtml() {
     + '</div>';
 }
 
+function cartaoImportGuideHtml() {
+  return '<div class="import-workflow">'
+    + '<div class="import-workflow-head"><div><span class="settings-eyebrow">Importacao XLSX</span><h4>Modelo padrao do Cartao</h4><p>Baixe o modelo, selecione o cartao da fatura e importe compras ou estornos em lote.</p></div><span class="settings-hero-badge">Cartao</span></div>'
+    + '<div class="import-guide">'
+      + '<div class="import-guide-head">Formato da planilha</div>'
+      + '<div class="import-guide-grid">'
+      + '<span class="import-guide-chip required">data</span>'
+      + '<span class="import-guide-chip required">descricao</span>'
+      + '<span class="import-guide-chip required">valor</span>'
+      + '<span class="import-guide-chip">categoria</span>'
+      + '</div>'
+      + '<ul class="import-guide-list">'
+      + '<li>Valor positivo vira <strong>lancamento</strong> na fatura.</li>'
+      + '<li>Valor negativo vira <strong>estorno</strong>.</li>'
+      + '<li>A coluna <strong>tipo</strong> nao e mais necessaria.</li>'
+      + '</ul>'
+    + '</div>'
+    + '</div>';
+}
+
 var _ccTipo = 'lancamento';
 var _ccFiltro = new Set();
 var _ccFiltroMes = '';

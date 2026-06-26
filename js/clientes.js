@@ -341,6 +341,8 @@ async function deleteClient(id) {
     return;
   }
   var c = data.clients[id];
+  var mostrarLoadingPF = c && String(c.tipoCliente || '').toLowerCase() !== 'pj' && typeof beginAppLoading === 'function';
+  if (mostrarLoadingPF) beginAppLoading('Carregando cliente PF');
   if (!c) return;
 
   if (!(await appConfirm('Excluir o cliente "' + c.name + '" e todos os seus dados?\n\nEsta ação não pode ser desfeita.', { title: 'Excluir cliente', confirmText: 'Excluir' }))) {
@@ -423,6 +425,12 @@ function selectClient(id) {
   else if (acesso) sufixo = ' · ' + accessRoleLabel(acesso.papel);
   document.getElementById('clientTitle').textContent = c.name + sufixo;
   renderTab(activeTab);
+
+  if (mostrarLoadingPF && typeof endAppLoading === 'function') {
+    setTimeout(function() {
+      endAppLoading();
+    }, 420);
+  }
 }
 
 async function grantClientAccess(clientId) {
