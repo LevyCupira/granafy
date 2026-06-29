@@ -623,6 +623,7 @@ async function loadDataFromSupabase() {
       id: l.id,
       cartaoId: l.cartao_id || l.cartaoId || null,
       data: l.data || null,
+      faturaMes: l.fatura_mes || l.faturaMes || ((l.data || '').slice(0, 7)),
       desc: l.descricao || l.desc || '',
       cat: l.categoria || l.cat || '',
       tipo: l.tipo || 'lancamento',

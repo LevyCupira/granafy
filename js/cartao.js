@@ -1,7 +1,8 @@
 // Cartao: logica da aba, filtros, importacao e pagamentos.
 
 var COLS_CARTAO = [
-  { key:'data',   label:'Data',      render: it => '<span style="color:var(--muted);font-size:.78rem">' + (it.data ? it.data.split('-').reverse().join('/') : '-') + '</span>' },
+  { key:'fatura', label:'Fatura',    render: it => '<strong>' + esc(cartaoFaturaLabel(cartaoFaturaMesItem(it))) + '</strong>' },
+  { key:'data',   label:'Compra',    render: it => '<span style="color:var(--muted);font-size:.78rem">' + (it.data ? it.data.split('-').reverse().join('/') : '-') + '</span>' },
   { key:'cartao', label:'Cartão',    render: it => { var cc = getCartaoById(it.cartaoId); return cc ? '<span class="badge badge-card">' + esc(cc.nome) + '</span>' : '<span style="color:var(--muted);font-size:.76rem">-</span>'; } },
   { key:'tipo',   label:'Tipo',      render: it => it.tipo === 'estorno'
       ? '<span class="badge badge-estorno">Estorno</span>'
@@ -71,6 +72,7 @@ function cartaoImportGuideHtml() {
       + '<div class="import-guide-head">Formato da planilha</div>'
       + '<div class="import-guide-grid">'
       + '<span class="import-guide-chip required">data</span>'
+      + '<span class="import-guide-chip">fatura</span>'
       + '<span class="import-guide-chip required">descricao</span>'
       + '<span class="import-guide-chip required">valor</span>'
       + '<span class="import-guide-chip">categoria</span>'
@@ -78,6 +80,7 @@ function cartaoImportGuideHtml() {
       + '<ul class="import-guide-list">'
       + '<li>Valor positivo vira <strong>lancamento</strong> na fatura.</li>'
       + '<li>Valor negativo vira <strong>estorno</strong>.</li>'
+      + '<li>A coluna <strong>fatura</strong> separa a competencia da data da compra.</li>'
       + '<li>A coluna <strong>tipo</strong> nao e mais necessaria.</li>'
       + '</ul>'
     + '</div>'
@@ -188,6 +191,98 @@ function saveCartaoLastDate(value) {
   } catch (e) {}
 }
 
+function cartaoFaturaMesFromDate(dateIso) {
+  var texto = String(dateIso || '').trim();
+  return /^\d{4}-\d{2}/.test(texto) ? texto.slice(0, 7) : '';
+}
+
+function cartaoFaturaMesItem(item) {
+  return String((item && item.faturaMes) || '').trim() || cartaoFaturaMesFromDate(item && item.data);
+}
+
+function cartaoFaturaLabel(monthKey) {
+  var texto = String(monthKey || '').trim();
+  var match = texto.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return '-';
+  return match[2] + '/' + match[1];
+}
+
+function cartaoAddMonthsToMonth(monthKey, offset) {
+  var match = String(monthKey || '').match(/^(\d{4})-(\d{2})$/);
+  if (!match) return '';
+  var date = new Date(Number(match[1]), Number(match[2]) - 1 + Number(offset || 0), 1);
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+}
+
+function cartaoDefaultFaturaMes(dateIso) {
+  return cartaoFaturaMesFromDate(dateIso) || cartaoFaturaMesFromDate(loadCartaoLastDate()) || new Date().toISOString().slice(0, 7);
+}
+
+function parseCartaoFaturaMesRaw(rawValue, fallbackDate) {
+  if (rawValue instanceof Date && !Number.isNaN(rawValue.getTime())) {
+    return rawValue.getFullYear() + '-' + String(rawValue.getMonth() + 1).padStart(2, '0');
+  }
+  if (typeof rawValue === 'number' && rawValue > 0) {
+    var numericDate = new Date(Math.round((rawValue - 25569) * 86400 * 1000));
+    if (!Number.isNaN(numericDate.getTime())) {
+      return numericDate.getFullYear() + '-' + String(numericDate.getMonth() + 1).padStart(2, '0');
+    }
+  }
+
+  var texto = String(rawValue || '').trim();
+  var iso = texto.match(/^(\d{4})[-\/](\d{1,2})(?:[-\/]\d{1,2})?$/);
+  if (iso) return iso[1] + '-' + iso[2].padStart(2, '0');
+  var br = texto.match(/^(\d{1,2})[\/\-](\d{4})$/);
+  if (br) return br[2] + '-' + br[1].padStart(2, '0');
+  var brData = texto.match(/^\d{1,2}[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (brData) return brData[2] + '-' + brData[1].padStart(2, '0');
+  return cartaoDefaultFaturaMes(fallbackDate);
+}
+
+function cartaoColumnMissingError(error) {
+  var msg = String((error && (error.message || error.details || error.hint)) || '').toLowerCase();
+  return !!(error && (error.code === '42703' || error.code === 'PGRST204' || msg.includes('fatura_mes') || msg.includes('schema cache')));
+}
+
+function cartaoPayloadWithoutFaturaMes(payload) {
+  var clone = Object.assign({}, payload || {});
+  if (clone.fatura_mes) clone.data = cartaoDateFromFaturaFallback(clone.fatura_mes, clone.data);
+  delete clone.fatura_mes;
+  return clone;
+}
+
+function cartaoDateFromFaturaFallback(monthKey, originalDate) {
+  var match = String(monthKey || '').match(/^(\d{4})-(\d{2})$/);
+  if (!match) return originalDate || null;
+  var dayMatch = String(originalDate || '').match(/^\d{4}-\d{2}-(\d{2})$/);
+  var wantedDay = dayMatch ? Number(dayMatch[1]) : 1;
+  var year = Number(match[1]);
+  var month = Number(match[2]);
+  var lastDay = new Date(year, month, 0).getDate();
+  return match[1] + '-' + match[2] + '-' + String(Math.min(Math.max(wantedDay, 1), lastDay)).padStart(2, '0');
+}
+
+async function insertLancamentosCartao(payloads) {
+  var lista = Array.isArray(payloads) ? payloads : [payloads];
+  var resposta = await supabaseClient.from('lancamentos_cartao').insert(lista);
+  if (resposta && resposta.error && cartaoColumnMissingError(resposta.error)) {
+    resposta = await supabaseClient.from('lancamentos_cartao').insert(lista.map(cartaoPayloadWithoutFaturaMes));
+  }
+  return resposta;
+}
+
+async function updateLancamentoCartao(id, payload) {
+  var resposta = await applyUserScope(
+    supabaseClient.from('lancamentos_cartao').update(payload).eq('id', id)
+  );
+  if (resposta && resposta.error && cartaoColumnMissingError(resposta.error)) {
+    resposta = await applyUserScope(
+      supabaseClient.from('lancamentos_cartao').update(cartaoPayloadWithoutFaturaMes(payload)).eq('id', id)
+    );
+  }
+  return resposta;
+}
+
 function addMonthsClampedIso(dateIso, monthsToAdd) {
   var match = String(dateIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return dateIso || '';
@@ -296,7 +391,7 @@ function cartaoFilteredItems(cliente) {
   var itensBase = _ccFiltro.size === 0 ? (cliente.cartao || []) : (cliente.cartao || []).filter(function(it) { return _ccFiltro.has(it.cartaoId); });
   return itensBase.filter(function(it) {
     var texto = ((it.desc || '') + ' ' + (it.cat || '')).toLowerCase();
-    if (_ccFiltroMes && !(it.data || '').startsWith(_ccFiltroMes)) return false;
+    if (_ccFiltroMes && cartaoFaturaMesItem(it) !== _ccFiltroMes) return false;
     if (_ccFiltroTipo !== 'todos' && it.tipo !== _ccFiltroTipo) return false;
     if (_ccFiltroCat && it.cat !== _ccFiltroCat) return false;
     if (_ccFiltroBusca && !texto.includes(_ccFiltroBusca)) return false;
@@ -305,6 +400,10 @@ function cartaoFilteredItems(cliente) {
     var deferredA = isDeferredCartaoInstallment(a);
     var deferredB = isDeferredCartaoInstallment(b);
     if (deferredA !== deferredB) return deferredA ? 1 : -1;
+
+    var fatA = cartaoFaturaMesItem(a);
+    var fatB = cartaoFaturaMesItem(b);
+    if (fatA !== fatB) return fatB.localeCompare(fatA);
 
     var dataA = String(a && a.data || '');
     var dataB = String(b && b.data || '');
@@ -383,7 +482,8 @@ function renderCartao() {
     + '<button class="tipo-btn credito" id="tc-estorno" onclick="setTipoCartao(\'estorno\')">Estorno</button>'
     + '</div>'
     + '<div class="form-row">'
-    + '<div class="form-group" style="max-width:132px"><label>Data</label><input type="date" id="cc-data"/></div>'
+    + '<div class="form-group" style="max-width:142px"><label>Data da compra</label><input type="date" id="cc-data"/></div>'
+    + '<div class="form-group" style="max-width:132px"><label>Fatura</label><input type="month" id="cc-fatura"/></div>'
     + '<div class="form-group" style="max-width:172px"><label>Cartão</label><select id="cc-cartao-sel">' + (c.cartoes.length === 0 ? '<option value="">- sem cartão -</option>' : cartaoOpts) + '</select></div>'
     + '<div class="form-group"><label>Descrição</label><input type="text" id="cc-desc" placeholder="Ex: Supermercado..." onblur="this.value=formatDescriptionTitleCase(this.value)"/></div>'
     + '<div class="form-group" style="max-width:165px"><label>Categoria <span style="color:var(--accent);cursor:pointer;font-size:.68rem" onclick="openModal(\'settings\',\'cats_cartao\')">(+ gerir)</span></label><select id="cc-cat">' + catOpts + '</select></div>'
@@ -397,6 +497,7 @@ function renderCartao() {
     + '<div class="form-group" style="max-width:180px"><label>Cartão</label><select id="pg-cartao">' + (c.cartoes.length === 0 ? '<option value="">- sem cartão -</option>' : cartaoOpts) + '</select></div>'
     + '<div class="form-group" style="max-width:150px"><label>Valor (R$)</label><input type="text" id="pg-valor" class="money-input" placeholder="0,00" inputmode="numeric"/></div>'
     + '<div class="form-group" style="max-width:160px"><label>Data</label><input type="date" id="pg-data"/></div>'
+    + '<div class="form-group" style="max-width:132px"><label>Fatura</label><input type="month" id="pg-fatura"/></div>'
     + '</div>'
     + '<div class="cartao-helper-text">Registra a saída no extrato e também entra no histórico do cartão como pagamento.</div>'
     + '<button class="btn-add" onclick="pagarFaturaCartao()">Pagar fatura</button>';
@@ -429,9 +530,21 @@ function renderCartao() {
   document.getElementById('cartao-content').innerHTML = html;
   var di = document.getElementById('cc-data');
   if (di) di.value = loadCartaoLastDate();
+  var fatInput = document.getElementById('cc-fatura');
+  if (fatInput) fatInput.value = cartaoDefaultFaturaMes(di ? di.value : '');
+  if (di && fatInput) {
+    di.addEventListener('change', function() {
+      if (!fatInput.dataset.manual) fatInput.value = cartaoDefaultFaturaMes(di.value);
+    });
+    fatInput.addEventListener('input', function() {
+      fatInput.dataset.manual = '1';
+    });
+  }
 
   var pgData = document.getElementById('pg-data');
   if (pgData) pgData.value = new Date().toISOString().slice(0, 10);
+  var pgFatura = document.getElementById('pg-fatura');
+  if (pgFatura) pgFatura.value = _ccFiltroMes || cartaoDefaultFaturaMes(pgData ? pgData.value : '');
 
   setTipoCartao(_ccTipo);
   initMoneyInputs(document.getElementById('cartao-content'));
@@ -446,7 +559,7 @@ function _renderCartaoFiltroETabela() {
   if (!Array.isArray(c.cartao)) c.cartao = [];
 
   var cols = getColOrder('cartao', COLS_CARTAO);
-  var meses = [...new Set(c.cartao.map(function(it) { return (it.data || '').slice(0, 7); }).filter(Boolean))].sort();
+  var meses = [...new Set(c.cartao.map(function(it) { return cartaoFaturaMesItem(it); }).filter(Boolean))].sort();
   var cats = [...new Set(c.cartao.map(function(it) { return it.cat || ''; }).filter(Boolean))].sort(compararCategoriaNome);
   var itens = cartaoFilteredItems(c);
 
@@ -496,7 +609,7 @@ function _renderCartaoFiltroETabela() {
 
   filterHtml += '<div class="form-card cc-filter-strip"><div class="cc-section-head"><div><h3>Filtros</h3><p class="cartao-helper-text">Filtre por cartão, período, tipo, categoria e busca textual.</p></div></div>'
     + '<div class="form-row">'
-    + '<div class="form-group" style="max-width:150px"><label>Período</label><select id="cc-filtro-mes"><option value="">Todos</option>' + filtroMesOpts + '</select></div>'
+    + '<div class="form-group" style="max-width:150px"><label>Fatura</label><select id="cc-filtro-mes"><option value="">Todas</option>' + filtroMesOpts + '</select></div>'
     + '<div class="form-group" style="max-width:160px"><label>Tipo</label><select id="cc-filtro-tipo"><option value="todos"' + (_ccFiltroTipo === 'todos' ? ' selected' : '') + '>Todos</option><option value="lancamento"' + (_ccFiltroTipo === 'lancamento' ? ' selected' : '') + '>Lançamento</option><option value="estorno"' + (_ccFiltroTipo === 'estorno' ? ' selected' : '') + '>Estorno</option><option value="pagamento"' + (_ccFiltroTipo === 'pagamento' ? ' selected' : '') + '>Pagamento</option></select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Categoria</label><select id="cc-filtro-cat"><option value="">Todas</option>' + filtroCatOpts + '</select></div>'
     + '<div class="form-group"><label>Busca</label><input type="text" id="cc-filtro-busca" value="' + esc(_ccFiltroBusca) + '" placeholder="Descrição ou categoria" onkeydown="if(event.key===\'Enter\')aplicarFiltrosCartao()"/></div>'
@@ -579,6 +692,7 @@ async function deleteCartaoCard(id) {
 async function addCartaoItem() {
   if (!canEditCartaoClient()) return;
   var d_ = document.getElementById('cc-data').value;
+  var faturaBase = (document.getElementById('cc-fatura') && document.getElementById('cc-fatura').value) || cartaoDefaultFaturaMes(d_);
   var cartaoId = (document.getElementById('cc-cartao-sel') && document.getElementById('cc-cartao-sel').value) || '';
   var desc = formatDescriptionTitleCase(document.getElementById('cc-desc').value);
   var cat = document.getElementById('cc-cat').value;
@@ -589,14 +703,15 @@ async function addCartaoItem() {
   if (!desc || !valor) return alert('Preencha descrição e valor.');
 
   var lancamentosParaInserir = Array.from({ length: parcelas }, function(_, idx) {
-    var dataParcela = _ccTipo === 'estorno' ? d_ : addMonthsClampedIso(d_, idx);
+    var faturaParcela = _ccTipo === 'estorno' ? faturaBase : cartaoAddMonthsToMonth(faturaBase, idx);
     var descricaoParcela = parcelas > 1 && _ccTipo !== 'estorno'
       ? (desc + ' ' + (idx + 1) + '/' + parcelas)
       : desc;
     return Object.assign({
       cliente_id: activeClient,
       cartao_id: cartaoId,
-      data: dataParcela || null,
+      data: d_ || null,
+      fatura_mes: faturaParcela || cartaoDefaultFaturaMes(d_),
       descricao: descricaoParcela,
       categoria: cat || null,
       tipo: _ccTipo,
@@ -608,6 +723,7 @@ async function addCartaoItem() {
     return (data.clients[activeClient].cartao || []).find(function(it) {
       return it.cartaoId === cartaoId
         && (it.data || '') === String(payload.data || '')
+        && cartaoFaturaMesItem(it) === String(payload.fatura_mes || '')
         && Number(it.valor || 0) === Number(valor || 0)
         && (it.tipo || 'lancamento') === _ccTipo;
     });
@@ -617,9 +733,7 @@ async function addCartaoItem() {
     return;
   }
 
-  const { error } = await supabaseClient
-    .from('lancamentos_cartao')
-    .insert(lancamentosParaInserir);
+  const { error } = await insertLancamentosCartao(lancamentosParaInserir);
 
   if (error) {
     console.error('Erro ao cadastrar lançamento do cartão:', error);
@@ -671,13 +785,13 @@ async function deleteCartaoItem(i) {
 
 function exportCsvTemplate() {
   var rows = [
-    ['data','descricao','valor','categoria'],
-    ['15/06/2025','Supermercado Extra',250.00,'Alimentacao'],
-    ['16/06/2025','Netflix',55.90,'Streaming'],
-    ['17/06/2025','Estorno Supermercado',-50.00,'Alimentacao'],
+    ['data','fatura','descricao','valor','categoria'],
+    ['15/06/2025','06/2025','Supermercado Extra',250.00,'Alimentacao'],
+    ['16/06/2025','06/2025','Netflix',55.90,'Streaming'],
+    ['17/06/2025','06/2025','Estorno Supermercado',-50.00,'Alimentacao'],
   ];
   var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:12},{wch:32},{wch:10},{wch:20}];
+  ws['!cols'] = [{wch:12},{wch:10},{wch:32},{wch:10},{wch:20}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Fatura');
   XLSX.writeFile(wb, 'modelo_fatura_granafy.xlsx');
@@ -695,7 +809,8 @@ async function editCartaoItem(i) {
   document.getElementById('modalTitle').textContent = 'Editar lançamento do cartão';
   document.getElementById('modalBody').innerHTML =
     '<div class="form-row">'
-    + '<div class="form-group" style="max-width:170px"><label>Data</label><input type="date" id="cc-edit-data" value="' + esc(item.data || '') + '"/></div>'
+    + '<div class="form-group" style="max-width:170px"><label>Data da compra</label><input type="date" id="cc-edit-data" value="' + esc(item.data || '') + '"/></div>'
+    + '<div class="form-group" style="max-width:132px"><label>Fatura</label><input type="month" id="cc-edit-fatura" value="' + esc(cartaoFaturaMesItem(item)) + '"/></div>'
     + '<div class="form-group" style="max-width:220px"><label>Cartão</label><select id="cc-edit-cartao">' + cartaoOptionsHtml(item.cartaoId || '') + '</select></div>'
     + '<div class="form-group" style="max-width:190px"><label>Tipo</label><select id="cc-edit-tipo"><option value="lancamento"' + ((item.tipo || 'lancamento') === 'lancamento' ? ' selected' : '') + '>Lançamento</option><option value="estorno"' + ((item.tipo || '') === 'estorno' ? ' selected' : '') + '>Estorno</option><option value="pagamento"' + ((item.tipo || '') === 'pagamento' ? ' selected' : '') + '>Pagamento</option></select></div>'
     + '</div>'
@@ -732,6 +847,7 @@ async function saveCartaoEditModal(i) {
   if (!item || !item.id) return;
 
   var novaData = document.getElementById('cc-edit-data').value;
+  var novaFatura = (document.getElementById('cc-edit-fatura') && document.getElementById('cc-edit-fatura').value) || cartaoDefaultFaturaMes(novaData);
   var novoCartaoId = document.getElementById('cc-edit-cartao').value || null;
   var tipoSelecionado = document.getElementById('cc-edit-tipo').value;
   var novoTipo = tipoSelecionado === 'estorno' ? 'estorno' : (tipoSelecionado === 'pagamento' ? 'pagamento' : 'lancamento');
@@ -749,44 +865,38 @@ async function saveCartaoEditModal(i) {
   if (aplicarSerie) {
     var infoAtual = parseCartaoInstallmentInfo(item.desc || '');
     var baseDate = novaData || item.data || null;
+    var baseFatura = novaFatura || cartaoFaturaMesItem(item) || cartaoDefaultFaturaMes(baseDate);
     for (var idx = 0; idx < serie.length; idx++) {
       var entry = serie[idx];
       var infoEntry = parseCartaoInstallmentInfo(entry.desc || '');
       var offset = infoEntry && infoAtual ? (infoEntry.atual - infoAtual.atual) : 0;
-      var dataSerie = baseDate ? addMonthsClampedIso(baseDate, offset) : (entry.data || null);
+      var dataSerie = baseDate || entry.data || null;
+      var faturaSerie = cartaoAddMonthsToMonth(baseFatura, offset) || cartaoFaturaMesItem(entry) || cartaoDefaultFaturaMes(dataSerie);
       var descSerie = infoEntry ? (novoDesc + ' ' + infoEntry.atual + '/' + infoEntry.total) : novoDesc;
-      var resposta = await applyUserScope(
-        supabaseClient
-          .from('lancamentos_cartao')
-          .update({
-            cartao_id: novoCartaoId,
-            data: dataSerie || null,
-            descricao: descSerie,
-            categoria: novaCat || null,
-            tipo: novoTipo,
-            valor: Number(novoValor || 0)
-          })
-          .eq('id', entry.id)
-      );
+      var resposta = await updateLancamentoCartao(entry.id, {
+        cartao_id: novoCartaoId,
+        data: dataSerie || null,
+        fatura_mes: faturaSerie || null,
+        descricao: descSerie,
+        categoria: novaCat || null,
+        tipo: novoTipo,
+        valor: Number(novoValor || 0)
+      });
       if (resposta && resposta.error) {
         error = resposta.error;
         break;
       }
     }
   } else {
-    var respostaUnica = await applyUserScope(
-      supabaseClient
-        .from('lancamentos_cartao')
-        .update({
-          cartao_id: novoCartaoId,
-          data: novaData || null,
-          descricao: infoItemAtual ? (novoDesc + ' ' + infoItemAtual.atual + '/' + infoItemAtual.total) : novoDesc,
-          categoria: novaCat || null,
-          tipo: novoTipo,
-          valor: Number(novoValor || 0)
-        })
-        .eq('id', item.id)
-    );
+    var respostaUnica = await updateLancamentoCartao(item.id, {
+      cartao_id: novoCartaoId,
+      data: novaData || null,
+      fatura_mes: novaFatura || cartaoDefaultFaturaMes(novaData),
+      descricao: infoItemAtual ? (novoDesc + ' ' + infoItemAtual.atual + '/' + infoItemAtual.total) : novoDesc,
+      categoria: novaCat || null,
+      tipo: novoTipo,
+      valor: Number(novoValor || 0)
+    });
     error = respostaUnica && respostaUnica.error ? respostaUnica.error : null;
   }
 
@@ -829,6 +939,7 @@ async function importXlsx(event) {
 
     var header = (rows[0] || []).map(h => String(h).toLowerCase().trim());
     var iDate = header.findIndex(h => h.includes('data') || h.includes('date'));
+    var iFatura = header.findIndex(h => h.includes('fatura') || h.includes('competencia') || h.includes('competência'));
     var iDesc = header.findIndex(h => h.includes('desc'));
     var iVal  = header.findIndex(h => h.includes('valor') || h.includes('value') || h.includes('amount'));
     var iCat  = header.findIndex(h => h.includes('cat'));
@@ -841,7 +952,7 @@ async function importXlsx(event) {
     let erros = 0;
 
     for (const row of rows.slice(1)) {
-      var rawDate = String(row[iDate] || '').trim();
+      var rawDate = row[iDate];
       var desc = formatDescriptionTitleCase(String(row[iDesc] || ''));
       var valorBruto = 0;
       var rawVal = row[iVal];
@@ -857,16 +968,21 @@ async function importXlsx(event) {
 
       var dataFmt = '';
       if (typeof rawDate === 'string') {
-        var dm = rawDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        var rawDateText = rawDate.trim();
+        var isoDate = rawDateText.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        var dm = rawDateText.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (isoDate) dataFmt = isoDate[1] + '-' + isoDate[2] + '-' + isoDate[3];
         if (dm) dataFmt = dm[3] + '-' + dm[2].padStart(2, '0') + '-' + dm[1].padStart(2, '0');
       } else if (typeof rawDate === 'number') {
         var d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
         dataFmt = d.toISOString().slice(0, 10);
       }
+      var faturaMes = iFatura >= 0 ? parseCartaoFaturaMesRaw(row[iFatura], dataFmt) : cartaoDefaultFaturaMes(dataFmt);
 
       var duplicado = (data.clients[activeClient].cartao || []).find(it =>
         it.cartaoId === importCartaoId
         && (it.data || '') === (dataFmt || '')
+        && cartaoFaturaMesItem(it) === faturaMes
         && Number(it.valor || 0) === Number(valor || 0)
         && (it.tipo || 'lancamento') === tipo
       );
@@ -875,17 +991,16 @@ async function importXlsx(event) {
         continue;
       }
 
-      const { error } = await supabaseClient
-        .from('lancamentos_cartao')
-        .insert([Object.assign({
-          cliente_id: activeClient,
-          cartao_id: importCartaoId,
-          data: dataFmt || null,
-          descricao: desc,
-          categoria: cat,
-          tipo: tipo,
-          valor: Number(valor || 0)
-        }, getUserScopePayload())]);
+      const { error } = await insertLancamentosCartao([Object.assign({
+        cliente_id: activeClient,
+        cartao_id: importCartaoId,
+        data: dataFmt || null,
+        fatura_mes: faturaMes || null,
+        descricao: desc,
+        categoria: cat,
+        tipo: tipo,
+        valor: Number(valor || 0)
+      }, getUserScopePayload())]);
 
       if (error) {
         console.error('Erro ao importar item da planilha:', row, error);
@@ -909,6 +1024,7 @@ async function pagarFaturaCartao() {
   var cartaoId = document.getElementById('pg-cartao').value;
   var valor = parseMoney(document.getElementById('pg-valor'));
   var dataPg = document.getElementById('pg-data').value;
+  var faturaPg = (document.getElementById('pg-fatura') && document.getElementById('pg-fatura').value) || cartaoDefaultFaturaMes(dataPg);
 
   if (!cartaoId || !valor) {
     return alert('Informe o cartão e o valor.');
@@ -938,17 +1054,16 @@ async function pagarFaturaCartao() {
     return;
   }
 
-  const { error: cardError } = await supabaseClient
-    .from('lancamentos_cartao')
-    .insert([Object.assign({
-      cliente_id: activeClient,
-      cartao_id: cartaoId,
-      data: dataPagamento,
-      descricao: descricaoPagamento,
-      categoria: 'Pagamento de Fatura',
-      tipo: 'pagamento',
-      valor: Number(valor || 0)
-    }, getUserScopePayload())]);
+  const { error: cardError } = await insertLancamentosCartao([Object.assign({
+    cliente_id: activeClient,
+    cartao_id: cartaoId,
+    data: dataPagamento,
+    fatura_mes: faturaPg || cartaoDefaultFaturaMes(dataPagamento),
+    descricao: descricaoPagamento,
+    categoria: 'Pagamento de Fatura',
+    tipo: 'pagamento',
+    valor: Number(valor || 0)
+  }, getUserScopePayload())]);
 
   if (cardError) {
     console.error(cardError);
