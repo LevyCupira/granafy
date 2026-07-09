@@ -379,6 +379,38 @@ async function loadDataFromSupabase() {
     return res;
   }
 
+  async function carregarImportacaoLotesComEscopo() {
+    var query = supabaseClient.from('importacao_lotes').select('*');
+    var res = await query.order('created_at', { ascending: false });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('importacao_lotes')) {
+      console.warn('Tabela importacao_lotes ainda nao existe. Rode a migracao 20260629_central_importacoes.sql.');
+      return { data: [], error: null };
+    }
+
+    return res;
+  }
+
+  async function carregarImportacaoItensComEscopo() {
+    var query = supabaseClient.from('importacao_itens').select('*');
+    var res = await query.order('created_at', { ascending: true });
+
+    if (!res.error) return res;
+
+    var msg = String((res.error.message || '') + ' ' + (res.error.details || '') + ' ' + (res.error.hint || '')).toLowerCase();
+    var tabelaAusente = res.error.code === '42P01' || res.error.code === 'PGRST205' || msg.includes('relation') || msg.includes('schema cache');
+    if (tabelaAusente && msg.includes('importacao_itens')) {
+      console.warn('Tabela importacao_itens ainda nao existe. Rode a migracao 20260629_central_importacoes.sql.');
+      return { data: [], error: null };
+    }
+
+    return res;
+  }
+
   let { clientesRes, dividasRes, lancRes, cartoesRes, lancCartaoRes } = await carregarComEscopo();
 
   const loadError = clientesRes.error || dividasRes.error || lancRes.error || cartoesRes.error || lancCartaoRes.error;
@@ -443,6 +475,16 @@ async function loadDataFromSupabase() {
     console.warn('Não foi possível carregar acessos compartilhados:', acessosClientesRes.error);
   }
   const acessosClientesRows = acessosClientesRes.data || [];
+  const importacaoLotesRes = await carregarImportacaoLotesComEscopo();
+  if (importacaoLotesRes.error) {
+    console.warn('Nao foi possivel carregar lotes de importacao:', importacaoLotesRes.error);
+  }
+  const importacaoLotesRows = importacaoLotesRes.data || [];
+  const importacaoItensRes = await carregarImportacaoItensComEscopo();
+  if (importacaoItensRes.error) {
+    console.warn('Nao foi possivel carregar itens de importacao:', importacaoItensRes.error);
+  }
+  const importacaoItensRows = importacaoItensRes.data || [];
 
   const contasPorCliente = {};
   (contasRows || []).forEach(conta => {
@@ -491,6 +533,37 @@ async function loadDataFromSupabase() {
   });
 
   const relacionamentosPorCliente = {};
+  const importacaoItensPorLote = {};
+  (importacaoItensRows || []).forEach(function(item) {
+    if (!item || !item.lote_id) return;
+    if (!importacaoItensPorLote[item.lote_id]) importacaoItensPorLote[item.lote_id] = [];
+    importacaoItensPorLote[item.lote_id].push({
+      id: item.id,
+      loteId: item.lote_id,
+      tabelaDestino: item.tabela_destino || '',
+      registroId: item.registro_id || '',
+      resumo: item.resumo || {},
+      valor: Number(item.valor || 0),
+      createdAt: item.created_at || null,
+      userId: item.user_id || null
+    });
+  });
+  const importacoesPorCliente = {};
+  (importacaoLotesRows || []).forEach(function(lote) {
+    if (!lote || !lote.cliente_id) return;
+    if (!importacoesPorCliente[lote.cliente_id]) importacoesPorCliente[lote.cliente_id] = [];
+    importacoesPorCliente[lote.cliente_id].push({
+      id: lote.id,
+      area: lote.area || '',
+      arquivoNome: lote.arquivo_nome || '',
+      quantidade: Number(lote.quantidade || 0),
+      valorTotal: Number(lote.valor_total || 0),
+      status: lote.status || 'ativo',
+      createdAt: lote.created_at || null,
+      userId: lote.user_id || null,
+      itens: importacaoItensPorLote[lote.id] || []
+    });
+  });
   (relacionamentosRows || []).forEach(rel => {
     if (!rel || !rel.cliente_id || !rel.nome) return;
     if (!relacionamentosPorCliente[rel.cliente_id]) relacionamentosPorCliente[rel.cliente_id] = [];
@@ -712,6 +785,7 @@ async function loadDataFromSupabase() {
       eventos: eventosPorCliente[c.id] || [],
       orcamentoEventos: orcamentoEventosPorCliente[c.id] || [],
       orcamentoRealizacoes: orcamentoRealizacoesPorCliente[c.id] || [],
+      importacoes: importacoesPorCliente[c.id] || [],
       acessos: acessosPorCliente[c.id] || [],
       dividas: dividasPorCliente[c.id] || [],
       extrato: extratoPorCliente[c.id] || [],

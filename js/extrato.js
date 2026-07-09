@@ -1370,10 +1370,12 @@ var TIPOS_RELACIONAMENTO = [
   { value: 'terceiro', label: 'Terceiro' }
 ];
 
-async function insertLancamentoComFallback(payload) {
-  var completo = await supabaseClient
+async function insertLancamentoComFallback(payload, options) {
+  var completoQuery = supabaseClient
     .from('lancamentos')
     .insert([Object.assign({}, payload, getUserScopePayload())]);
+  if (options && options.select) completoQuery = completoQuery.select();
+  var completo = await completoQuery;
 
   if (!completo.error) return completo;
 
@@ -1382,16 +1384,20 @@ async function insertLancamentoComFallback(payload) {
   if (payload.conta_id && isMissingContaSchemaError(completo.error)) {
     delete basico.conta_id;
     console.warn('Tentando salvar lançamento sem conta_id após erro no schema:', completo.error);
-    return supabaseClient
+    var contaFallback = supabaseClient
       .from('lancamentos')
       .insert([Object.assign(basico, getUserScopePayload())]);
+    if (options && options.select) contaFallback = contaFallback.select();
+    return contaFallback;
   }
   if (payload.centro_custo_id && isMissingCentroCustoSchemaError(completo.error)) {
     delete basico.centro_custo_id;
     console.warn('Tentando salvar lançamento sem centro_custo_id após erro no schema:', completo.error);
-    return supabaseClient
+    var centroFallback = supabaseClient
       .from('lancamentos')
       .insert([Object.assign(basico, getUserScopePayload())]);
+    if (options && options.select) centroFallback = centroFallback.select();
+    return centroFallback;
   }
   return completo;
 }
@@ -2750,16 +2756,42 @@ async function importExtratoXlsx(event) {
 
     var count = 0;
     var erros = 0;
+    var registrosImportados = [];
     var paraImportar = novos.concat(duplicadosSelecionados);
     for (const item of paraImportar) {
-      const { error } = await insertLancamentoComFallback(item.payload);
+      const resposta = await insertLancamentoComFallback(item.payload, { select: true });
+      const error = resposta && resposta.error;
 
       if (error) {
         console.error('Erro ao importar item do extrato:', item, error);
         erros++;
       } else {
         count++;
+        var criado = Array.isArray(resposta.data) ? resposta.data[0] : resposta.data;
+        if (criado && criado.id) {
+          registrosImportados.push({
+            id: criado.id,
+            tabelaDestino: 'lancamentos',
+            valor: item.valor,
+            resumo: {
+              data: item.data,
+              descricao: item.desc,
+              categoria: item.cat,
+              tipo: item.tipo,
+              valor: item.valor
+            }
+          });
+        }
       }
+    }
+
+    if (typeof registrarImportacaoLote === 'function') {
+      await registrarImportacaoLote({
+        area: 'extrato',
+        arquivoNome: file.name,
+        tabelaDestino: 'lancamentos',
+        registros: registrosImportados
+      });
     }
 
     await loadData();

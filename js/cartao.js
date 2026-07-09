@@ -94,6 +94,8 @@ var _ccFiltroTipo = 'todos';
 var _ccFiltroCat = '';
 var _ccFiltroBusca = '';
 var _ccFiltroMulti = loadCartaoFilterMultiState();
+var _ccBulkMode = false;
+var _ccBulkSelected = new Set();
 var _ccLastDateMemory = '';
 var _ccView = 'lancamentos';
 var _ccPanels = {
@@ -262,11 +264,15 @@ function cartaoDateFromFaturaFallback(monthKey, originalDate) {
   return match[1] + '-' + match[2] + '-' + String(Math.min(Math.max(wantedDay, 1), lastDay)).padStart(2, '0');
 }
 
-async function insertLancamentosCartao(payloads) {
+async function insertLancamentosCartao(payloads, options) {
   var lista = Array.isArray(payloads) ? payloads : [payloads];
-  var resposta = await supabaseClient.from('lancamentos_cartao').insert(lista);
+  var query = supabaseClient.from('lancamentos_cartao').insert(lista);
+  if (options && options.select) query = query.select();
+  var resposta = await query;
   if (resposta && resposta.error && cartaoColumnMissingError(resposta.error)) {
-    resposta = await supabaseClient.from('lancamentos_cartao').insert(lista.map(cartaoPayloadWithoutFaturaMes));
+    var fallback = supabaseClient.from('lancamentos_cartao').insert(lista.map(cartaoPayloadWithoutFaturaMes));
+    if (options && options.select) fallback = fallback.select();
+    resposta = await fallback;
   }
   return resposta;
 }
@@ -354,6 +360,39 @@ function toggleFiltroCartao(id) {
 function toggleFiltroCartaoMulti(enabled) {
   _ccFiltroMulti = !!enabled;
   saveCartaoFilterMultiState(_ccFiltroMulti);
+  _renderCartaoFiltroETabela();
+}
+
+function cartaoItemSelectionId(item) {
+  return item && item.id ? String(item.id) : '';
+}
+
+function toggleCartaoBulkMode(enabled) {
+  _ccBulkMode = !!enabled;
+  if (!_ccBulkMode) _ccBulkSelected.clear();
+  _renderCartaoFiltroETabela();
+}
+
+function toggleCartaoBulkItem(id, enabled) {
+  var key = String(id || '');
+  if (!key) return;
+  if (enabled) _ccBulkSelected.add(key);
+  else _ccBulkSelected.delete(key);
+  _renderCartaoFiltroETabela();
+}
+
+function selecionarCartaoFiltrados() {
+  var c = data.clients[activeClient];
+  cartaoFilteredItems(c).forEach(function(item) {
+    var id = cartaoItemSelectionId(item);
+    if (id) _ccBulkSelected.add(id);
+  });
+  _ccBulkMode = true;
+  _renderCartaoFiltroETabela();
+}
+
+function limparSelecaoCartao() {
+  _ccBulkSelected.clear();
   _renderCartaoFiltroETabela();
 }
 
@@ -562,6 +601,10 @@ function _renderCartaoFiltroETabela() {
   var meses = [...new Set(c.cartao.map(function(it) { return cartaoFaturaMesItem(it); }).filter(Boolean))].sort();
   var cats = [...new Set(c.cartao.map(function(it) { return it.cat || ''; }).filter(Boolean))].sort(compararCategoriaNome);
   var itens = cartaoFilteredItems(c);
+  var idsExistentes = new Set((c.cartao || []).map(cartaoItemSelectionId).filter(Boolean));
+  Array.from(_ccBulkSelected).forEach(function(id) {
+    if (!idsExistentes.has(id)) _ccBulkSelected.delete(id);
+  });
 
   var lancs = itens.filter(function(i) { return i.tipo !== 'estorno' && i.tipo !== 'pagamento'; });
   var ests  = itens.filter(function(i) { return i.tipo === 'estorno'; });
@@ -620,12 +663,29 @@ function _renderCartaoFiltroETabela() {
   var area = document.getElementById('cc-filter-table-area');
   if (!area) return;
 
+  var bulkHtml = '<div class="extrato-bulk-bar cc-bulk-bar">'
+    + '<label class="extrato-bulk-toggle"><input type="checkbox"' + (_ccBulkMode ? ' checked' : '') + ' onchange="toggleCartaoBulkMode(this.checked)"/><span>Selecionar lancamentos</span></label>'
+    + (_ccBulkMode
+      ? '<div class="extrato-bulk-actions">'
+        + '<button class="btn-sm" type="button" onclick="selecionarCartaoFiltrados()">Selecionar filtrados</button>'
+        + '<button class="btn-sm red" type="button" onclick="deleteCartaoSelecionados()" ' + (_ccBulkSelected.size ? '' : 'disabled') + '>Excluir selecionados</button>'
+        + '<button class="btn-sm" type="button" onclick="limparSelecaoCartao()">Limpar</button>'
+        + '<span class="extrato-bulk-count">' + _ccBulkSelected.size + ' selecionado(s)</span>'
+        + '</div>'
+      : '')
+    + '</div>';
+
   area.innerHTML = filterHtml
     + '<div class="cc-list-head"><div><h3>Histórico de lançamentos</h3><p class="cartao-helper-text">' + itens.length + ' item(ns) com os filtros atuais.</p></div></div>'
+    + bulkHtml
     + buildTable('cartao', cols, itens, function(item) {
         var realIdx = c.cartao.indexOf(item);
+        var itemId = cartaoItemSelectionId(item);
+        var bulkCheckbox = _ccBulkMode && itemId
+          ? '<label class="cartao-row-check" title="Selecionar lancamento"><input type="checkbox" ' + (_ccBulkSelected.has(itemId) ? 'checked' : '') + ' onchange="toggleCartaoBulkItem(\'' + esc(itemId) + '\', this.checked)"/></label>'
+          : '';
         return cols.map(function(col) { return col.key === '_del'
-          ? '<td><div class="row-actions"><button class="btn-icon" onclick="editCartaoItem(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteCartaoItem(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
+          ? '<td><div class="row-actions">' + bulkCheckbox + '<button class="btn-icon" onclick="editCartaoItem(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteCartaoItem(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'
           : '<td>' + col.render(item, realIdx) + '</td>';
         }).join('');
       }, function(r) {
@@ -779,6 +839,43 @@ async function deleteCartaoItem(i) {
     return;
   }
 
+  await loadData();
+  renderCartao();
+}
+
+async function deleteCartaoSelecionados() {
+  if (!canEditCartaoClient()) return;
+  var c = data.clients[activeClient];
+  var ids = Array.from(_ccBulkSelected).filter(function(id) {
+    return (c.cartao || []).some(function(item) { return cartaoItemSelectionId(item) === id; });
+  });
+
+  if (!ids.length) {
+    alert('Selecione pelo menos um lancamento.');
+    return;
+  }
+
+  if (!(await appConfirm(
+    'Excluir ' + ids.length + ' lancamento(s) selecionado(s)? Esta acao nao pode ser desfeita.',
+    { title: 'Excluir em lote', confirmText: 'Excluir selecionados', cancelText: 'Cancelar' }
+  ))) return;
+
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('lancamentos_cartao')
+      .delete()
+      .in('id', ids)
+  );
+
+  if (error) {
+    console.error('Erro ao excluir lancamentos do cartao em lote:', error);
+    alert('Nao foi possivel excluir os lancamentos selecionados.');
+    return;
+  }
+
+  _ccBulkSelected.clear();
+  _ccBulkMode = false;
+  if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'cartao');
   await loadData();
   renderCartao();
 }
@@ -950,6 +1047,7 @@ async function importXlsx(event) {
 
     let count = 0;
     let erros = 0;
+    let registrosImportados = [];
 
     for (const row of rows.slice(1)) {
       var rawDate = row[iDate];
@@ -991,7 +1089,7 @@ async function importXlsx(event) {
         continue;
       }
 
-      const { error } = await insertLancamentosCartao([Object.assign({
+      const resposta = await insertLancamentosCartao([Object.assign({
         cliente_id: activeClient,
         cartao_id: importCartaoId,
         data: dataFmt || null,
@@ -1000,14 +1098,40 @@ async function importXlsx(event) {
         categoria: cat,
         tipo: tipo,
         valor: Number(valor || 0)
-      }, getUserScopePayload())]);
+      }, getUserScopePayload())], { select: true });
+      const error = resposta && resposta.error;
 
       if (error) {
         console.error('Erro ao importar item da planilha:', row, error);
         erros++;
       } else {
         count++;
+        var criado = Array.isArray(resposta.data) ? resposta.data[0] : resposta.data;
+        if (criado && criado.id) {
+          registrosImportados.push({
+            id: criado.id,
+            tabelaDestino: 'lancamentos_cartao',
+            valor: valor,
+            resumo: {
+              data: dataFmt,
+              fatura: faturaMes,
+              descricao: desc,
+              categoria: cat,
+              tipo: tipo,
+              valor: valor
+            }
+          });
+        }
       }
+    }
+
+    if (typeof registrarImportacaoLote === 'function') {
+      await registrarImportacaoLote({
+        area: 'cartao',
+        arquivoNome: file.name,
+        tabelaDestino: 'lancamentos_cartao',
+        registros: registrosImportados
+      });
     }
 
     await loadData();

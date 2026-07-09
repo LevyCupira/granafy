@@ -173,6 +173,17 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .settings-shortcut:hover{border-color:var(--accent);background:rgba(91,140,255,.08)}
 .settings-shortcut strong{display:block;font-size:.86rem;margin-bottom:4px}
 .settings-shortcut small{display:block;color:var(--muted);font-size:.74rem;line-height:1.35}
+.import-batch-list{display:grid;gap:10px}
+.import-batch-card{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:12px}
+.import-batch-main{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.import-batch-main strong{display:block;color:var(--text);font-size:.9rem;margin:3px 0}
+.import-batch-main small{display:block;color:var(--muted);font-size:.74rem}
+.import-batch-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.import-batch-preview{margin-top:12px;border-top:1px solid var(--border);padding-top:8px;display:grid;gap:6px;max-height:280px;overflow:auto}
+.import-batch-item{display:grid;grid-template-columns:110px minmax(0,1fr) 120px;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.04);border-radius:7px;background:rgba(11,15,28,.34);padding:8px 10px}
+.import-batch-item span{font-size:.68rem;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700}
+.import-batch-item strong{font-size:.8rem;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.import-batch-item em{font-style:normal;text-align:right;color:var(--accent);font-weight:700;font-size:.8rem}
 .settings-cat-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
 .settings-cat-toolbar .form-group{max-width:360px;margin:0}
 .settings-cat-toolbar-note{color:var(--muted);font-size:.76rem;font-weight:700;white-space:nowrap}
@@ -459,6 +470,9 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .btn-icon:hover{background:rgba(91,140,255,.1);border-color:var(--accent);color:var(--accent)}
 .btn-icon.danger:hover{background:rgba(255,107,107,.1);border-color:var(--danger);color:var(--danger)}
 .row-actions{display:flex;align-items:center;gap:4px;justify-content:flex-start}
+.cartao-row-check{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.cartao-row-check input{accent-color:var(--accent);cursor:pointer}
+.cc-bulk-bar{margin-top:2px}
 .extrato-bulk-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px}
 .extrato-bulk-toggle{display:inline-flex;align-items:center;gap:8px;color:var(--text);font-size:.84rem}
 .extrato-bulk-toggle input{accent-color:var(--accent)}
@@ -875,6 +889,7 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
 .dv-progress-labels{display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-top:3px}
 .dv-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border)}
 .dv-pag-input{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.82rem;padding:6px 9px;border-radius:7px;outline:none;width:130px;transition:border-color var(--tr)}
+.dv-pag-input-wide{width:min(420px,100%)}
 .btn-pagar{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:.8rem;cursor:pointer;white-space:nowrap;transition:opacity var(--tr)}
 .btn-pagar:hover{opacity:.85}
 .btn-hist{background:var(--card);border:1px solid var(--border);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.76rem;padding:6px 12px;border-radius:7px;cursor:pointer;transition:border-color var(--tr),color var(--tr)}
@@ -1070,6 +1085,10 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .settings-tab-rich{min-width:150px}
   .settings-overview-grid,.settings-shortcut-row,.client-access-grid{grid-template-columns:1fr}
   .settings-overview-card{min-height:auto}
+  .import-batch-main{display:grid;grid-template-columns:1fr}
+  .import-batch-actions{justify-content:flex-start}
+  .import-batch-item{grid-template-columns:1fr}
+  .import-batch-item em{text-align:left}
   .settings-cat-toolbar{display:grid;grid-template-columns:1fr;align-items:stretch}
   .settings-cat-toolbar .form-group{max-width:none}
   .settings-cat-toolbar-note{white-space:normal}

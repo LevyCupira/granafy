@@ -619,6 +619,7 @@ function renderSettingsModal(activeTabKey) {
   }
   if (showTabsPanel) {
     tabButtons += '<button class="modal-tab" data-stab="visual" onclick="switchSettingsTab(\'visual\')">Abas</button>';
+    tabButtons += '<button class="modal-tab" data-stab="importacoes" onclick="switchSettingsTab(\'importacoes\')">Importacoes</button>';
   }
 
   if (showUsersTab) {
@@ -646,6 +647,7 @@ function renderSettingsModal(activeTabKey) {
     + '<div id="modal-panel-cats_cartao" class="modal-panel"></div>'
     + '<div id="modal-panel-cats_financeiro" class="modal-panel"></div>'
     + '<div id="modal-panel-visual" class="modal-panel"></div>'
+    + '<div id="modal-panel-importacoes" class="modal-panel"></div>'
     + '<div id="modal-panel-usuarios" class="modal-panel"></div>'
     + '<div id="modal-panel-lgpd" class="modal-panel"></div>'
     + '<div id="modal-panel-auditoria" class="modal-panel"></div>';
@@ -654,6 +656,7 @@ function renderSettingsModal(activeTabKey) {
   if (firstTab === 'usuarios' && !showUsersTab) firstTab = 'cats_cc';
   if (firstTab === 'lgpd' && !showLgpdTab) firstTab = 'cats_cc';
   if (firstTab === 'visual' && !showTabsPanel) firstTab = 'cats_cc';
+  if (firstTab === 'importacoes' && !showTabsPanel) firstTab = 'cats_cc';
   if (firstTab === 'cats_financeiro' && !(cliente && String(cliente.tipoCliente || '').toLowerCase() === 'pj')) firstTab = 'cats_cc';
   switchSettingsTab(firstTab);
 }
@@ -676,6 +679,7 @@ function switchSettingsTab(tab) {
   if (tab === 'cats_cartao') renderCatsPanel('cartao');
   if (tab === 'cats_financeiro') renderCatsPanel('financeiro');
   if (tab === 'visual') renderClientTabsPanel();
+  if (tab === 'importacoes' && typeof renderImportacoesPanel === 'function') renderImportacoesPanel();
   if (tab === 'usuarios' && (typeof canSeeUsersTab !== 'function' || canSeeUsersTab())) renderUsuariosPanel();
   if (tab === 'lgpd') renderLgpdPanel();
   if (tab === 'auditoria' && (typeof canSeeAuditoria !== 'function' || canSeeAuditoria())) renderAuditoriaPanel();
@@ -713,6 +717,7 @@ function renderSettingsOverviewPanel() {
         + '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'cats_cc\')"><strong>Conta Corrente</strong><small>Categorias do Extrato e DRE</small></button>'
         + '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'cats_cartao\')"><strong>Cartao</strong><small>Categorias da fatura</small></button>'
         + (isPj ? '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'cats_financeiro\')"><strong>Financeiro</strong><small>Categorias de titulos PJ</small></button>' : '')
+        + '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'importacoes\')"><strong>Importacoes</strong><small>Revisar e desfazer lotes</small></button>'
         + '<button class="settings-shortcut" type="button" onclick="switchSettingsTab(\'usuarios\')"><strong>Usuarios</strong><small>Perfil e permissoes</small></button>'
       + '</div>'
     + '</div>';

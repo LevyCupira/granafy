@@ -661,11 +661,35 @@ async function importTitulosXlsx(event) {
 
     var response = await supabaseClient
       .from('titulos_financeiros')
-      .insert(payloads);
+      .insert(payloads)
+      .select();
 
     if (response.error) {
       console.error('Erro ao importar títulos financeiros:', response.error);
       return alert('Não foi possível importar os títulos. Verifique a planilha e a migração do Financeiro PJ.');
+    }
+
+    if (typeof registrarImportacaoLote === 'function') {
+      var registrosImportados = (response.data || []).map(function(item) {
+        return {
+          id: item.id,
+          tabelaDestino: 'titulos_financeiros',
+          valor: Number(item.valor_total || 0),
+          resumo: {
+            vencimento: item.vencimento || '',
+            pessoa: item.pessoa_nome || '',
+            descricao: item.descricao || '',
+            tipo: item.natureza || '',
+            valor: Number(item.valor_total || 0)
+          }
+        };
+      });
+      await registrarImportacaoLote({
+        area: 'financeiro',
+        arquivoNome: file.name,
+        tabelaDestino: 'titulos_financeiros',
+        registros: registrosImportados
+      });
     }
 
     if (typeof notifyWorkspaceDataChanged === 'function') notifyWorkspaceDataChanged(activeClient, 'importacao_titulos');

@@ -315,6 +315,35 @@ function descricaoPagamentoDivida(d, parcelaRef, banco) {
   ].join(' | ');
 }
 
+function lancamentoEhPagamentoDivida(lancamento) {
+  return !!(lancamento && String(lancamento.desc || '').startsWith('Pagamento dívida |'));
+}
+
+function labelLancamentoDivida(lancamento) {
+  if (!lancamento) return '';
+  var data = lancamento.data ? String(lancamento.data).split('-').reverse().join('/') : '-';
+  var desc = String(lancamento.descOriginal || lancamento.desc || 'Sem descrição').trim();
+  if (desc.length > 54) desc = desc.slice(0, 51) + '...';
+  return data + ' - ' + desc + ' (' + fmt(lancamento.valor || 0) + ')';
+}
+
+function lancamentosExtratoDisponiveisDivida(c, d) {
+  return (c && Array.isArray(c.extrato) ? c.extrato : [])
+    .filter(function(lancamento) {
+      if (!lancamento || !lancamento.id) return false;
+      if (String(lancamento.tipo || '').toLowerCase() !== 'debito') return false;
+      if (Number(lancamento.valor || 0) <= 0) return false;
+      if (lancamento.estornoStatus && lancamento.estornoStatus !== 'normal') return false;
+      if (lancamentoEhPagamentoDivida(lancamento)) return false;
+      return true;
+    })
+    .sort(function(a, b) {
+      return String(b.data || '').localeCompare(String(a.data || ''))
+        || Math.abs(Number(b.valor || 0)) - Math.abs(Number(a.valor || 0));
+    })
+    .slice(0, 80);
+}
+
 function historicoPagamentosDivida(c, d, excluirLancamentoId) {
   var prefixo = 'Pagamento dívida | ' + (d.org || 'Sem credor') + ' |';
   return (c.extrato || [])
@@ -450,6 +479,11 @@ function renderDividas() {
       var historico = historicoPagamentosDivida(c, d);
       var histOpen = _dvHistOpen.has(i);
       var hoje = new Date().toISOString().slice(0, 10);
+      var lancamentosAssociaveis = lancamentosExtratoDisponiveisDivida(c, d);
+      var extratoOpts = '<option value="">Registrar novo no Extrato</option>'
+        + lancamentosAssociaveis.map(function(lancamento) {
+          return '<option value="' + esc(lancamento.id) + '">' + esc(labelLancamentoDivida(lancamento)) + '</option>';
+        }).join('');
       var histHtml = historico.length
         ? historico.map(h =>
           '<div class="dv-hist-item">'
@@ -485,6 +519,7 @@ function renderDividas() {
         + '<input class="dv-pag-input money-input" id="dv-pag-inp-' + i + '" placeholder="Valor pago" inputmode="numeric"/>'
         + '<input class="dv-pag-input" id="dv-parcela-inp-' + i + '" type="number" min="1" max="' + Number(d.parcelas || 0) + '" placeholder="Parcela ref."/>'
         + '<input class="dv-pag-input" id="dv-data-pag-inp-' + i + '" type="date" value="' + hoje + '"/>'
+        + '<select class="dv-pag-input dv-pag-input-wide" id="dv-extrato-inp-' + i + '">' + extratoOpts + '</select>'
         + '<select class="dv-pag-input" id="dv-banco-inp-' + i + '">' + contasPagamentoOpts + '</select>'
         + '<button class="btn-pagar" onclick="registrarPagamentoDivida(' + i + ')">Registrar pagamento</button>'
         + '<button class="btn-hist" onclick="toggleDividaHistorico(' + i + ')">' + (histOpen ? 'Ocultar pagamentos' : 'Ver pagamentos') + ' (' + historico.length + ')</button>'
@@ -654,22 +689,36 @@ async function deleteDivida(i) {
 
 async function registrarPagamentoDivida(i) {
   if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
-  var valor = parseMoney(document.getElementById('dv-pag-inp-' + i));
+  var c = data.clients[activeClient];
+  var d = c.dividas[i];
+  if (!d) return;
+
+  var extratoSelect = document.getElementById('dv-extrato-inp-' + i);
+  var lancamentoId = extratoSelect && extratoSelect.value ? extratoSelect.value : '';
+  var lancamentoAssociado = lancamentoId
+    ? (c.extrato || []).find(function(lancamento) { return lancamento && lancamento.id === lancamentoId; })
+    : null;
+
+  var valorDigitado = parseMoney(document.getElementById('dv-pag-inp-' + i));
+  var valor = lancamentoAssociado ? Math.abs(Number(lancamentoAssociado.valor || 0)) : valorDigitado;
   var parcelaRef = parseInt((document.getElementById('dv-parcela-inp-' + i) || {}).value, 10) || 0;
-  var dataPagamento = ((document.getElementById('dv-data-pag-inp-' + i) || {}).value) || new Date().toISOString().slice(0, 10);
+  var dataPagamento = lancamentoAssociado
+    ? (lancamentoAssociado.data || new Date().toISOString().slice(0, 10))
+    : (((document.getElementById('dv-data-pag-inp-' + i) || {}).value) || new Date().toISOString().slice(0, 10));
   var contaSelect = document.getElementById('dv-banco-inp-' + i);
-  var contaId = (contaSelect && contaSelect.value) ? contaSelect.value : null;
-  var banco = contaSelect && contaSelect.selectedOptions && contaSelect.selectedOptions[0]
+  var contaId = lancamentoAssociado ? (lancamentoAssociado.contaId || null) : ((contaSelect && contaSelect.value) ? contaSelect.value : null);
+  var contaAssociada = contaId && Array.isArray(c.contas)
+    ? c.contas.find(function(conta) { return conta && conta.id === contaId; })
+    : null;
+  var banco = contaAssociada
+    ? nomeContaCliente(contaAssociada)
+    : contaSelect && contaSelect.selectedOptions && contaSelect.selectedOptions[0]
     ? contaSelect.selectedOptions[0].textContent.trim()
     : '';
   if (!contaId) banco = '';
 
   if (!valor) return alert('Informe valor');
-  if (!contaId) return alert('Selecione uma conta cadastrada para registrar onde a dívida foi paga.');
-
-  var c = data.clients[activeClient];
-  var d = c.dividas[i];
-  if (!d) return;
+  if (!lancamentoAssociado && !contaId) return alert('Selecione uma conta cadastrada para registrar onde a dívida foi paga.');
 
   var novoPago = Number(d.pago || 0) + valor;
   var valorParcela = Number(d.valorParcela || 0);
@@ -695,25 +744,47 @@ async function registrarPagamentoDivida(i) {
     return;
   }
 
-  var lancPayload = {
-    cliente_id: activeClient,
-    data_lancamento: dataPagamento,
-    descricao: descricaoPagamentoDivida(d, parcelaRef, banco),
-    categoria: d.tipo || 'Divida',
-    tipo: 'debito',
-    valor: Number(valor || 0),
-    conta_id: contaId || null
-  };
+  var extratoError = null;
+  if (lancamentoAssociado) {
+    var observacaoAtual = String(lancamentoAssociado.observacao || '').trim();
+    var notaAssociacao = 'Associado ao pagamento da dívida: ' + (d.org || 'Sem credor');
+    var novaObservacao = observacaoAtual
+      ? (observacaoAtual.includes(notaAssociacao) ? observacaoAtual : observacaoAtual + ' | ' + notaAssociacao)
+      : notaAssociacao;
+    var updateRes = await applyUserScope(
+      supabaseClient
+        .from('lancamentos')
+        .update({
+          descricao: descricaoPagamentoDivida(d, parcelaRef, banco),
+          descricao_original: lancamentoAssociado.descOriginal || lancamentoAssociado.desc || null,
+          categoria: d.tipo || lancamentoAssociado.cat || 'Divida',
+          tipo: 'debito',
+          observacao: novaObservacao || null
+        })
+        .eq('id', lancamentoAssociado.id)
+    );
+    extratoError = updateRes.error;
+  } else {
+    var lancPayload = {
+      cliente_id: activeClient,
+      data_lancamento: dataPagamento,
+      descricao: descricaoPagamentoDivida(d, parcelaRef, banco),
+      descricao_original: descricaoPagamentoDivida(d, parcelaRef, banco),
+      categoria: d.tipo || 'Divida',
+      tipo: 'debito',
+      valor: Number(valor || 0),
+      conta_id: contaId || null
+    };
 
-  var lancRes = typeof insertLancamentoComFallback === 'function'
-    ? await insertLancamentoComFallback(lancPayload)
-    : await supabaseClient.from('lancamentos').insert([Object.assign(lancPayload, getUserScopePayload())]);
-
-  const extratoError = lancRes.error;
+    var lancRes = typeof insertLancamentoComFallback === 'function'
+      ? await insertLancamentoComFallback(lancPayload)
+      : await supabaseClient.from('lancamentos').insert([Object.assign(lancPayload, getUserScopePayload())]);
+    extratoError = lancRes.error;
+  }
 
   if (extratoError) {
-    console.error('Erro ao lançar pagamento da dívida no extrato:', extratoError);
-    alert('Pagamento registrado na dívida, mas não foi possível incluir no extrato: ' + (extratoError.message || 'erro desconhecido'));
+    console.error('Erro ao registrar pagamento da dívida no extrato:', extratoError);
+    alert('Pagamento registrado na dívida, mas não foi possível atualizar o extrato: ' + (extratoError.message || 'erro desconhecido'));
   }
 
   await loadData();
