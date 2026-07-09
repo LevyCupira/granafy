@@ -663,16 +663,24 @@ function _renderCartaoFiltroETabela() {
   var area = document.getElementById('cc-filter-table-area');
   if (!area) return;
 
-  var bulkHtml = '<div class="extrato-bulk-bar cc-bulk-bar">'
-    + '<label class="extrato-bulk-toggle"><input type="checkbox"' + (_ccBulkMode ? ' checked' : '') + ' onchange="toggleCartaoBulkMode(this.checked)"/><span>Selecionar lancamentos</span></label>'
-    + (_ccBulkMode
-      ? '<div class="extrato-bulk-actions">'
-        + '<button class="btn-sm" type="button" onclick="selecionarCartaoFiltrados()">Selecionar filtrados</button>'
-        + '<button class="btn-sm red" type="button" onclick="deleteCartaoSelecionados()" ' + (_ccBulkSelected.size ? '' : 'disabled') + '>Excluir selecionados</button>'
-        + '<button class="btn-sm" type="button" onclick="limparSelecaoCartao()">Limpar</button>'
-        + '<span class="extrato-bulk-count">' + _ccBulkSelected.size + ' selecionado(s)</span>'
-        + '</div>'
-      : '')
+  var bulkHtml = '<div class="cc-selection-card' + (_ccBulkMode ? ' active' : '') + '">'
+    + '<div class="cc-selection-copy">'
+      + '<span class="settings-eyebrow">Selecao em lote</span>'
+      + '<strong>' + (_ccBulkMode ? (_ccBulkSelected.size + ' lancamento(s) selecionado(s)') : 'Selecione varios lancamentos') + '</strong>'
+      + '<small>' + (_ccBulkMode ? 'Use os checkboxes da lista ou selecione todos os itens filtrados.' : 'Ative para excluir varios lancamentos de uma vez com mais controle.') + '</small>'
+    + '</div>'
+    + '<div class="cc-selection-actions">'
+      + '<label class="cc-selection-toggle" title="Selecionar varios lancamentos">'
+        + '<input type="checkbox"' + (_ccBulkMode ? ' checked' : '') + ' onchange="toggleCartaoBulkMode(this.checked)"/>'
+        + '<span class="toggle-track"></span>'
+        + '<span>' + (_ccBulkMode ? 'Modo selecao ativo' : 'Selecionar varios') + '</span>'
+      + '</label>'
+      + (_ccBulkMode
+        ? '<button class="btn-sm" type="button" onclick="selecionarCartaoFiltrados()">Selecionar filtrados</button>'
+          + '<button class="btn-sm" type="button" onclick="limparSelecaoCartao()" ' + (_ccBulkSelected.size ? '' : 'disabled') + '>Limpar selecao</button>'
+          + '<button class="btn-sm red" type="button" onclick="deleteCartaoSelecionados()" ' + (_ccBulkSelected.size ? '' : 'disabled') + '>Excluir selecionados</button>'
+        : '')
+    + '</div>'
     + '</div>';
 
   area.innerHTML = filterHtml
@@ -682,7 +690,7 @@ function _renderCartaoFiltroETabela() {
         var realIdx = c.cartao.indexOf(item);
         var itemId = cartaoItemSelectionId(item);
         var bulkCheckbox = _ccBulkMode && itemId
-          ? '<label class="cartao-row-check" title="Selecionar lancamento"><input type="checkbox" ' + (_ccBulkSelected.has(itemId) ? 'checked' : '') + ' onchange="toggleCartaoBulkItem(\'' + esc(itemId) + '\', this.checked)"/></label>'
+          ? '<label class="cartao-row-check' + (_ccBulkSelected.has(itemId) ? ' checked' : '') + '" title="Selecionar lancamento"><input type="checkbox" ' + (_ccBulkSelected.has(itemId) ? 'checked' : '') + ' onchange="toggleCartaoBulkItem(\'' + esc(itemId) + '\', this.checked)"/></label>'
           : '';
         return cols.map(function(col) { return col.key === '_del'
           ? '<td><div class="row-actions">' + bulkCheckbox + '<button class="btn-icon" onclick="editCartaoItem(' + realIdx + ')" title="Editar">&#9998;</button><button class="btn-icon danger" onclick="deleteCartaoItem(' + realIdx + ')" title="Excluir">&#128465;</button></div></td>'

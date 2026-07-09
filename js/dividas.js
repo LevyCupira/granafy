@@ -83,6 +83,10 @@ function moneyInputText(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function moneyInputAttr(valor) {
+  return esc(moneyInputText(valor));
+}
+
 function setMoneyInputValue(id, valor) {
   var el = document.getElementById(id);
   if (!el) return;
@@ -500,7 +504,10 @@ function renderDividas() {
         + '<div class="dv-header-left"><div class="dv-title">' + esc(d.org || 'Sem credor') + '</div>'
         + '<span class="dv-tipo-badge">' + esc(d.tipo || 'Outros') + '</span>'
         + '<span class="dv-status-badge ' + status + '">' + (DV_STATUS_LABEL[status] || status) + '</span></div>'
-        + '<button class="btn-sm red" onclick="deleteDivida(' + i + ')">Excluir</button>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+          + '<button class="btn-sm" type="button" onclick="openEditDividaModal(' + i + ')">Editar</button>'
+          + '<button class="btn-sm red" type="button" onclick="deleteDivida(' + i + ')">Excluir</button>'
+        + '</div>'
         + '</div>'
         + '<div class="dv-meta">'
         + '<span>Total: <strong>' + fmt(d.total || 0) + '</strong></span>'
@@ -683,6 +690,118 @@ async function deleteDivida(i) {
     return;
   }
 
+  await loadData();
+  renderDividas();
+}
+
+function openEditDividaModal(i) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  var c = data.clients[activeClient];
+  var d = c && c.dividas ? c.dividas[i] : null;
+  if (!d) return alert('Dívida não encontrada.');
+
+  var overlay = document.getElementById('modalOverlay');
+  var modal = overlay ? overlay.querySelector('.modal') : null;
+  var title = document.getElementById('modalTitle');
+  var body = document.getElementById('modalBody');
+  if (!overlay || !body) return;
+
+  var tipos = DV_TIPOS.slice();
+  if (d.tipo && !tipos.includes(d.tipo)) tipos.push(d.tipo);
+  var tipoOpts = tipos.map(function(tipo) {
+    return '<option value="' + esc(tipo) + '"' + (tipo === d.tipo ? ' selected' : '') + '>' + esc(tipo) + '</option>';
+  }).join('');
+
+  if (title) title.textContent = 'Editar dívida';
+  overlay.classList.add('open');
+  if (overlay) overlay.dataset.mode = 'backup';
+  if (modal) modal.classList.remove('modal-wide');
+  if (typeof handleMainModalEscape === 'function') document.addEventListener('keydown', handleMainModalEscape);
+
+  body.innerHTML =
+    '<div class="settings-section-card">'
+      + '<div class="settings-card-head"><div><h5>' + esc(d.org || 'Dívida') + '</h5><p>Ajuste os dados cadastrados, valores pagos e parcelas restantes.</p></div></div>'
+      + '<div class="form-row">'
+        + '<div class="form-group"><label>Órgão / credor</label><input type="text" id="dv-edit-org" value="' + esc(d.org || '') + '"/></div>'
+        + '<div class="form-group" style="max-width:220px"><label>Tipo</label><select id="dv-edit-tipo">' + tipoOpts + '</select></div>'
+        + '<div class="form-group" style="max-width:180px"><label>Início</label><input type="date" id="dv-edit-inicio" value="' + esc(d.dataInicio || '') + '"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="margin-top:10px">'
+        + '<div class="form-group"><label>Valor total</label><input type="text" id="dv-edit-total" class="money-input" inputmode="numeric" value="' + moneyInputAttr(d.total || 0) + '"/></div>'
+        + '<div class="form-group"><label>Valor pago</label><input type="text" id="dv-edit-pago" class="money-input" inputmode="numeric" value="' + moneyInputAttr(d.pago || 0) + '"/></div>'
+        + '<div class="form-group"><label>IOF</label><input type="text" id="dv-edit-iof" class="money-input" inputmode="numeric" value="' + moneyInputAttr(lerIofDivida(d)) + '"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="margin-top:10px">'
+        + '<div class="form-group"><label>Parcelas totais</label><input type="number" id="dv-edit-parcelas" min="0" step="1" value="' + Number(d.parcelas || 0) + '"/></div>'
+        + '<div class="form-group"><label>Parcelas restantes</label><input type="number" id="dv-edit-restantes" min="0" step="1" value="' + Number(d.restantes || 0) + '"/></div>'
+        + '<div class="form-group"><label>Valor da parcela</label><input type="text" id="dv-edit-vparcela" class="money-input" inputmode="numeric" value="' + moneyInputAttr(d.valorParcela || 0) + '"/></div>'
+        + '<div class="form-group"><label>Taxa mensal (%)</label><input type="number" id="dv-edit-taxa" min="0" step="0.01" value="' + Number(d.taxa || 0) + '"/></div>'
+      + '</div>'
+      + '<div class="client-form-actions"><button class="btn-sm red" type="button" onclick="closeModal()">Cancelar</button><button class="btn-add" type="button" style="margin-top:0" onclick="saveEditDivida(' + i + ')">Salvar dívida</button></div>'
+    + '</div>';
+
+  initMoneyInputs(body);
+  var totalEl = document.getElementById('dv-edit-total');
+  var parcelasEl = document.getElementById('dv-edit-parcelas');
+  if (totalEl) totalEl.addEventListener('input', function() { setTimeout(syncEditDividaParcela, 0); });
+  if (parcelasEl) parcelasEl.addEventListener('input', function() { setTimeout(syncEditDividaParcela, 0); });
+}
+
+function syncEditDividaParcela() {
+  var total = parseMoney(document.getElementById('dv-edit-total'));
+  var parcelas = parseInt(((document.getElementById('dv-edit-parcelas') || {}).value || '0'), 10) || 0;
+  if (!total || !parcelas) return;
+  setMoneyInputValue('dv-edit-vparcela', total / parcelas);
+}
+
+async function saveEditDivida(i) {
+  if (!canEditActiveClient()) return alert('Este cliente pertence a outro login e está disponível apenas para visualização.');
+  var c = data.clients[activeClient];
+  var d = c && c.dividas ? c.dividas[i] : null;
+  if (!d || !d.id) return alert('Dívida não encontrada.');
+
+  var org = ((document.getElementById('dv-edit-org') || {}).value || '').trim();
+  var tipo = ((document.getElementById('dv-edit-tipo') || {}).value || '').trim() || 'Outros';
+  var inicio = ((document.getElementById('dv-edit-inicio') || {}).value || '').trim();
+  var total = parseMoney(document.getElementById('dv-edit-total'));
+  var pago = parseMoney(document.getElementById('dv-edit-pago'));
+  var iof = parseMoney(document.getElementById('dv-edit-iof'));
+  var parcelas = parseInt(((document.getElementById('dv-edit-parcelas') || {}).value || '0'), 10) || 0;
+  var restantes = parseInt(((document.getElementById('dv-edit-restantes') || {}).value || '0'), 10) || 0;
+  var valorParcela = parseMoney(document.getElementById('dv-edit-vparcela'));
+  var taxa = parseFloat(((document.getElementById('dv-edit-taxa') || {}).value || '0').replace(',', '.')) || 0;
+
+  if (!org) return alert('Informe o credor.');
+  if (!total) return alert('Informe o valor total.');
+  if (restantes > parcelas && parcelas > 0) return alert('Parcelas restantes não pode ser maior que o total de parcelas.');
+
+  var payload = {
+    credor: org,
+    tipo_divida: tipo,
+    data_inicio: inicio || null,
+    valor_total: Number(total || 0),
+    valor_pago: Number(pago || 0),
+    parcelas_total: parcelas,
+    parcelas_restantes: restantes,
+    valor_parcela: Number(valorParcela || 0),
+    taxa: Number(taxa || 0),
+    observacoes: montarObservacaoDivida(iof)
+  };
+
+  const { error } = await applyUserScope(
+    supabaseClient
+      .from('dividas')
+      .update(payload)
+      .eq('id', d.id)
+  );
+
+  if (error) {
+    console.error('Erro ao editar dívida:', error);
+    alert('Não foi possível salvar a dívida: ' + (error.message || 'erro desconhecido'));
+    return;
+  }
+
+  closeModal();
   await loadData();
   renderDividas();
 }
