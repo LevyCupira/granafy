@@ -1124,6 +1124,47 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .auth-primary,.auth-secondary,.auth-link{min-height:44px}
 }
 
+/* ── Dashboard Financeiro ── */
+.financeiro-dashboard{padding:20px;display:flex;flex-direction:column;gap:24px}
+.dashboard-header{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.dashboard-header h3{margin:0;font-size:1.5rem;font-family:'DM Serif Display',serif}
+.period-selector{display:flex;gap:12px;align-items:center}
+.period-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;cursor:pointer;font-size:.85rem;transition:all var(--tr)}
+.period-btn:hover{border-color:var(--accent);color:var(--accent)}
+.period-display{color:var(--muted);font-size:.9rem;min-width:140px;text-align:center}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:8px;transition:all var(--tr)}
+.kpi-card:hover{border-color:var(--accent)}
+.kpi-card.kpi-despesa{border-left:4px solid var(--danger)}
+.kpi-card.kpi-receita{border-left:4px solid var(--success)}
+.kpi-card.kpi-saldo{border-left:4px solid var(--accent)}
+.kpi-card.kpi-divida{border-left:4px solid var(--warning)}
+.kpi-label{color:var(--muted);font-size:.85rem;font-weight:600}
+.kpi-value{font-size:1.8rem;font-weight:700;font-family:'DM Serif Display',serif;color:var(--accent)}
+.kpi-value.positive{color:var(--success)}
+.kpi-value.negative{color:var(--danger)}
+.kpi-change{font-size:.75rem;color:var(--muted)}
+.kpi-change.positive{color:var(--success)}
+.kpi-change.negative{color:var(--danger)}
+.kpi-info{font-size:.75rem;color:var(--muted)}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:20px}
+.chart-container{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;height:350px;display:flex;flex-direction:column}
+.chart-container h4{margin:0 0 16px 0;color:var(--text);font-size:1rem}
+.chart-container canvas{flex:1}
+.top-categories{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px}
+.top-categories h4{margin:0 0 16px 0;color:var(--text);font-size:1rem}
+.categories-list{display:flex;flex-direction:column;gap:16px}
+.category-item{display:flex;flex-direction:column;gap:8px}
+.category-info{display:flex;justify-content:space-between;align-items:center}
+.category-name{color:var(--text);font-weight:500}
+.category-percentage{color:var(--muted);font-size:.85rem}
+.category-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.category-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent3));transition:width var(--tr)}
+.category-value{color:var(--muted);font-size:.8rem}
+.dashboard-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:16px}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 @media(max-width:480px){
   .sidebar-nav{grid-template-columns:1fr}
   .new-client-area{grid-template-columns:1fr}
@@ -1136,4 +1177,11 @@ body.auth-locked .app,body.auth-locked .footer-bar{display:none}
   .auth-panel{padding:20px 16px}
   .dv-hero{display:grid;grid-template-columns:1fr;gap:12px;padding:14px}
   .dv-hero-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .financeiro-dashboard{padding:12px}
+  .kpi-grid{grid-template-columns:1fr}
+  .charts-grid{grid-template-columns:1fr}
+  .chart-container{height:250px}
+  .dashboard-header{gap:8px}
+  .period-selector{gap:4px}
+  .period-btn{padding:6px 10px;font-size:.75rem}
 }
