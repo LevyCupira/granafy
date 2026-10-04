@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://pjnnkaafrxruooplccnz.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_hiH2CKVSf-he9QP_M3ByrQ_wXXbKZbf';
+const SUPABASE_KEY = window.SUPABASE_KEY || (typeof process !== 'undefined' ? process.env.SUPABASE_KEY : null);
 const GRANAFY_PUBLIC_URL = 'https://levycupira.github.io/granafy/';
 
 var supabaseClient = window.supabaseClient || (window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
@@ -25,13 +25,3 @@ function getGranafyAppUrl() {
 
 window.getGranafyAppUrl = getGranafyAppUrl;
 
-async function testarConexao() {
-  const { data, error } = await applyUserScope(
-    supabaseClient
-    .from('clientes')
-    .select('*')
-  );
-
-  console.log('DATA:', data);
-  console.log('ERROR:', error);
-}
