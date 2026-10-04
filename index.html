@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Granafy</title>
+
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css?v=20260708-2"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<meta name="theme-color" content="#181c27"/>
+<link rel="icon" href="data:,">
+</head>
+
+<body>
+<div class="app">
+  <aside class="sidebar minimized" id="appSidebar">
+    <div class="sidebar-logo">
+      <div>
+        <span class="logo-text">Granafy</span>
+        <span>Gestão Financeira</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebarMenu()" aria-expanded="false" title="Abrir menu">☰</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="snav-btn" id="sidebarSettingsBtn" onclick="openModal('settings')" title="Configurações">
+        <span class="snav-icon">&#9881;</span>
+        <span class="snav-label">Configurações</span>
+      </button>
+      <button class="snav-btn" id="sidebarBackupBtn" onclick="openModal('backup')" title="Backup">
+        <span class="snav-icon">&#10515;</span>
+        <span class="snav-label">Backup</span>
+      </button>
+      <button class="snav-btn" id="installAppBtn" onclick="installGranafyApp()" title="Instalar app">
+        <span class="snav-icon">&#8681;</span>
+        <span class="snav-label">Instalar app</span>
+      </button>
+      <div id="auth-user-box" class="auth-user-box"><span>Verificando login...</span></div>
+    </nav>
+
+    <div class="sidebar-body">
+      <div>
+        <p class="sidebar-section-label">Cliente ativo</p>
+
+        <div class="client-dropdown-wrap" id="clientDropdownWrap">
+          <button class="client-dropdown-toggle" id="clientDropdownToggle" onclick="toggleDropdown()">
+            <span class="toggle-left">
+              <span class="avatar" id="toggleAvatar" style="display:none"></span>
+              <span class="toggle-label" id="toggleLabel">Selecionar cliente...</span>
+            </span>
+            <span class="chevron">▼</span>
+          </button>
+
+          <div class="client-dropdown-menu" id="clientDropdownMenu"></div>
+        </div>
+      </div>
+
+      <div class="new-client-area">
+        <p class="sidebar-section-label">Cadastro de cliente</p>
+        <button id="openClientFormBtn" onclick="addClient()">+ Cadastrar cliente</button>
+      </div>
+
+      <div class="sidebar-theme-card">
+        <div class="sidebar-theme-copy">
+          <p class="sidebar-section-label">Tema</p>
+          <small id="sidebarThemeText">Tema escuro</small>
+        </div>
+        <label class="sidebar-theme-toggle" title="Alternar tema claro e escuro">
+          <input type="checkbox" id="sidebarThemeToggle" onchange="toggleTheme(this.checked)"/>
+          <span class="sidebar-theme-track">
+            <span class="sidebar-theme-icon sidebar-theme-icon-moon">&#9790;</span>
+            <span class="sidebar-theme-icon sidebar-theme-icon-sun">&#9728;</span>
+          </span>
+        </label>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <div class="main-header-title-row">
+        <h2 id="clientTitle">Selecione um cliente</h2>
+        <button class="workspace-new-tab-btn" type="button" onclick="openCurrentWorkspaceInNewTab()" title="Abrir tela atual em nova aba" aria-label="Abrir tela atual em nova aba">&#8599;</button>
+      </div>
+      <div class="tabs" id="tabsContainer"></div>
+    </div>
+
+    <div class="main-content">
+      <div id="tab-cartao" class="tab-panel active">
+        <div id="cartao-content">
+          <div class="empty-state">Selecione um cliente.</div>
+        </div>
+      </div>
+
+      <div id="tab-dividas" class="tab-panel">
+        <div id="dividas-content">
+          <div class="empty-state">Selecione um cliente.</div>
+        </div>
+      </div>
+
+      <div id="tab-extrato" class="tab-panel">
+        <div id="extrato-content">
+          <div class="empty-state">Selecione um cliente.</div>
+        </div>
+      </div>
+
+      <div id="tab-financeiro" class="tab-panel">
+        <div id="financeiro-content">
+          <div class="empty-state">Selecione um cliente.</div>
+        </div>
+      </div>
+
+      <div id="tab-resumo" class="tab-panel">
+        <div id="resumo-content">
+          <div class="empty-state">Selecione um cliente.</div>
+        </div>
+      </div>
+
+      <div id="tab-dre" class="tab-panel">
+        <div id="dre-content">
+          <div class="empty-state">Selecione um cliente.</div>
+        </div>
+      </div>
+
+      <div id="tab-graficos" class="tab-panel">
+        <div id="graficos-content">
+          <div class="empty-state">Selecione um cliente.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="app-loading-overlay" id="appLoadingOverlay" role="status" aria-live="polite" aria-hidden="true">
+    <div class="app-loading-panel">
+      <span class="app-loading-spinner" aria-hidden="true"></span>
+      <div><strong id="appLoadingMessage">Atualizando informações</strong><small>Aguarde um instante.</small></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" onclick="closeModal()">x</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<input type="file" id="importFileInput" accept=".json" onchange="importData(event)" style="display:none"/>
+<input type="file" id="importXlsxInput" accept=".xlsx,.xls,.ods" onchange="importXlsx(event)" style="display:none"/>
+<input type="file" id="importExtratoXlsxInput" accept=".xlsx,.xls,.ods" onchange="importExtratoXlsx(event)" style="display:none"/>
+<input type="file" id="importTitulosXlsxInput" accept=".xlsx,.xls,.ods" onchange="importTitulosXlsx(event)" style="display:none"/>
+
+<div class="footer-bar">
+  Desenvolvido por <strong>Levy Lima</strong> - Granafy Beta Test
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Injetar chave Supabase (configurada em variáveis de ambiente ou localmente)
+  window.SUPABASE_KEY = window.SUPABASE_KEY || 'sb_publishable_hiH2CKVSf-he9QP_M3ByrQ_wXXbKZbf';
+</script>
+<script src="js/supabase.js?v=20260531-2"></script>
+<script src="js/auth.js?v=20260626-1"></script>
+<script src="js/migracao.js?v=20260412-5"></script>
+
+<script src="js/utils.js?v=20260521-1"></script>
+<script src="js/clientes.js?v=20260626-2"></script>
+<script src="js/categorias.js?v=20260520-1"></script>
+<script src="js/importacoes.js?v=20260629-1"></script>
+<script src="js/cartao.js?v=20260708-1"></script>
+<script src="js/dividas.js?v=20260708-2"></script>
+<script src="js/extrato.js?v=20260629-1"></script>
+<script src="js/titulos.js?v=20260629-1"></script>
+<script src="js/resumo.js?v=20260611-1"></script>
+<script src="js/dre.js?v=20260611-1"></script>
+<script src="js/graficos.js?v=20260613-2"></script>
+<script src="js/pdf.js?v=20260611-1"></script>
+<script src="js/settings.js?v=20260629-1"></script>
+<script src="js/data.js?v=20260629-2"></script>
+<script src="js/migracao-cartao-segura.js?v=20260412-6"></script>
+<script src="js/auditoria.js?v=20260412-3"></script>
+</body>
+</html>
