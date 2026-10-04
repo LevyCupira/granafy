@@ -72,6 +72,42 @@ function authTermsAccepted() {
   return !!(el && el.checked);
 }
 
+function authRememberMe() {
+  var el = document.getElementById('auth-remember');
+  return !!(el && el.checked);
+}
+
+function saveRememberMeSession(email, password) {
+  try {
+    var session = {
+      email: email,
+      password: password,
+      savedAt: new Date().toISOString()
+    };
+    sessionStorage.setItem('granafy_remember_me', JSON.stringify(session));
+  } catch (e) {
+    console.warn('Não foi possível salvar sessão:', e);
+  }
+}
+
+function clearRememberMeSession() {
+  try {
+    sessionStorage.removeItem('granafy_remember_me');
+  } catch (e) {
+    console.warn('Erro ao limpar sessão:', e);
+  }
+}
+
+function getRememberMeSession() {
+  try {
+    var stored = sessionStorage.getItem('granafy_remember_me');
+    return stored ? JSON.parse(stored) : null;
+  } catch (e) {
+    console.warn('Erro ao recuperar sessão:', e);
+    return null;
+  }
+}
+
 function currentUserId() {
   return authUser && authUser.id ? authUser.id : null;
 }
@@ -288,6 +324,7 @@ function renderAuthScreen() {
         + '<div class="form-group auth-signup-only" style="display:none"><label>Empresa ou razão social</label><input id="auth-company" type="text" autocomplete="organization" placeholder="Obrigatório para PJ/consultor"/></div>'
         + '<div class="form-group"><label>E-mail</label><input id="auth-email" type="email" autocomplete="email" placeholder="voce@email.com"/></div>'
         + '<div class="form-group"><label>Senha</label><input id="auth-password" type="password" autocomplete="current-password" placeholder="Sua senha"/></div>'
+        + '<label class="auth-check" style="margin-bottom:12px"><input id="auth-remember" type="checkbox"/>Manter conectado neste dispositivo</label>'
         + '<label class="auth-check auth-signup-only" style="display:none"><input id="auth-terms" type="checkbox"/>Confirmo que li e aceito os <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'terms\')">termos de uso</a> e a <a href="#" onclick="event.preventDefault();event.stopPropagation();openModal(\'legal\',\'privacy\')">política de privacidade</a>.</label>'
         + '<div id="auth-message" class="auth-message"></div>'
         + '<button class="auth-primary" onclick="loginUsuario()">Entrar</button>'
@@ -603,6 +640,12 @@ async function loginUsuario() {
       return;
     }
 
+    if (authRememberMe()) {
+      saveRememberMeSession(email, password);
+    } else {
+      clearRememberMeSession();
+    }
+
     hideAuthScreen();
     renderAuthUser();
 
@@ -782,6 +825,7 @@ async function logoutUsuario() {
   localStorage.removeItem('fb_activeClient');
   localStorage.removeItem(previousClientKey);
   activeClient = null;
+  clearRememberMeSession();
   if (typeof clearActiveClientView === 'function') clearActiveClientView();
   renderAuthScreen();
   renderAuthUser();
@@ -797,6 +841,28 @@ async function requireAuthSession() {
     hideAuthScreen();
     renderAuthUser();
     return authUser;
+  }
+
+  var rememberMe = getRememberMeSession();
+  if (rememberMe && rememberMe.email && rememberMe.password) {
+    try {
+      var response = await supabaseClient.auth.signInWithPassword({
+        email: rememberMe.email,
+        password: rememberMe.password
+      });
+      if (response.data && response.data.user && !response.error) {
+        authUser = response.data.user;
+        await loadAuthProfileSafe();
+        hideAuthScreen();
+        renderAuthUser();
+        return authUser;
+      } else {
+        clearRememberMeSession();
+      }
+    } catch (e) {
+      console.warn('Erro ao restaurar sessão salva:', e);
+      clearRememberMeSession();
+    }
   }
 
   renderAuthScreen();
